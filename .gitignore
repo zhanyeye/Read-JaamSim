@@ -36,3 +36,5 @@ target/
 
 ### other
 /out
+.idea/libraries/jar.xml
+.idea/modules.xml
