@@ -131,8 +131,13 @@ final class Process extends Thread {
 		}
 	}
 
-	/*
+
+	/**
 	 * Setup the process state for execution.
+	 * 设置线程执行状态，包括 EventManager, 该线程的调用线程，执行目标
+	 * @param evt
+	 * @param next
+	 * @param targ
 	 */
 	private synchronized void setup(EventManager evt, Process next, ProcessTarget targ) {
 		eventManager = evt;
@@ -143,8 +148,12 @@ final class Process extends Thread {
 		condWait = false;
 	}
 
-	// Pull a process from the pool and have it attempt to execute events from the
-	// given eventManager
+
+	/**
+	 * 从线程池拉取一个线程, 尝试执行给定eventManager中的事件
+     * Pull a process from the pool and have it attempt to execute events from the given eventManager
+	 * @param evt
+	 */
 	static void processEvents(EventManager evt) {
 		Process newProcess = Process.getProcess();
 		newProcess.setup(evt, null, null);
@@ -196,6 +205,7 @@ final class Process extends Thread {
 	/**
 	 * This is the wrapper to allow internal code to advance the state machine by waking
 	 * a Process.
+     * 
 	 */
 	final void wake() {
 		super.interrupt();

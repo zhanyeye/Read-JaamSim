@@ -368,6 +368,7 @@ public final class EventManager {
 	}
 
 	/**
+     * 计算系统当前刻度 + 等待刻度， 要考虑数据溢出的情况
 	 * Calculate the time for an event taking into account numeric overflow.
 	 * Must hold the lockObject when calling this method
 	 */
@@ -447,6 +448,7 @@ public final class EventManager {
 	}
 
 	/**
+	 * 查找指定的事件节点，如果没有则按照参数创建一个
 	 * Find an eventNode in the list, if a node is not found, create one and
 	 * insert it.
 	 */
@@ -455,6 +457,11 @@ public final class EventManager {
 	}
 
 	private Event freeEvents = null;
+
+	/**
+	 * 创建一个事件
+	 * @return
+	 */
 	private Event getEvent() {
 		if (freeEvents != null) {
 			Event evt = freeEvents;
@@ -708,17 +715,20 @@ public final class EventManager {
 	}
 
 	/**
-	 *
-	 * @param waitLength
-	 * @param eventPriority
-	 * @param fifo
-	 * @param t
+	 * 将进程目标合成为Event节点, 插入事件队列中
+	 * @param waitLength 等待刻度
+	 * @param eventPriority 事件优先级
+	 * @param fifo 进出队列方式
+	 * @param t 进程目标
 	 * @param handle
 	 */
 	public void scheduleProcessExternal(long waitLength, int eventPriority, boolean fifo, ProcessTarget t, EventHandle handle) {
 		synchronized (lockObject) {
+		    // 调度事件 = 系统当前时刻 + 等待时刻
 			long schedTick = calculateEventTime(waitLength);
+			// 根据时刻和优先级创建一个节点
 			EventNode node = getEventNode(schedTick, eventPriority);
+			// 创建一个Event, 设置Event对应的节点，执行目标t, 等
 			Event evt = getEvent();
 			evt.node = node;
 			evt.target = t;
@@ -729,6 +739,7 @@ public final class EventManager {
 				handle.event = evt;
 			}
 			if (trcListener != null) trcListener.traceSchedProcess(this, currentTick, schedTick, eventPriority, t);
+			// 将事件添加到对应节点，（这个节点已经在队列中）
 			node.addEvent(evt, fifo);
 		}
 	}

@@ -558,7 +558,7 @@ public class Simulation extends Entity {
 	 * @param evt - EventManager for the run.
 	 */
 	public static void startRun(EventManager evt) {
-		// 向调度器中设置初始化进程
+		// 向调度器中设置初始化进程任务
 		evt.scheduleProcessExternal(0, 0, false, new InitModelTarget(), null);
 		evt.resume(evt.secondsToNearestTick(Simulation.getPauseTime()));
 	}
