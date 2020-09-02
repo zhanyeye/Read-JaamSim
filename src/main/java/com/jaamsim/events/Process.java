@@ -39,6 +39,12 @@ final class Process extends Thread {
 	private static int numProcesses = 0; // Total of all created processes to date (used to name new Processes)
 
 	private EventManager eventManager; // The EventManager that is currently managing this Process
+	/**
+	 * This is related to how the startProcess() API is implemented,
+	 * as sub-processes are started, the original process is paused until the subprocess either waits, or exists.
+	 * Upon waiting or exiting, the subprocess notifies whoever started it to continue execution,
+	 * the nextProcess filed is used to hold this reference.
+	 */
 	private Process nextProcess; // The Process from which the present process was created
 	private ProcessTarget target; // The entity whose method is to be executed
 

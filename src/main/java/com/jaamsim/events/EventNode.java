@@ -22,7 +22,13 @@ class EventNode {
 		void runOnNode(EventNode node);
 	}
 
+	/**
+	 * 事件发生时间
+	 */
 	long schedTick; // The tick at which this event will execute
+	/**
+	 * 调度时间的优先级
+	 */
 	int priority;   // The schedule priority of this event
 	Event head;
 	Event tail;

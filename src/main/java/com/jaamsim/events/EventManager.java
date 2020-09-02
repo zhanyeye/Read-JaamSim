@@ -182,6 +182,7 @@ public final class EventManager {
 			// Notify the event manager that the process has been completed
 			if (trcListener != null) trcListener.traceProcessEnd(this, currentTick);
 			if (cur.hasNext()) {
+				// 如果有该线程是其他线程的子线程，则唤醒它的父线程，并释放该线程回线程池
 				cur.wakeNextProcess();
 				// 将线程返回线程池
 				return false;
@@ -255,7 +256,7 @@ public final class EventManager {
 					// the return from execute target informs whether or not this
 					// thread should grab an new Event, or return to the pool
 					if (executeTarget(cur, nextTarget)) {
-						// 继续获取事件执行
+						// 继续获取事件执行, 从队列中取出事件继续执行
 						continue;
 					} else {
 						// 释放线程到线程池
@@ -265,6 +266,9 @@ public final class EventManager {
 
 				// If the next event would require us to advance the time, check the
 				// conditonal events
+				/**
+				 * 如果下一个事件需要推进时间（发生时间大于系统当前时间），检查条件事件
+				 */
 				if (eventTree.getNextNode().schedTick > nextTick) {
 					if (condEvents.size() > 0) {
 						evaluateConditions(cur);
@@ -294,10 +298,11 @@ public final class EventManager {
 				}
 
 				// advance time
-				if (targetTick < nextTick)
+				if (targetTick < nextTick) {
 					currentTick = targetTick;
-				else
+				} else {
 					currentTick = nextTick;
+				}
 
 				timelistener.tickUpdate(currentTick);
 			}

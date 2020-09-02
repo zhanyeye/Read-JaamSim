@@ -38,3 +38,4 @@ target/
 /out
 .idea/libraries/jar.xml
 .idea/modules.xml
+*.log
