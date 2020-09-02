@@ -749,6 +749,7 @@ public class GUIFrame extends JFrame implements EventTimeListener, EventErrorLis
 				JToggleButton startResume = (JToggleButton)event.getSource();
 				startResume.setEnabled(false);
 				if(startResume.isSelected()) {
+					// GUI 启动仿真
 					GUIFrame.this.startSimulation();
 					controlStartResume.setPressedIcon(pausePressedIcon);
 				}
@@ -1210,15 +1211,20 @@ public class GUIFrame extends JFrame implements EventTimeListener, EventErrorLis
 
 	/**
 	 * Starts or resumes the simulation run.
+	 * 启动或恢复进程运行
 	 */
 	public void startSimulation() {
 		if( getSimState() <= SIM_STATE_CONFIGURED ) {
+			// 仿真当前没有运行
 			if (InputAgent.isSessionEdited()) {
+				// 判断是否要保存文件
 				this.saveAs();
 			}
+			// 仿真启动并执行初始化， 基于事件管理器
 			Simulation.start(currentEvt);
 		}
 		else if( getSimState() == SIM_STATE_PAUSED ) {
+			// 仿真当前是暂停状态
 			currentEvt.resume(currentEvt.secondsToNearestTick(Simulation.getPauseTime()));
 		}
 		else

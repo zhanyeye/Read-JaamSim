@@ -514,6 +514,7 @@ public class Simulation extends Entity {
 	 */
 	public static void start(EventManager evt) {
 		// Validate each entity based on inputs only
+		// 验证每一个实体基于它的input
 		for (int i = 0; i < Entity.getAll().size(); i++) {
 			try {
 				Entity.getAll().get(i).validate();
@@ -530,6 +531,7 @@ public class Simulation extends Entity {
 		}
 
 		InputAgent.prepareReportDirectory();
+		// 事件管理清空状态
 		evt.clear();
 		evt.setTraceListener(null);
 
@@ -544,12 +546,14 @@ public class Simulation extends Entity {
 			evt.setTraceListener(trc);
 		}
 
+		// 设置时间刻度长度
 		evt.setTickLength(tickLengthInput.getValue());
 
 		startTime = startTimeInput.getValue();
 		endTime = startTime + Simulation.getInitializationTime() + Simulation.getRunDuration();
 
 		Simulation.setRunNumber(startingRunNumber.getValue());
+		// 该方法会运行一个新线程
 		Simulation.startRun(evt);
 	}
 
@@ -558,8 +562,9 @@ public class Simulation extends Entity {
 	 * @param evt - EventManager for the run.
 	 */
 	public static void startRun(EventManager evt) {
-		// 向调度器中设置初始化进程任务
+		// 将[初始化任务]设置到调度器中
 		evt.scheduleProcessExternal(0, 0, false, new InitModelTarget(), null);
+		// 在指定时间恢复运行
 		evt.resume(evt.secondsToNearestTick(Simulation.getPauseTime()));
 	}
 

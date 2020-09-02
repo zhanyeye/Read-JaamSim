@@ -103,6 +103,7 @@ final class Process extends Thread {
 			// Ensure all state is cleared before returning to the pool
 			evt = null;
 			hasNext = false;
+			// 设置该线程的事件管理器，调用它的线程，和执行目标都为空
 			setup(null, null, null);
 		}
 	}

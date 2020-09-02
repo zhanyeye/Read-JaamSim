@@ -122,6 +122,9 @@ public final class EventManager {
 		}
 	}
 
+	/**
+	 * 清空事件管理器的状态
+	 */
 	public void clear() {
 		synchronized (lockObject) {
 			currentTick = 0;
@@ -168,6 +171,8 @@ public final class EventManager {
 				p.setNextProcess(cur);
 				p.wake();
 				threadWait(cur);
+
+				// 通知 execute() 继续获取事件执行
 				return true;
 			}
 
@@ -178,9 +183,11 @@ public final class EventManager {
 			if (trcListener != null) trcListener.traceProcessEnd(this, currentTick);
 			if (cur.hasNext()) {
 				cur.wakeNextProcess();
+				// 将线程返回线程池
 				return false;
 			}
 			else {
+				// 通知 execute() 继续获取事件执行
 				return true;
 			}
 		}
@@ -223,8 +230,8 @@ public final class EventManager {
 			// Loop continuously
 			while (true) {
 				EventNode nextNode = eventTree.getNextNode();
-				if (nextNode == null ||
-				    currentTick >= targetTick) {
+				if (nextNode == null || currentTick >= targetTick) {
+					// 如果优先队列为空，或事件发生时间已经过期，则结束循环
 					executeEvents = false;
 				}
 
@@ -239,16 +246,21 @@ public final class EventManager {
 					// Remove the event from the future events
 					Event nextEvent = nextNode.head;
 					ProcessTarget nextTarget = nextEvent.target;
-					if (trcListener != null) trcListener.traceEvent(this, currentTick, nextNode.schedTick, nextNode.priority, nextTarget);
+					if (trcListener != null) {
+						trcListener.traceEvent(this, currentTick, nextNode.schedTick, nextNode.priority, nextTarget);
+					}
 
 					removeEvent(nextEvent);
 
 					// the return from execute target informs whether or not this
 					// thread should grab an new Event, or return to the pool
-					if (executeTarget(cur, nextTarget))
+					if (executeTarget(cur, nextTarget)) {
+						// 继续获取事件执行
 						continue;
-					else
+					} else {
+						// 释放线程到线程池
 						return;
+					}
 				}
 
 				// If the next event would require us to advance the time, check the
@@ -818,6 +830,7 @@ public final class EventManager {
 				return;
 
 			executeEvents = true;
+			// 从线程池中拉取一个线程，指定事件管理器，唤醒该线程
 			Process.processEvents(this);
 		}
 	}
