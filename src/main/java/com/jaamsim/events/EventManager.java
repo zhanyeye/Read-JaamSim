@@ -177,6 +177,7 @@ public final class EventManager {
 			}
 
 			// Execute the method
+			// 执行进程目标的任务
 			t.process();
 
 			// Notify the event manager that the process has been completed

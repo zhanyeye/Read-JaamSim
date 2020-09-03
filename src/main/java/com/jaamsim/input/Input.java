@@ -44,6 +44,7 @@ import com.jaamsim.units.Unit;
 import com.jaamsim.units.UserSpecifiedUnit;
 
 public abstract class Input<T> {
+	// 各种异常提示
 	protected static final String INP_ERR_COUNT = "Expected an input with %s value(s), received: %s";
 	protected static final String INP_ERR_RANGECOUNT = "Expected an input with %d to %d values, received: %s";
 	protected static final String INP_ERR_RANGECOUNTMIN = "Expected an input with at least %d values, received: %s";
@@ -78,20 +79,51 @@ public abstract class Input<T> {
 	public static final String NEGATIVE_INFINITY = "-Infinity";
 	protected static final String SEPARATOR = "  ";
 
-	private String keyword; // the preferred name for the input keyword
+	/**
+	 * the preferred name for the input keyword
+	 */
+	private String keyword;
+
 	private final String category;
 
 	protected T defValue;
+
 	protected T value;
+	/**
+	 * indicates if input has been edited for this entity
+	 */
+	private boolean edited;
+	/**
+	 * indicates whether to prompt the user to save the configuration file
+	 */
+	private boolean promptReqd;
+	/**
+	 * Hide this input from the EditBox
+	 */
+	private boolean hidden;
+	/**
+	 * Is this input still the default value?
+	 */
+	private boolean isDef;
+	/**
+	 * value from .cfg file
+	 */
+	private String[] valueTokens;
+	/**
+	 * special text to show in the default column of the Input Editor
+	 */
+	private String defText;
+	/**
+	 * indicates whether this input must be provided by the user
+	 */
+	private boolean isReqd;
 
-	private boolean edited; // indicates if input has been edited for this entity
-	private boolean promptReqd; // indicates whether to prompt the user to save the configuration file
-	private boolean hidden; // Hide this input from the EditBox
-	private boolean isDef; // Is this input still the default value?
-	private String[] valueTokens; // value from .cfg file
-	private String defText; // special text to show in the default column of the Input Editor
-	private boolean isReqd;     // indicates whether this input must be provided by the user
-
+	/**
+	 * 初始化一个Input
+	 * @param key 关键字
+	 * @param cat 分类
+	 * @param def 默认值
+	 */
 	public Input(String key, String cat, T def) {
 		keyword = key;
 		category = cat;
@@ -114,8 +146,7 @@ public abstract class Input<T> {
 	}
 
 	/**
-	 * Assigns the internal state for this input to the same values as the
-	 * specified input.
+	 * Assigns the internal state for this input to the same values as the specified input.
 	 * @param in - input object to be copied.
 	 */
 	public void copyFrom(Input<?> in) {

@@ -30,6 +30,7 @@ import com.jaamsim.units.TimeUnit;
 
 /**
  * EntityGenerator creates sequence of DisplayEntities at random intervals, which are placed in a target Queue.
+ * EntityGenerator以随机间隔创建DisplayEntities序列，这些序列放置在目标队列中
  */
 public class EntityGenerator extends LinkedService {
 
@@ -57,7 +58,10 @@ public class EntityGenerator extends LinkedService {
 	         exampleList = {"3"})
 	private final IntegerInput maxNumber;
 
-	private int numberGenerated = 0;  // Number of entities generated so far
+	/**
+	 * Number of entities generated so far
+	 */
+	private int numberGenerated = 0;
 
 	{
 		testEntity.setHidden(true);

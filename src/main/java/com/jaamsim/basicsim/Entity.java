@@ -50,11 +50,15 @@ import com.jaamsim.units.UserSpecifiedUnit;
  * event execution.
  */
 public class Entity {
+
 	private static AtomicLong entityCount = new AtomicLong(0);
+
 	private static final ArrayList<Entity> allInstances;
+
 	private static final HashMap<String, Entity> namedEntities;
 
 	private String entityName;
+
 	private final long entityNumber;
 
 	//public static final int FLAG_TRACE = 0x01; // reserved in case we want to treat tracing like the other flags
@@ -66,7 +70,9 @@ public class Entity {
 	public static final int FLAG_EDITED = 0x40;
 	public static final int FLAG_GENERATED = 0x80;
 	public static final int FLAG_DEAD = 0x0100;
+
 	private int flags;
+
 	protected boolean traceFlag = false;
 
 	private final ArrayList<Input<?>> inpList = new ArrayList<>();
