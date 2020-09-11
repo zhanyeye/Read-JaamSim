@@ -41,6 +41,7 @@ public class InitModelTarget extends ProcessTarget {
 		}
 
 		// Start each entity
+        // 将 每个实体的StartUpTarget事件添加到事件管理器的队列当中
 		double startTime = Simulation.getStartTime();
 		for (int i = Entity.getAll().size() - 1; i >= 0; i--) {
 			EventManager.scheduleSeconds(startTime, 0, false, new StartUpTarget(Entity.getAll().get(i)), null);
@@ -54,6 +55,7 @@ public class InitModelTarget extends ProcessTarget {
 
 		// Schedule the end of the simulation run
 		double endTime = Simulation.getEndTime();
+		// 将结束仿真的模型的执行目标加入事件管理器的事件队列
 		EventManager.scheduleSeconds(endTime, 5, false, new EndModelTarget(), null);
 
 		// Start checking the pause condition

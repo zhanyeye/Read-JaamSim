@@ -793,6 +793,15 @@ public final class EventManager {
 		cur.evt().scheduleTicks(cur, ticks, eventPriority, fifo, t, handle);
 	}
 
+	/**
+	 *
+	 * @param cur 执行的线程
+	 * @param waitLength 等待多久tick后发生
+	 * @param eventPriority 事件优先级
+	 * @param fifo
+	 * @param t 执行目标
+	 * @param handle
+	 */
 	private void scheduleTicks(Process cur, long waitLength, int eventPriority, boolean fifo, ProcessTarget t, EventHandle handle) {
 		cur.checkCondWait();
 		long schedTick = calculateEventTime(waitLength);

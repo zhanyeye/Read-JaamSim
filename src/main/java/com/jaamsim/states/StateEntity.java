@@ -90,10 +90,14 @@ public class StateEntity extends DisplayEntity {
 		super.lateInit();
 
 		stateListeners.clear();
+		/**
+		 * 过滤实现了StateEntityListener接口的Entity类
+		 */
 		for (Entity ent : Entity.getClonesOfIterator(Entity.class, StateEntityListener.class)) {
 			StateEntityListener sel = (StateEntityListener)ent;
-			if (sel.isWatching(this))
+			if (sel.isWatching(this)) {
 				stateListeners.add(sel);
+			}
 		}
 	}
 

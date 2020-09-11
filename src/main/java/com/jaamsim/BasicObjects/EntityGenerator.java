@@ -161,6 +161,7 @@ public class EntityGenerator extends LinkedService {
 			ent.earlyInit();
 
 			// Send the entity to the next element in the chain
+			// 将entity 传送给下一个链中的实体
 			this.sendToNextComponent(ent);
 		}
 
