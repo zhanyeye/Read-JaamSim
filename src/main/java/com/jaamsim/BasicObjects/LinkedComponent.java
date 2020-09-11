@@ -35,25 +35,50 @@ import com.jaamsim.units.TimeUnit;
  */
 public abstract class LinkedComponent extends StateEntity {
 
+	/**
+	 * 该对象用于接收实体原型
+	 */
 	@Keyword(description = "The prototype for entities that will be received by this object.\n" +
 			"This input must be set if the expression 'this.obj' is used in the input to any keywords.",
 	         exampleList = {"Proto"})
 	protected final EntityInput<DisplayEntity> testEntity;
 
+	/**
+	 * 已处理的 DisplayEntity 将被传递到的下一个对象
+	 */
 	@Keyword(description = "The next object to which the processed DisplayEntity is passed.",
 			exampleList = {"Queue1"})
 	protected final EntityInput<LinkedComponent> nextComponent;
 
+	/**
+	 * 到达此对象时分配给每个实体的状态
+	 */
 	@Keyword(description = "The state to be assigned to each entity on arrival at this object.\n" +
 			"No state is assigned if the entry is blank.",
 	         exampleList = {"Service"})
 	protected final StringInput stateAssignment;
 
-	private long numberAdded;     // Number of entities added to this component from upstream after initialisation
-	private long numberProcessed; // Number of entities processed by this component after initialisation
-	private long initialNumberAdded;     // Number of entities added to this component from upstream during initialisation
-	private long initialNumberProcessed; // Number of entities processed by this component during initialisation
-	private DisplayEntity receivedEntity; // Entity most recently received by this component
+	/**
+	 * Number of entities added to this component from upstream after initialisation
+	 */
+	private long numberAdded;
+	/**
+	 * Number of entities processed by this component after initialisation
+	 */
+	private long numberProcessed;
+	/**
+	 * Number of entities added to this component from upstream during initialisation
+	 */
+	private long initialNumberAdded;
+	/**
+	 * Number of entities processed by this component during initialisation
+	 */
+	private long initialNumberProcessed;
+	/**
+	 * Entity most recently received by this component
+	 */
+	private DisplayEntity receivedEntity;
+
 	private double releaseTime = Double.NaN;
 
 	{

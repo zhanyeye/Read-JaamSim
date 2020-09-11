@@ -28,12 +28,18 @@ import com.jaamsim.units.TimeUnit;
  */
 public class Server extends LinkedService {
 
+	/**
+	 * 处理一个实体所需要的服务时间
+	 */
 	@Keyword(description = "The service time required to process an entity.\n" +
 			"A constant value, a distribution to be sampled, or a time series can be entered.",
 	         exampleList = { "3.0 h", "NormalDistribution1", "'1[s] + 0.5*[TimeSeries1].PresentValue'" })
 	private final SampleExpInput serviceTime;
 
-	private DisplayEntity servedEntity;	// the DisplayEntity being server
+	/**
+	 * the DisplayEntity being server
+	 */
+	private DisplayEntity servedEntity;
 
 	{
 		serviceTime = new SampleExpInput("ServiceTime", "Key Inputs", new SampleConstant(TimeUnit.class, 0.0));

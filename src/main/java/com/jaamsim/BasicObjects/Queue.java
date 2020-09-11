@@ -42,12 +42,19 @@ import com.jaamsim.units.TimeUnit;
 
 public class Queue extends LinkedComponent {
 
+	/**
+	 * Priority 的值越小，优先级越大
+	 */
 	@Keyword(description = "The priority for positioning the received entity in the queue.\n" +
 			"Priority is integer valued and a lower numerical value indicates a higher priority.\n" +
 			"For example, priority 3 is higher than 4, and priorities 3, 3.2, and 3.8 are equivalent.",
 	         exampleList = {"this.obj.Attrib1"})
 	private final SampleExpInput priority;
 
+	/**
+	 * 该表达式返回一个无量纲的整数，该值可以用于匹配队列中的实体
+	 * 实体首次到达时对表达式进行求值
+	 */
 	@Keyword(description = "An expression that returns a dimensionless integer value that can be used to "
 			+ "match entities in separate queues. The expression is evaluated when the entity "
 			+ "first arrives at the queue. Since Match is integer valued, a value of 3.2 for one "
@@ -55,6 +62,9 @@ public class Queue extends LinkedComponent {
 	         exampleList = {"this.obj.Attrib1"})
 	private final SampleExpInput match;
 
+	/**
+	 * 决定实体进入队列的顺序
+	 */
 	@Keyword(description = "Determines the order in which entities are placed in the queue (FIFO or LIFO):\n" +
 			"TRUE = first in first out (FIFO) order (the default setting)," +
 			"FALSE = last in first out (LIFO) order.",
@@ -65,17 +75,33 @@ public class Queue extends LinkedComponent {
 	         exampleList = {"1 m"})
 	private final ValueInput spacing;
 
+	/**
+	 * maximum items per sub line-up of queue
+	 */
 	@Keyword(description = "The number of queuing entities in each row.",
 			exampleList = {"4"})
-	protected final IntegerInput maxPerLine; // maximum items per sub line-up of queue
+	protected final IntegerInput maxPerLine;
 
-	private final TreeSet<QueueEntry> itemSet;  // contains all the entities in queue order
-	private final HashMap<Integer, TreeSet<QueueEntry>> matchMap; // each TreeSet contains the queued entities for a given match value
-
-	private Integer matchForMaxCount;  // match value with the largest number of entities
-	private int maxCount;     // largest number of entities for a given match value
-
-	private final ArrayList<QueueUser> userList;  // other objects that use this queue
+	/**
+	 * contains all the entities in queue order
+	 */
+	private final TreeSet<QueueEntry> itemSet;
+	/**
+	 * each TreeSet contains the queued entities for a given match value
+	 */
+	private final HashMap<Integer, TreeSet<QueueEntry>> matchMap;
+	/**
+	 * match value with the largest number of entities
+	 */
+	private Integer matchForMaxCount;
+	/**
+	 * largest number of entities for a given match value
+	 */
+	private int maxCount;
+	/**
+	 * other objects that use this queue
+	 */
+	private final ArrayList<QueueUser> userList;
 
 	//	Statistics
 	protected double timeOfLastUpdate; // time at which the statistics were last updated
@@ -142,6 +168,7 @@ public class Queue extends LinkedComponent {
 		queueLengthDist.clear();
 
 		// Identify the objects that use this queue
+		// 扫描所有实体，将使用该队列的实体加入到 userList
 		userList.clear();
 		for (Entity each : Entity.getAll()) {
 			if (each instanceof QueueUser) {

@@ -33,6 +33,9 @@ import com.jaamsim.units.TimeUnit;
  */
 public class EntityConveyor extends LinkedService {
 
+	/**
+	 * 输送机的行程时间
+	 */
 	@Keyword(description = "The travel time for the conveyor.",
 	         exampleList = {"10.0 s"})
 	private final ValueInput travelTimeInput;
@@ -45,11 +48,26 @@ public class EntityConveyor extends LinkedService {
 	         exampleList = {"red"})
 	private final ColourInput colorInput;
 
-	private final ArrayList<DisplayEntity> entityList;  // List of the entities being conveyed
-	private final ArrayList<Double> startTimeList;  // List of times at which the entities entered the conveyor
-	private double totalLength;  // Graphical length of the conveyor
-	private final ArrayList<Double> lengthList;  // Length of each segment of the conveyor
-	private final ArrayList<Double> cumLengthList;  // Total length to the end of each segment
+	/**
+	 * List of the entities being conveyed
+	 */
+	private final ArrayList<DisplayEntity> entityList;
+	/**
+	 * List of times at which the entities entered the conveyor
+	 */
+	private final ArrayList<Double> startTimeList;
+	/**
+	 * Graphical length of the conveyor
+	 */
+	private double totalLength;
+	/**
+	 * Length of each segment of the conveyor
+	 */
+	private final ArrayList<Double> lengthList;
+	/**
+	 * Total length to the end of each segment
+	 */
+	private final ArrayList<Double> cumLengthList;
 
 	{
 		operatingThresholdList.setHidden(true);
