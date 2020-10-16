@@ -16,6 +16,9 @@
  */
 package com.jaamsim.events;
 
+/**
+ * 一个实现事件优先队列的红黑树节点
+ */
 class EventNode {
 
 	interface Runner {
@@ -23,18 +26,40 @@ class EventNode {
 	}
 
 	/**
-	 * 事件发生时间
+	 * The tick at which this event will execute
+	 * 事件发生的时刻
 	 */
-	long schedTick; // The tick at which this event will execute
+	long schedTick;
+
 	/**
-	 * 调度时间的优先级
+	 * The schedule priority of this event
+	 * 调度事件的优先级
 	 */
-	int priority;   // The schedule priority of this event
+	int priority;
+
+	/**
+	 * ？？？
+	 */
 	Event head;
+
+	/**
+	 * ？？？
+	 */
 	Event tail;
 
+	/**
+	 * 该节点的颜色
+	 */
 	boolean red;
+
+	/**
+	 * 左子节点
+	 */
 	EventNode left;
+
+	/**
+	 * 右子节点
+	 */
 	EventNode right;
 
 	EventNode(long tick, int prio) {
@@ -44,6 +69,11 @@ class EventNode {
 		right = nilNode;
 	}
 
+	/**
+	 *
+	 * @param e 被添加的事件
+	 * @param fifo 队列
+	 */
 	final void addEvent(Event e, boolean fifo) {
 		if (head == null) {
 			head = e;
@@ -56,19 +86,23 @@ class EventNode {
 			tail.next = e;
 			tail = e;
 			e.next = null;
-		}
-		else {
+		} else {
 			e.next = head;
 			head = e;
 		}
 	}
 
+	/**
+	 * 从红黑树中移除事件
+	 * @param evt
+	 */
 	final void removeEvent(Event evt) {
 		// quick case where we are the head event
 		if (this.head == evt) {
 			this.head = evt.next;
-			if (evt.next == null)
+			if (evt.next == null) {
 				this.tail = null;
+			}
 		}
 		else {
 			Event prev = this.head;
@@ -77,15 +111,27 @@ class EventNode {
 			}
 
 			prev.next = evt.next;
-			if (evt.next == null)
+			if (evt.next == null) {
 				this.tail = prev;
+			}
 		}
 	}
 
+	/**
+	 * 和其他的EventNode 比较大小
+	 * @param other
+	 * @return
+	 */
 	final int compareToNode(EventNode other) {
 		return compare(other.schedTick, other.priority);
 	}
 
+	/**
+	 * 根据事件发生的时间刻度和事件优先级比较大小
+	 * @param schedTick 时间发生的时间刻度
+	 * @param priority
+	 * @return -1 表示小于； 1 表示大于； 0表示等于
+	 */
 	final int compare(long schedTick, int priority) {
 		if (this.schedTick < schedTick) return -1;
 		if (this.schedTick > schedTick) return  1;
@@ -96,12 +142,14 @@ class EventNode {
 		return 0;
 	}
 
+
 	final void rotateRight(EventNode parent) {
 		if (parent != null) {
-			if (parent.left == this)
+			if (parent.left == this) {
 				parent.left = left;
-			else
+			} else {
 				parent.right = left;
+			}
 		}
 
 		EventNode oldMid = left.right;
@@ -109,12 +157,15 @@ class EventNode {
 
 		this.left = oldMid;
 	}
+
+
 	final void rotateLeft(EventNode parent) {
 		if (parent != null) {
-			if (parent.left == this)
+			if (parent.left == this) {
 				parent.left = right;
-			else
+			} else {
 				parent.right = right;
+			}
 		}
 
 		EventNode oldMid = right.left;
@@ -122,6 +173,7 @@ class EventNode {
 
 		this.right = oldMid;
 	}
+
 
 	final void cloneFrom(EventNode source) {
 		this.head = source.head;
@@ -135,6 +187,9 @@ class EventNode {
 		}
 	}
 
+	/**
+	 * 红黑树的空节点
+	 */
 	static final EventNode nilNode;
 
 	static {
