@@ -27,7 +27,13 @@ import java.util.Arrays;
  */
 class EventTree {
 
+	/**
+	 * 根节点
+	 */
 	private EventNode root = EventNode.nilNode;
+	/**
+	 * 最小值节点
+	 */
 	private EventNode lowest = null;
 
 	///////////////////////////////////////////
@@ -39,19 +45,24 @@ class EventTree {
 	private void pushScratch(EventNode n) {
 		scratch[scratchPos++] = n;
 	}
+
 	private void dropScratch(int n) {
 		scratchPos = Math.max(0, scratchPos - n);
 	}
+
 	// Get the 'nth' node from the end of the scratch (1 being the first)
 	private EventNode getScratch(int n) {
 		return (scratchPos >= n) ? scratch[scratchPos - n] : null;
 	}
+
 	private void resetScratch() {
 		scratchPos = 0;
 	}
 
 	EventNode getNextNode() {
-		if (lowest == null) updateLowest();
+		if (lowest == null) {
+			updateLowest();
+		}
 		return lowest;
 	}
 
@@ -69,8 +80,9 @@ class EventTree {
 			return;
 		}
 		EventNode current = root;
-		while (current.left != EventNode.nilNode)
+		while (current.left != EventNode.nilNode) {
 			current = current.left;
+		}
 
 		lowest = current;
 	}
@@ -218,14 +230,16 @@ class EventTree {
 
 		// Drop the node
 		if (parent != null) {
-			if (parent.left == current)
+			if (parent.left == current) {
 				parent.left = child;
-			else
+			} else {
 				parent.right = child;
+			}
 		}
 
-		if (current == root)
+		if (current == root) {
 			root = child;
+		}
 
 		boolean currentIsRed = current.red;
 

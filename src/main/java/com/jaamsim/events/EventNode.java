@@ -17,7 +17,8 @@
 package com.jaamsim.events;
 
 /**
- * 一个实现事件优先队列的红黑树节点
+ * 一个实现事件优先队列的红黑树节点, 同时又维护了一个事件链表的表头和表尾
+ * 它是一个红黑树和链表的结合，当被插入事件发生的时间相同时，则插入对应的链表中
  */
 class EventNode {
 
@@ -38,12 +39,12 @@ class EventNode {
 	int priority;
 
 	/**
-	 * ？？？
+	 * 链表表头
 	 */
 	Event head;
 
 	/**
-	 * ？？？
+	 * 链表表尾
 	 */
 	Event tail;
 
@@ -70,12 +71,13 @@ class EventNode {
 	}
 
 	/**
-	 *
+	 * 向该节点的事件链表种添加一个元素
 	 * @param e 被添加的事件
-	 * @param fifo 队列
+	 * @param fifo 元素插入的方式
 	 */
 	final void addEvent(Event e, boolean fifo) {
 		if (head == null) {
+			// 若链表为空
 			head = e;
 			tail = e;
 			e.next = null;
@@ -83,18 +85,20 @@ class EventNode {
 		}
 
 		if (fifo) {
+			// 尾插法
 			tail.next = e;
-			tail = e;
+			tail = tail.next;
 			e.next = null;
 		} else {
+			// 头插发
 			e.next = head;
 			head = e;
 		}
 	}
 
 	/**
-	 * 从红黑树中移除事件
-	 * @param evt
+	 * 从节点链表中移除事件
+	 * @param evt 被移除的事件
 	 */
 	final void removeEvent(Event evt) {
 		// quick case where we are the head event
@@ -142,7 +146,10 @@ class EventNode {
 		return 0;
 	}
 
-
+	/**
+	 * 红黑树右旋
+	 * @param parent
+	 */
 	final void rotateRight(EventNode parent) {
 		if (parent != null) {
 			if (parent.left == this) {
@@ -159,6 +166,10 @@ class EventNode {
 	}
 
 
+	/**
+	 * 红黑树左旋
+	 * @param parent
+	 */
 	final void rotateLeft(EventNode parent) {
 		if (parent != null) {
 			if (parent.left == this) {
@@ -175,6 +186,10 @@ class EventNode {
 	}
 
 
+	/**
+	 * 克隆一个指定节点
+	 * @param source 被克隆的节点
+	 */
 	final void cloneFrom(EventNode source) {
 		this.head = source.head;
 		this.tail = source.tail;
