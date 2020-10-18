@@ -40,7 +40,7 @@ class EventTree {
 
 	/**
 	 * Scratch space, used instead of having parent pointers
-	 * 暂存空间，用来代替父指针
+	 * 暂存空间，用来暂存父指针
 	 */
 	private EventNode[] scratch = new EventNode[64];
 	private int scratchPos = 0;
@@ -104,7 +104,7 @@ class EventTree {
 
 	/**
 	 * 更新红黑树的最小值节点，被 getNextNode() 调用
-	 * 即遍历找到红黑树中最后一个节点
+	 * 即遍历找到红黑树中最小节点
 	 */
 	private void updateLowest() {
 		if (root == EventNode.nilNode) {
@@ -516,6 +516,14 @@ class EventTree {
 		freeList = null;
 	}
 
+
+
+	// ******************
+	// 测试验证红黑树相关代码
+	// ******************
+
+
+	
 	// Verify the sorting structure and return the number of nodes
 	final int verify() {
 		if (root == EventNode.nilNode) {
@@ -526,12 +534,6 @@ class EventTree {
 			throw new RuntimeException("nil node corrupted, turned red");
 		return verifyNode(root);
 	}
-
-
-
-	// ******************
-	// 测试验证红黑树相关代码
-	// ******************
 
 	private int verifyNode(EventNode n) {
 		int lBlacks = 0;
