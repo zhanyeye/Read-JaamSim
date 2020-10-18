@@ -83,7 +83,7 @@ class EventTree {
 	}
 
 	/**
-	 * 更新红黑树的最小值节点
+	 * 更新红黑树的最小值节点，被 getNextNode() 调用
 	 * 即遍历找到红黑树中最后一个节点
 	 */
 	private void updateLowest() {
@@ -107,6 +107,7 @@ class EventTree {
 	 */
 	final EventNode createOrFindNode(long schedTick, int priority) {
 
+		// 若红黑树为空，则新建一个节点作为根节点
 		if (root == EventNode.nilNode) {
 			root = getNewNode(schedTick, priority);
 			lowest = root;
@@ -117,13 +118,16 @@ class EventTree {
 		EventNode n = root;
 		EventNode newNode = null;
 
+		// 遍历整颗树，去寻找目标节点，
 		while (true) {
 			int comp = n.compare(schedTick, priority);
 			if (comp == 0) {
-				return n; // Found existing node
+				// Found existing node
+				return n;
 			}
 			EventNode next = comp > 0 ? n.left : n.right;
 			if (next != EventNode.nilNode) {
+				// 若节点n的next不为空，将n保存到Scratch中， n指向next,继续遍历
 				pushScratch(n);
 				n = next;
 				continue;
@@ -133,29 +137,38 @@ class EventTree {
 			newNode = getNewNode(schedTick, priority);
 			pushScratch(n);
 			newNode.red = true;
-			if (comp > 0)
+			if (comp > 0) {
 				n.left = newNode;
-			else
+			} else {
 				n.right = newNode;
+			}
 			break;
 		}
 
+		// 针对新节点平衡红黑树
 		insertBalance(newNode);
 		root.red = false;
 
 		if (lowest != null && newNode.compareToNode(lowest) < 0) {
+			// 更新红黑树的最小节点
 			lowest = newNode;
 		}
 		return newNode;
 
 	}
 
+	/**
+	 * 针对新插入的节点平衡红黑树
+	 * @param n
+	 */
 	private void insertBalance(EventNode n) {
 		// See the wikipedia page for red-black trees to understand the case numbers
 
+		// 获取该节点的父节点
 		EventNode parent = getScratch(1);
 		if (parent == null || !parent.red) return; // cases 1 and 2
 
+		// 获取祖父节点
 		EventNode gp = getScratch(2);
 		if (gp == null) return;
 
@@ -201,6 +214,13 @@ class EventTree {
 
 	}
 
+
+	/**
+	 * 删除红黑树的指定节点
+	 * @param schedTick
+	 * @param priority
+	 * @return
+	 */
 	final boolean removeNode(long schedTick, int priority) {
 		// First find the node to remove
 		resetScratch();
