@@ -55,10 +55,15 @@ class EventTree {
 		return (scratchPos >= n) ? scratch[scratchPos - n] : null;
 	}
 
+
 	private void resetScratch() {
 		scratchPos = 0;
 	}
 
+	/**
+	 * 返回红黑树中最小值节点
+	 * @return
+	 */
 	EventNode getNextNode() {
 		if (lowest == null) {
 			updateLowest();
@@ -66,6 +71,9 @@ class EventTree {
 		return lowest;
 	}
 
+	/**
+	 * 重置红黑树
+	 */
 	final void reset() {
 		root = EventNode.nilNode;
 		lowest = null;
@@ -74,6 +82,10 @@ class EventTree {
 		Arrays.fill(scratch, null);
 	}
 
+	/**
+	 * 更新红黑树的最小值节点
+	 * 即遍历找到红黑树中最后一个节点
+	 */
 	private void updateLowest() {
 		if (root == EventNode.nilNode) {
 			lowest = null;
@@ -87,6 +99,12 @@ class EventTree {
 		lowest = current;
 	}
 
+	/**
+	 * 根据调度刻度和优先级去查询或创建节点
+	 * @param schedTick
+	 * @param priority
+	 * @return
+	 */
 	final EventNode createOrFindNode(long schedTick, int priority) {
 
 		if (root == EventNode.nilNode) {
@@ -424,31 +442,51 @@ class EventTree {
 		if (root == EventNode.nilNode) return 0;
 		return countNodes(root);
 	}
+
+	/**
+	 * 递归的统计节点n的子节点数，（包括自己）
+	 * @param n
+	 * @return
+	 */
 	private int countNodes(EventNode n) {
 		int count = 1;
-		if (n.left != EventNode.nilNode)
+		if (n.left != EventNode.nilNode) {
 			count += countNodes(n.left);
-		if (n.right != EventNode.nilNode)
+		}
+		if (n.right != EventNode.nilNode) {
 			count += countNodes(n.right);
+		}
 
 		return count;
 	}
 
+	/**
+	 * 可复用空闲节点链表，是一个只用到节点左子树的链表结构
+	 */
 	private EventNode freeList = null;
 
+	/**
+	 * 根据调度刻度和事件优先级创建一个新节点
+	 * 在创建是考虑复用空闲节点
+	 * @param schedTick
+	 * @param priority
+	 * @return
+	 */
 	private EventNode getNewNode(long schedTick, int priority) {
+		// 是否有可复用的空闲节点
 		if (freeList == null) {
 			return new EventNode(schedTick, priority);
 		}
 
+		// 复用空闲节点的头节点
 		EventNode ret = freeList;
+		// 重置空闲节点为头节点的下一个节点
 		freeList = freeList.left;
 
 		ret.schedTick = schedTick;
 		ret.priority = priority;
 		ret.head = null;
 		ret.tail = null;
-
 		ret.left = EventNode.nilNode;
 		ret.right = EventNode.nilNode;
 		ret.red = false;
@@ -456,6 +494,10 @@ class EventTree {
 		return ret;
 	}
 
+	/**
+	 * 回收空闲的节点，
+	 * @param node
+	 */
 	private void reuseNode(EventNode node) {
 		// Clear the node
 		node.left = null;
@@ -467,6 +509,9 @@ class EventTree {
 		freeList = node;
 	}
 
+	/**
+	 * 清空空闲节点
+	 */
 	private void clearFreeList() {
 		freeList = null;
 	}
