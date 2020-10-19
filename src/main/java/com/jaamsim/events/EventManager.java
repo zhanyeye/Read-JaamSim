@@ -22,6 +22,7 @@ import java.util.ArrayList;
  * The EventManager is responsible for scheduling future events, controlling
  * conditional event evaluation, and advancing the simulation time. Events are
  * scheduled in based on:
+ * EventManager负责调度未来事件、控制条件事件计算和推进仿真时间。事件调度基于以下规则:
  * <ul>
  * <li>1 - The execution time scheduled for the event
  * <li>2 - The priority of the event (if scheduled to occur at the same time)
@@ -35,33 +36,80 @@ import java.util.ArrayList;
  * Most EventManager functionality is available through static methods that rely
  * on being in a running model context which will access the eventmanager that is
  * currently running, think of it like a thread-local variable for all model threads.
+ * 大多数EventManager功能都是通过静态方法提供的，这些静态方法依赖于运行中的模型上下文来访问当前运行的EventManager，
+ * 可以把它看作是所有模型线程的一个线程局部变量。
  */
 public final class EventManager {
 	public final String name;
 
-	private final Object lockObject; // Object used as global lock for synchronization
+	/**
+	 * Object used as global lock for synchronization
+	 */
+	private final Object lockObject;
 
+	/**
+	 * 事件的优先队列
+	 */
 	private final EventTree eventTree;
 
+	/**
+	 *
+	 */
 	private volatile boolean executeEvents;
+
+	/**
+	 *
+	 */
 	private boolean processRunning;
 
 	private final ArrayList<ConditionalEvent> condEvents;
 
-	private long currentTick; // Master simulation time (long)
-	private long nextTick; // The next tick to execute events at
-	private long targetTick; // the largest time we will execute events for (run to time)
-
-	private double ticksPerSecond; // The number of discrete ticks per simulated second
-	private double secsPerTick;    // The length of time in seconds each tick represents
+	/**
+	 * Master simulation time (long)
+	 */
+	private long currentTick;
+	/**
+	 * The next tick to execute events at
+	 */
+	private long nextTick;
+	/**
+	 * the largest time we will execute events for (run to time)
+	 */
+	private long targetTick;
+	/**
+	 * The number of discrete ticks per simulated second
+	 * 每秒的仿真执行刻度数
+	 */
+	private double ticksPerSecond;
+	/**
+	 * The length of time in seconds each tick represents
+	 * 每一个仿真刻度所需要的秒数
+	 */
+	private double secsPerTick;
 
 	// Real time execution state
-	private long realTimeTick;    // the simulation tick corresponding to the wall-clock millis value
-	private long realTimeMillis;  // the wall-clock time in millis
 
-	private volatile boolean executeRealTime;  // TRUE if the simulation is to be executed in Real Time mode
-	private volatile boolean rebaseRealTime;   // TRUE if the time keeping for Real Time model needs re-basing
-	private volatile int realTimeFactor;       // target ratio of elapsed simulation time to elapsed wall clock time
+	/**
+	 * the simulation tick corresponding to the wall-clock millis value
+	 */
+	private long realTimeTick;
+	/**
+	 * the wall-clock time in millis
+	 */
+	private long realTimeMillis;
+
+	/**
+	 * TRUE if the simulation is to be executed in Real Time mode
+	 */
+	private volatile boolean executeRealTime;
+	/**
+	 * TRUE if the time keeping for Real Time model needs re-basing
+	 */
+	private volatile boolean rebaseRealTime;
+	/**
+	 * target ratio of elapsed simulation time to elapsed wall clock time
+	 */
+	private volatile int realTimeFactor;
 
 	private EventTimeListener timelistener;
 	private EventErrorListener errListener;
@@ -892,6 +940,10 @@ public final class EventManager {
 		return currentTick * secsPerTick;
 	}
 
+	/**
+	 * 设置 tick 花费时间，
+	 * @param tickLength
+	 */
 	public final void setTickLength(double tickLength) {
 		secsPerTick = tickLength;
 		ticksPerSecond = Math.round(1e9d / secsPerTick) / 1e9d;
