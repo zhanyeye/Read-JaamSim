@@ -44,6 +44,7 @@ public final class EventManager {
 
 	/**
 	 * Object used as global lock for synchronization
+     * 全局同步锁
 	 */
 	private final Object lockObject;
 
@@ -62,6 +63,9 @@ public final class EventManager {
 	 */
 	private boolean processRunning;
 
+	/**
+	 *
+	 */
 	private final ArrayList<ConditionalEvent> condEvents;
 
 	/**
@@ -111,8 +115,17 @@ public final class EventManager {
 	 */
 	private volatile int realTimeFactor;
 
+	/**
+	 * 时间监听器，用于向gui更新仿真时间和仿真转态
+	 */
 	private EventTimeListener timelistener;
+	/**
+	 * 错误监听器，用于向gui发送错误信息
+	 */
 	private EventErrorListener errListener;
+	/**
+	 *
+	 */
 	private EventTraceListener trcListener;
 
 	/**
@@ -129,7 +142,7 @@ public final class EventManager {
 		// Initialize and event lists and timekeeping variables
 		currentTick = 0;
 		nextTick = 0;
-
+		// 调用该函数设置secsPerTick为1e-6d, 即 1 秒中 1000000 tick
 		setTickLength(1e-6d);
 
 		eventTree = new EventTree();
@@ -157,10 +170,11 @@ public final class EventManager {
 
 	public final void setErrorListener(EventErrorListener l) {
 		synchronized (lockObject) {
-			if (l != null)
+			if (l != null) {
 				errListener = l;
-			else
+			} else {
 				errListener = new NoopListener();
+			}
 		}
 	}
 
@@ -942,6 +956,7 @@ public final class EventManager {
 
 	/**
 	 * 设置 tick 花费时间，
+     * eventManager 初始化时,调用该函数设置secsPerTick为1e-6d, 即 1 秒中 1000000tick
 	 * @param tickLength
 	 */
 	public final void setTickLength(double tickLength) {
