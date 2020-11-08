@@ -130,7 +130,7 @@ public final class EventManager {
 
 	/**
 	 * Allocates a new EventManager with the given parent and name
-	 *
+	 * 实例化一个新的事件管理器
 	 * @param parent the connection point for this EventManager in the tree
 	 * @param name the name this EventManager should use
 	 */
@@ -157,6 +157,10 @@ public final class EventManager {
 		setErrorListener(null);
 	}
 
+	/**
+	 * 设置时间监听器，通知gui系统仿真时间变化
+	 * @param l
+	 */
 	public final void setTimeListener(EventTimeListener l) {
 		synchronized (lockObject) {
 			if (l != null)
@@ -168,6 +172,10 @@ public final class EventManager {
 		}
 	}
 
+	/**
+	 * 设置错误监听器
+	 * @param l
+	 */
 	public final void setErrorListener(EventErrorListener l) {
 		synchronized (lockObject) {
 			if (l != null) {
@@ -178,6 +186,10 @@ public final class EventManager {
 		}
 	}
 
+	/**
+	 * 设置事件跟踪监听器
+	 * @param l
+	 */
 	public final void setTraceListener(EventTraceListener l) {
 		synchronized (lockObject) {
 			trcListener = l;
@@ -209,6 +221,9 @@ public final class EventManager {
 		}
 	}
 
+	/**
+	 * 实现了 EventNode.Runner 接口，关闭所有事件
+	 */
 	private static class KillAllEvents implements EventNode.Runner {
 		@Override
 		public void runOnNode(EventNode node) {
@@ -225,13 +240,24 @@ public final class EventManager {
 		}
 	}
 
+
+	/**
+	 *
+	 * @param cur
+	 * @param t
+	 * @return boolean
+	 */
 	private boolean executeTarget(Process cur, ProcessTarget t) {
 		try {
 			// If the event has a captured process, pass control to it
+			// 如果该事件已经捕获了线程，则传递控制给它
 			Process p = t.getProcess();
 			if (p != null) {
+			    // 记录cur线程为调用该线程的父线程
 				p.setNextProcess(cur);
+				// 唤醒已经被event捕获的线程
 				p.wake();
+				// 让当前线程等待
 				threadWait(cur);
 
 				// 通知 execute() 继续获取事件执行
@@ -244,14 +270,14 @@ public final class EventManager {
 
 			// Notify the event manager that the process has been completed
 			if (trcListener != null) trcListener.traceProcessEnd(this, currentTick);
+			// 如果有该线程是其他线程的子线程，则唤醒它的父线程，并释放该线程回线程池
 			if (cur.hasNext()) {
-				// 如果有该线程是其他线程的子线程，则唤醒它的父线程，并释放该线程回线程池
+			    // 唤醒它的父线程
 				cur.wakeNextProcess();
-				// 将线程返回线程池
+				// 返回false: 表示当前线程有父线程等待，需唤醒父线程，将该线程返回线程池
 				return false;
-			}
-			else {
-				// 通知 execute() 继续获取事件执行
+			} else {
+				// 返回true: 表示当前线程没有父线程等待， 通知 execute() 继续获取事件执行
 				return true;
 			}
 		}
@@ -261,6 +287,7 @@ public final class EventManager {
 				return false;
 
 			// Tear down any threads waiting for this to finish
+            // 删除任何等待此操作完成的线程
 			Process next = cur.forceKillNext();
 			while (next != null) {
 				next = next.forceKillNext();
