@@ -246,7 +246,9 @@ final class Process extends Thread {
 		Process ret = nextProcess;
 		nextProcess = null;
 		if (ret != null) {
+		    // 将线程的关闭flag设置为真
 			ret.dieFlag = true;
+			// 唤醒线程，线程被唤醒后会检查 cur.shouldDie()，从而抛出异常
 			ret.wake();
 		}
 		return ret;

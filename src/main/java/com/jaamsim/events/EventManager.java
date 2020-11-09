@@ -38,6 +38,7 @@ import java.util.ArrayList;
  * currently running, think of it like a thread-local variable for all model threads.
  * 大多数EventManager功能都是通过静态方法提供的，这些静态方法依赖于运行中的模型上下文来访问当前运行的EventManager，
  * 可以把它看作是所有模型线程的一个线程局部变量。
+ * 每一个线程都有一个事件管理器
  */
 public final class EventManager {
 	public final String name;
@@ -287,7 +288,7 @@ public final class EventManager {
 				return false;
 
 			// Tear down any threads waiting for this to finish
-            // 删除任何等待此操作完成的线程
+            // 说明执行t.process()时出现了异常,删除任何等待此操作完成的线程
 			Process next = cur.forceKillNext();
 			while (next != null) {
 				next = next.forceKillNext();
@@ -320,6 +321,7 @@ public final class EventManager {
 
 			// Loop continuously
 			while (true) {
+				// 从优先队列中取出最近的事件
 				EventNode nextNode = eventTree.getNextNode();
 				if (nextNode == null || currentTick >= targetTick) {
 					// 如果优先队列为空，或事件发生时间已经过期，则结束循环
@@ -335,12 +337,14 @@ public final class EventManager {
 				// If the next event is at the current tick, execute it
 				if (nextNode.schedTick == currentTick) {
 					// Remove the event from the future events
+                    // 因为EventNode是一个发生时间相同，优先级也相同的事件的链表，所以取出链表头元素
 					Event nextEvent = nextNode.head;
+					// 获取这个链表头元素的执行目标
 					ProcessTarget nextTarget = nextEvent.target;
 					if (trcListener != null) {
 						trcListener.traceEvent(this, currentTick, nextNode.schedTick, nextNode.priority, nextTarget);
 					}
-
+					// 删除这个头元素
 					removeEvent(nextEvent);
 
 					// the return from execute target informs whether or not this
