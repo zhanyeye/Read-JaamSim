@@ -1,2 +1,2 @@
 # Read JaamSim
- Read JaamSim source code
+ Read [JaamSim](github.com/jaamsim/jaamsim) source code
