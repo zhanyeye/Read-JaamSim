@@ -243,13 +243,17 @@ public final class EventManager {
 
 
 	/**
-	 *
+     * 线程cur执行事件目标
+	 * the return from execute target informs whether or not this thread should grab an new Event, or return to the pool
 	 * @param cur
 	 * @param t
-	 * @return boolean
+	 * @return boolean 返回true: 让该线程继续获取事件； 返回false:将该线程返回线程池
 	 */
 	private boolean executeTarget(Process cur, ProcessTarget t) {
 		try {
+			// If the event has a captured process, pass control to it
+			// 如果该事件已经捕获了线程，则这是一个waitTarget，还是让原来的线程执行它
+            // 只有 waitTarget 的getProcess 才不为空
 			Process p = t.getProcess();
 			// If the event has a captured process, pass control to it
 			if (p != null) {
@@ -257,7 +261,7 @@ public final class EventManager {
 				p.setNextProcess(cur);
 				// 唤醒已经被event捕获的线程
 				p.wake();
-				// 让当前线程等待
+				// 让当前线程休眠
 				threadWait(cur);
 
 				// 通知 execute() 继续获取事件执行
@@ -280,8 +284,7 @@ public final class EventManager {
 				// 返回true: 表示当前线程没有父线程等待， 通知 execute() 继续获取事件执行
 				return true;
 			}
-		}
-		catch (Throwable e) {
+		} catch (Throwable e) {
 			// This is how kill() is implemented for sleeping processes.
 			if (e instanceof ThreadKilledException)
 				return false;
@@ -323,7 +326,7 @@ public final class EventManager {
 				// 从优先队列中取出最近的事件
 				EventNode nextNode = eventTree.getNextNode();
 				if (nextNode == null || currentTick >= targetTick) {
-					// 如果优先队列为空，或事件发生时间已经过期，则结束循环
+					// 如果优先队列为空或已经到达目标时间，则结束循环
 					executeEvents = false;
 				}
 
@@ -359,9 +362,6 @@ public final class EventManager {
 
 				// If the next event would require us to advance the time, check the
 				// conditonal events
-				/**
-				 * 如果下一个事件需要推进时间（发生时间大于系统当前时间），检查条件事件
-				 */
 				if (eventTree.getNextNode().schedTick > nextTick) {
 					if (condEvents.size() > 0) {
 						evaluateConditions(cur);
@@ -402,6 +402,10 @@ public final class EventManager {
 		}
 	}
 
+	/**
+	 *
+	 * @param cur
+	 */
 	private void evaluateConditions(Process cur) {
 		cur.begCondWait();
 		try {

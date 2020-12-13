@@ -119,7 +119,6 @@ public abstract class Input<T> {
 	private boolean isReqd;
 
 	/**
-	 * 初始化一个Input
 	 * @param key 关键字
 	 * @param cat 分类
 	 * @param def 默认值
