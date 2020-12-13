@@ -722,8 +722,9 @@ public class Simulation extends Entity {
 	}
 
 	public void doPauseCondition() {
-		if (pauseConditionInput.getValue() != null)
+		if (pauseConditionInput.getValue() != null) {
 			EventManager.scheduleUntil(pauseModel, pauseCondition, null);
+		}
 	}
 
 	private final PauseModelTarget pauseModel = new PauseModelTarget();

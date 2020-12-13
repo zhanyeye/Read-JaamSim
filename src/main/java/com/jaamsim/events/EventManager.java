@@ -250,9 +250,8 @@ public final class EventManager {
 	 */
 	private boolean executeTarget(Process cur, ProcessTarget t) {
 		try {
-			// If the event has a captured process, pass control to it
-			// 如果该事件已经捕获了线程，则传递控制给它
 			Process p = t.getProcess();
+			// If the event has a captured process, pass control to it
 			if (p != null) {
 			    // 记录cur线程为调用该线程的父线程
 				p.setNextProcess(cur);
@@ -442,6 +441,7 @@ public final class EventManager {
 	 * @return simulation time in seconds
 	 */
 	private long calcRealTimeTick() {
+		// 系统当前时间毫秒
 		long curMS = System.currentTimeMillis();
 		if (rebaseRealTime) {
 			realTimeTick = currentTick;
