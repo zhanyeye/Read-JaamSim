@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2012 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2018-2020 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -43,6 +44,7 @@ import java.util.Map.Entry;
 import java.util.Queue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Pattern;
 
 import com.jaamsim.DisplayModels.DisplayModel;
 import com.jaamsim.MeshFiles.MeshData;
@@ -52,6 +54,8 @@ import com.jaamsim.input.ColourInput;
 import com.jaamsim.math.AABB;
 import com.jaamsim.math.Color4d;
 import com.jaamsim.math.Ray;
+import com.jaamsim.math.Transform;
+import com.jaamsim.math.Vec2d;
 import com.jaamsim.math.Vec3d;
 import com.jaamsim.math.Vec4d;
 import com.jaamsim.render.util.ExceptionLogger;
@@ -66,6 +70,7 @@ import com.jogamp.opengl.DebugGL4bc;
 import com.jogamp.opengl.GL;
 import com.jogamp.opengl.GL2GL3;
 import com.jogamp.opengl.GL3;
+import com.jogamp.opengl.GL4;
 import com.jogamp.opengl.GL4bc;
 import com.jogamp.opengl.GLAnimatorControl;
 import com.jogamp.opengl.GLAutoDrawable;
@@ -86,23 +91,28 @@ import com.jogamp.opengl.GLProfile;
 public class Renderer implements GLAnimatorControl {
 
 	public enum ShaderHandle {
-		FONT, HULL, OVERLAY_FONT, OVERLAY_FLAT, DEBUG, SKYBOX
+		FONT, HULL, OVERLAY_FONT, OVERLAY_FLAT, DEBUG, DEBUG_BATCH, SKYBOX, MESH_BATCH
 	}
 
 	private static final AtomicInteger nextAssetID = new AtomicInteger(0);
 
 	/**
 	 * Get a system wide unique ID
-	 * @return
 	 */
 	public static int getAssetID() {
 		return nextAssetID.incrementAndGet();
 	}
 
 	private static boolean USE_DEBUG_GL = true;
+	private static boolean DEBUG_DRAW_AABBS = false;
+	private static boolean DEBUG_DRAW_HULLS = false;
+	private static boolean DEBUG_DRAW_ARMATURES = false;
 
 	public static int DIFF_TEX_FLAG = 1;
-	public static int NUM_MESH_SHADERS = 2; // Should be 2^(max_flag)
+	public static int STATIC_BATCH_FLAG = 2;
+	public static int NUM_MESH_SHADERS = 4; // Should be 2^(max_flag)
+
+	public static long DEBUG_PICK_ID = Long.MIN_VALUE;
 
 	private EnumMap<ShaderHandle, Shader> shaders;
 	private final Shader[] meshShaders = new Shader[NUM_MESH_SHADERS];
@@ -114,9 +124,15 @@ public class Renderer implements GLAnimatorControl {
 
 	private GLCapabilities caps = null;
 
-	private final TexCache texCache = new TexCache(this);
+	private boolean gl3Supported;
+	private boolean gl4Supported;
+	private VersionNumber glVersion;
+	private boolean indirectSupported;
 
-	// An initalization time flag specifying if the 'safest' graphical techniques should be used
+	private final TexCache texCache = new TexCache(this);
+	private final GraphicsMemManager graphicsMemManager = new GraphicsMemManager(this);
+
+	// An initialization time flag specifying if the 'safest' graphical techniques should be used
 	private boolean safeGraphics;
 
 	private final Thread renderThread;
@@ -147,8 +163,8 @@ public class Renderer implements GLAnimatorControl {
 	private ArrayList<RenderProxy> proxyScene = new ArrayList<>();
 
 	private boolean allowDelayedTextures;
-	private double sceneTimeMS;
-	private double loopTimeMS;
+	private long sceneTimeNS;
+	private long loopTimeNS;
 
 	private final Object settingsLock = new Object();
 	private boolean showDebugInfo = false;
@@ -207,20 +223,23 @@ public class Renderer implements GLAnimatorControl {
 			dummyDrawable.display(); // triggers GLContext object creation and native realization.
 
 			sharedContext = dummyDrawable.getContext();
-			assert (sharedContext != null);
+
+			GL gl = sharedContext.getGL();
+			gl3Supported = gl.isGL3();
+			gl4Supported = gl.isGL4();
+			glVersion = sharedContext.getGLVersionNumber();
+			indirectSupported = checkGLVersion(4, 3) && !safeGraphics;
 
 //			long endNanos = System.nanoTime();
 //			long ms = (endNanos - startNanos) /1000000L;
 //			LogBox.formatRenderLog("Creating shared context at:" + ms + "ms");
-
-			checkForIntelDriver();
 
 			initSharedContext();
 
 			// Notify the main thread we're done
 			initialized.set(true);
 
-		} catch (Exception e) {
+		} catch (Throwable e) {
 
 			fatalError.set(true);
 			errorString = e.getLocalizedMessage();
@@ -292,6 +311,16 @@ public class Renderer implements GLAnimatorControl {
 
 				displayNeeded.set(false);
 
+				// Area for common housekeeping
+				sharedContext.makeCurrent();
+				drawContext = sharedContext;
+
+				graphicsMemManager.tickFrame();
+				graphicsMemManager.freeOldTextures();
+
+				sharedContext.release();
+				drawContext = null;
+
 				updateRenderableScene();
 
 				// Run all render messages
@@ -341,7 +370,7 @@ public class Renderer implements GLAnimatorControl {
 				}
 
 				long loopEnd = System.nanoTime();
-				loopTimeMS = (loopEnd - lastLoopEnd) / 1000000;
+				loopTimeNS = (loopEnd - lastLoopEnd);
 				lastLoopEnd = loopEnd;
 
 				try {
@@ -364,7 +393,6 @@ public class Renderer implements GLAnimatorControl {
 	/**
 	 * Returns the shader object for this handle, should only be called from the render thread (during a render)
 	 * @param h
-	 * @return
 	 */
 	public Shader getShader(ShaderHandle h) {
 		return shaders.get(h);
@@ -378,7 +406,6 @@ public class Renderer implements GLAnimatorControl {
 	/**
 	 * Returns the MeshProto for the supplied key, should only be called from the render thread (during a render)
 	 * @param key
-	 * @return
 	 */
 	public MeshProto getProto(MeshProtoKey key) {
 		MeshProto proto = protoCache.get(key);
@@ -418,9 +445,7 @@ public class Renderer implements GLAnimatorControl {
 	}
 
 	public void setCameraInfoForWindow(int windowID, CameraInfo info) {
-		synchronized (renderMessages) {
-			addRenderMessage(new SetCameraMessage(windowID, info));
-		}
+		addRenderMessage(new SetCameraMessage(windowID, info));
 	}
 
 	private void setCameraInfoImp(SetCameraMessage mes) {
@@ -446,10 +471,12 @@ public class Renderer implements GLAnimatorControl {
 	public GL2GL3 getGL() {
 		return drawContext.getGL().getGL2GL3();
 	}
+	public GL4 getGL4() {
+		return drawContext.getGL().getGL4();
+	}
 
 	/**
 	 * Get a list of all the IDs of currently open windows
-	 * @return
 	 */
 	public ArrayList<Integer> getOpenWindowIDs() {
 		synchronized(openWindows) {
@@ -491,11 +518,23 @@ public class Renderer implements GLAnimatorControl {
 	}
 
 	/**
+	 * Returns the width and height in pixels of the graphics contents of the specified view
+	 * window.
+	 * @param windowID - identification number for the window
+	 * @return width and height of graphics portion of the window
+	 */
+	public Vec2d getViewableSize(int windowID) {
+		synchronized(openWindows) {
+			RenderWindow win = openWindows.get(windowID);
+			return new Vec2d(win.getViewableWidth(), win.getViewableHeight());
+		}
+	}
+
+	/**
 	 * Construct a new window (a NEWT window specifically)
 	 *
 	 * @param width
 	 * @param height
-	 * @return
 	 */
 	private void createWindowImp(CreateWindowMessage message) {
 
@@ -512,7 +551,8 @@ public class Renderer implements GLAnimatorControl {
 		                                       message.listener);
 		listener.setWindow(window);
 
-		Camera camera = new Camera(Math.PI/3.0, 1, 0.1, 1000);
+		CameraInfo ci = new CameraInfo(Math.PI/3.0, Transform.ident, null);
+		Camera camera = new Camera(ci, 1);
 
 		synchronized (openWindows) {
 			openWindows.put(message.windowID, window);
@@ -541,12 +581,10 @@ public class Renderer implements GLAnimatorControl {
 
 	public int createWindow(int x, int y, int width, int height, int viewID, String title, String name, Image icon,
 	                         WindowInteractionListener listener) {
-		synchronized (renderMessages) {
-			int windowID = getAssetID();
-			addRenderMessage(new CreateWindowMessage(x, y, width, height, title,
-					name, windowID, viewID, icon, listener));
-			return windowID;
-		}
+		int windowID = getAssetID();
+		addRenderMessage(new CreateWindowMessage(x, y, width, height, title,
+				name, windowID, viewID, icon, listener));
+		return windowID;
 	}
 
 	public void setWindowDebugInfo(int windowID, String debugString, ArrayList<Long> debugIDs) {
@@ -560,12 +598,17 @@ public class Renderer implements GLAnimatorControl {
 		}
 	}
 
-	public void closeWindow(int windowID) {
-
-		synchronized (renderMessages) {
-			addRenderMessage(new CloseWindowMessage(windowID));
+	public void closeViewWindow(int viewID) {
+		for (RenderWindow wind : openWindows.values()) {
+			if (wind.getViewID() == viewID) {
+				closeWindow(wind.getWindowID());
+				return;
+			}
 		}
+	}
 
+	public void closeWindow(int windowID) {
+		addRenderMessage(new CloseWindowMessage(windowID));
 	}
 
 	private void closeWindowImp(CloseWindowMessage msg) {
@@ -634,9 +677,13 @@ private String getMeshShaderDefines(int i) {
 	if ((i & DIFF_TEX_FLAG) != 0) {
 		defines.append("#define DIFF_TEX\n");
 	}
+	if ((i & STATIC_BATCH_FLAG) != 0) {
+		defines.append("#define BATCH_RENDER\n");
+	}
 	return defines.toString();
 }
 
+private static final Pattern definespat = Pattern.compile("@DEFINES@");
 /**
  * Create and compile all the shaders
  */
@@ -664,9 +711,13 @@ private void initShaders(GL2GL3 gl) throws RenderException {
 	frag = "/resources/shaders/debug.frag";
 	createShader(ShaderHandle.DEBUG, vert, frag, gl);
 
+	// Note: DEBUG_BATCH is only available as a core shader
+
 	vert = "/resources/shaders/skybox.vert";
 	frag = "/resources/shaders/skybox.frag";
 	createShader(ShaderHandle.SKYBOX, vert, frag, gl);
+
+	// Note: MESH_BATCH is only available as a core shader
 
 	String meshVertSrc = readSource("/resources/shaders/flat.vert");
 	String meshFragSrc = readSource("/resources/shaders/flat.frag");
@@ -675,7 +726,7 @@ private void initShaders(GL2GL3 gl) throws RenderException {
 	for (int i = 0; i < NUM_MESH_SHADERS; ++i) {
 		String defines = getMeshShaderDefines(i);
 
-		String definedFragSrc = meshFragSrc.replaceAll("@DEFINES@", defines);
+		String definedFragSrc = definespat.matcher(meshFragSrc).replaceAll(defines);
 
 		Shader s = new Shader(meshVertSrc, definedFragSrc, gl);
 		if (!s.isGood()) {
@@ -688,7 +739,27 @@ private void initShaders(GL2GL3 gl) throws RenderException {
 }
 
 /**
- * Create and compile all the shaders
+ * Common code to setup basic openGL state, including depth test, blending etc.
+ * @param gl
+ */
+private void initSurfaceState(GL2GL3 gl) {
+	// Some of this is probably redundant, but here goes
+	gl.glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+	gl.glEnable(GL.GL_DEPTH_TEST);
+	gl.glClearDepth(1.0);
+
+	gl.glDepthFunc(GL2GL3.GL_LEQUAL);
+
+	gl.glEnable(GL2GL3.GL_CULL_FACE);
+	gl.glCullFace(GL2GL3.GL_BACK);
+
+	gl.glBlendEquationSeparate(GL2GL3.GL_FUNC_ADD, GL2GL3.GL_MAX);
+	gl.glBlendFuncSeparate(GL2GL3.GL_SRC_ALPHA, GL2GL3.GL_ONE_MINUS_SRC_ALPHA, GL2GL3.GL_ONE, GL2GL3.GL_ONE);
+
+}
+
+/**
+ * Create and compile all the shaders for gl >= 3 core profile
  */
 private void initCoreShaders(GL2GL3 gl, String version) throws RenderException {
 	shaders = new EnumMap<>(ShaderHandle.class);
@@ -714,9 +785,20 @@ private void initCoreShaders(GL2GL3 gl, String version) throws RenderException {
 	frag = "/resources/shaders_core/debug.frag";
 	createCoreShader(ShaderHandle.DEBUG, vert, frag, gl, version);
 
+	vert = "/resources/shaders_core/debug_batch.vert";
+	frag = "/resources/shaders_core/debug_batch.frag";
+	createCoreShader(ShaderHandle.DEBUG_BATCH, vert, frag, gl, version);
+
 	vert = "/resources/shaders_core/skybox.vert";
 	frag = "/resources/shaders_core/skybox.frag";
 	createCoreShader(ShaderHandle.SKYBOX, vert, frag, gl, version);
+
+	if (isIndirectSupported()) {
+		// Do not compile MESH_BATCH for openGL < 4.3
+		vert = "/resources/shaders_core/mesh_batch.vert";
+		frag = "/resources/shaders_core/mesh_batch.frag";
+		createCoreShader(ShaderHandle.MESH_BATCH, vert, frag, gl, version);
+	}
 
 	String meshVertSrc = readSource("/resources/shaders_core/flat.vert").replaceAll("@VERSION@", version);
 	String meshFragSrc = readSource("/resources/shaders_core/flat.frag").replaceAll("@VERSION@", version);
@@ -725,8 +807,9 @@ private void initCoreShaders(GL2GL3 gl, String version) throws RenderException {
 	for (int i = 0; i < NUM_MESH_SHADERS; ++i) {
 		String defines = getMeshShaderDefines(i);
 
-		String definedFragSrc = meshFragSrc.replaceAll("@DEFINES@", defines);
-		Shader s = new Shader(meshVertSrc, definedFragSrc, gl);
+		String definedVertSrc = definespat.matcher(meshVertSrc).replaceAll(defines);
+		String definedFragSrc = definespat.matcher(meshFragSrc).replaceAll(defines);
+		Shader s = new Shader(definedVertSrc, definedFragSrc, gl);
 		if (!s.isGood()) {
 			String failure = s.getFailureLog();
 			throw new RenderException("Mesh Shader failed, flags: " + i + " " + failure);
@@ -788,12 +871,12 @@ private void initCoreShaders(GL2GL3 gl, String version) throws RenderException {
 			throw new RenderException("OpenGL version is too low. OpenGL >= 2.1 is required.");
 		}
 		GL2GL3 gl = sharedContext.getGL().getGL2GL3();
-		if (!isCore)
+		if (!isCore && (!gl3Supported || safeGraphics))
 			initShaders(gl);
 		else
 			initCoreShaders(gl, sharedContext.getGLSLVersionString());
 
-		// Sub system specific intitializations
+		// Sub system specific initializations
 		DebugUtils.init(this, gl);
 		Polygon.init(this, gl);
 		MeshProto.init(this, gl);
@@ -801,7 +884,7 @@ private void initCoreShaders(GL2GL3 gl, String version) throws RenderException {
 
 		// Load the bad mesh proto
 		badData = MeshDataCache.getBadMesh();
-		badProto = new MeshProto(badData, safeGraphics);
+		badProto = new MeshProto(badData, safeGraphics, false);
 		badProto.loadGPUAssets(gl, this);
 
 		skybox = new Skybox();
@@ -825,12 +908,13 @@ private void initCoreShaders(GL2GL3 gl, String version) throws RenderException {
 		GL2GL3 gl = sharedContext.getGL().getGL2GL3();
 
 		MeshProto proto;
+		boolean canBatch = indirectSupported;
 
 		MeshData data = MeshDataCache.getMeshData(key);
 		if (data == badData) {
 			proto = badProto;
 		} else {
-			proto = new MeshProto(data, safeGraphics);
+			proto = new MeshProto(data, safeGraphics, canBatch);
 
 			assert (proto != null);
 			proto.loadGPUAssets(gl, this);
@@ -893,8 +977,7 @@ private void initCoreShaders(GL2GL3 gl, String version) throws RenderException {
 				proxy.collectOverlayRenderables(this, currentOverlay);
 			}
 
-			long sceneTime = System.nanoTime() - sceneStart;
-			sceneTimeMS = sceneTime / 1000000.0;
+			sceneTimeNS = System.nanoTime() - sceneStart;
 		}
 	}
 
@@ -910,8 +993,6 @@ private void initCoreShaders(GL2GL3 gl, String version) throws RenderException {
 
 	/**
 	 * Cast the provided ray into the current scene and return the list of bounds collisions
-	 * @param ray
-	 * @return
 	 */
 	public List<PickResult> pick(Ray pickRay, int viewID, boolean precise) {
 
@@ -951,6 +1032,48 @@ private void initCoreShaders(GL2GL3 gl, String version) throws RenderException {
 		}
 	}
 
+	/**
+	 * Pick from the overlay objects based on pixel coordinates
+	 * @param coord - Coordinate in window pixel space
+	 *
+	 * @return - List of picking IDs for successful collisions
+	 *
+	 */
+	public List<Long> overlayPick(Vec2d coord, int viewID) {
+
+		synchronized(openWindows) {
+			ArrayList<Long> ret = new ArrayList<>();
+
+			if (currentOverlay == null) {
+				return ret;
+			}
+
+			int width = 0;
+			int height = 0;
+			Camera cam = null;
+			for (RenderWindow wind : openWindows.values()) {
+				if (wind.getViewID() == viewID) {
+					cam = cameras.get(wind.getWindowID());
+					width = wind.getViewableWidth();
+					height = wind.getViewableHeight();
+					break;
+				}
+			}
+
+			// Do not update the scene while a pick is underway
+			synchronized (sceneLock) {
+				for (OverlayRenderable r : currentOverlay) {
+					boolean collides = r.collides(coord, width, height, cam);
+
+					if (r.renderForView(viewID, cam) && collides) {
+						ret.add(r.getPickingID());
+					}
+				}
+				return ret;
+			}
+		}
+	}
+
 	public static class WindowMouseInfo {
 		public int x, y;
 		public int width, height;
@@ -962,7 +1085,6 @@ private void initCoreShaders(GL2GL3 gl, String version) throws RenderException {
 	/**
 	 * Get Window specific information about the mouse. This is very useful for picking on the App side
 	 * @param windowID
-	 * @return
 	 */
 	public WindowMouseInfo getMouseInfo(int windowID) {
 		synchronized(openWindows) {
@@ -1122,20 +1244,10 @@ private void initCoreShaders(GL2GL3 gl, String version) throws RenderException {
 
 				GL2GL3 gl = drawable.getGL().getGL2GL3();
 
-				// Some of this is probably redundant, but here goes
-				gl.glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
-				gl.glEnable(GL.GL_DEPTH_TEST);
-				gl.glClearDepth(1.0);
-
-				gl.glDepthFunc(GL2GL3.GL_LEQUAL);
-
-				gl.glEnable(GL2GL3.GL_CULL_FACE);
-				gl.glCullFace(GL2GL3.GL_BACK);
+				initSurfaceState(gl);
 
 				gl.glEnable(GL.GL_MULTISAMPLE);
 
-				gl.glBlendEquationSeparate(GL2GL3.GL_FUNC_ADD, GL2GL3.GL_MAX);
-				gl.glBlendFuncSeparate(GL2GL3.GL_SRC_ALPHA, GL2GL3.GL_ONE_MINUS_SRC_ALPHA, GL2GL3.GL_ONE, GL2GL3.GL_ONE);
 
 			}
 		}
@@ -1201,18 +1313,18 @@ private void initCoreShaders(GL2GL3 gl, String version) throws RenderException {
 					perf.append( String.format( "Objects Culled: %s", pi.objectsCulled) );
 					perf.append( String.format( "   VRAM (MB): %.0f", usedVRAM/(1024.0*1024.0)) );
 					perf.append( String.format( "   Frame time (ms): %.3f", lastFrameNanos/1000000.0) );
-					perf.append( String.format( "   SceneTime (ms): %.3f", sceneTimeMS) );
-					perf.append( String.format( "   Loop Time (ms): %.3f", loopTimeMS) );
+					perf.append( String.format( "   SceneTime (ms): %.3f", sceneTimeNS/1000000.0) );
+					perf.append( String.format( "   Loop Time (ms): %.3f", loopTimeNS/1000000.0) );
 
 					TessFont defFont = getTessFont(defaultBoldFontKey);
 					OverlayString os = new OverlayString(defFont, perf.toString(), ColourInput.BLACK,
-					                                     10, 10, 15, false, false, DisplayModel.ALWAYS);
+					                                     10, 10, 15, false, false, DisplayModel.ALWAYS, DEBUG_PICK_ID);
 					os.render(window.getWindowID(), Renderer.this,
 					          window.getViewableWidth(), window.getViewableHeight(), cam, null);
 
 					// Also draw this window's debug string
 					os = new OverlayString(defFont, window.getDebugString(), ColourInput.BLACK,
-					                       10, 10, 30, false, false, DisplayModel.ALWAYS);
+					                       10, 10, 30, false, false, DisplayModel.ALWAYS, DEBUG_PICK_ID);
 					os.render(window.getWindowID(), Renderer.this,
 					          window.getViewableWidth(), window.getViewableHeight(), cam, null);
 
@@ -1302,30 +1414,60 @@ private void initCoreShaders(GL2GL3 gl, String version) throws RenderException {
 
 	private static class CreateOffscreenTargetMessage extends RenderMessage {
 		public OffscreenTarget target;
+		CreateOffscreenTargetMessage(OffscreenTarget t) {
+			target = t;
+		}
 	}
 
 	private static class FreeOffscreenTargetMessage extends RenderMessage {
 		public OffscreenTarget target;
+		FreeOffscreenTargetMessage(OffscreenTarget t) {
+			target = t;
+		}
 	}
 
 	public TexCache getTexCache() {
 		return texCache;
 	}
+	public GraphicsMemManager getTexMemManager() {
+		return graphicsMemManager;
+	}
 
 	public static boolean debugDrawHulls() {
-		return false;
+		return DEBUG_DRAW_HULLS;
 	}
 
 	public static boolean debugDrawAABBs() {
-		return false;
+		return DEBUG_DRAW_AABBS;
 	}
 
 	public static boolean debugDrawArmatures() {
-		return false;
+		return DEBUG_DRAW_ARMATURES;
 	}
 
 	public boolean isInitialized() {
 		 return initialized.get() && !fatalError.get();
+	}
+
+	private boolean checkGLVersion(int majorVer, int minorVer) {
+		if (glVersion.getMajor() > majorVer)
+			return true;
+
+		if (glVersion.getMajor() == majorVer)
+			return glVersion.getMinor() >= minorVer;
+
+		return false;
+	}
+
+	public boolean isGL3Supported() {
+		return gl3Supported;
+	}
+
+	public boolean isGL4Supported() {
+		return gl4Supported;
+	}
+	public boolean isIndirectSupported() {
+		return indirectSupported;
 	}
 
 	public boolean hasFatalError() {
@@ -1368,43 +1510,27 @@ private void initCoreShaders(GL2GL3 gl, String version) throws RenderException {
 	/**
 	 * Queue up an off screen rendering
 	 * @param scene
-	 * @param cam
 	 * @param width
 	 * @param height
-	 * @return
 	 */
 	public Future<BufferedImage> renderOffscreen(ArrayList<RenderProxy> scene, int viewID, CameraInfo camInfo,
 	                                   int width, int height, Runnable runWhenDone, OffscreenTarget target) {
 		Future<BufferedImage> result = new Future<>(runWhenDone);
 
 		Camera cam = new Camera(camInfo, (double)width/(double)height);
-
-		synchronized (renderMessages) {
-			addRenderMessage(new OffScreenMessage(scene, viewID, cam, width, height, result, target));
-		}
-
-		queueRedraw();
+		addRenderMessage(new OffScreenMessage(scene, viewID, cam, width, height, result, target));
 
 		return result;
 	}
 
 	public OffscreenTarget createOffscreenTarget(int width, int height) {
 		OffscreenTarget ret = new OffscreenTarget(width, height);
-
-		synchronized (renderMessages) {
-			CreateOffscreenTargetMessage msg = new CreateOffscreenTargetMessage();
-			msg.target = ret;
-			addRenderMessage(msg);
-		}
+		addRenderMessage(new CreateOffscreenTargetMessage(ret));
 		return ret;
 	}
 
 	public void freeOffscreenTarget(OffscreenTarget target) {
-		synchronized (renderMessages) {
-			FreeOffscreenTargetMessage msg = new FreeOffscreenTargetMessage();
-			msg.target = target;
-			addRenderMessage(msg);
-		}
+		addRenderMessage(new FreeOffscreenTargetMessage(target));
 	}
 
 	/**
@@ -1514,13 +1640,13 @@ private void initCoreShaders(GL2GL3 gl, String version) throws RenderException {
 			int height = message.height;
 
 			if (!target.isLoaded()) {
-				message.result.setFailed("Contexted not loaded. Is OpenGL 3 supported?");
+				message.result.setFailed("Context not loaded. Is OpenGL 3 supported?");
 				return;
 			}
 			assert(target.isLoaded());
 
 			// Collect the renderables
-			ArrayList<Renderable> renderables;
+			final ArrayList<Renderable> renderables;
 			ArrayList<OverlayRenderable> overlay;
 
 			if (message.scene != null) {
@@ -1543,10 +1669,9 @@ private void initCoreShaders(GL2GL3 gl, String version) throws RenderException {
 
 			gl.glBindFramebuffer(GL2GL3.GL_DRAW_FRAMEBUFFER, target.getDrawFBO());
 
-			gl.glClearColor(0, 0, 0, 0);
 			gl.glViewport(0, 0, width, height);
-			gl.glEnable(GL2GL3.GL_DEPTH_TEST);
-			gl.glDepthFunc(GL2GL3.GL_LEQUAL);
+
+			initSurfaceState(gl);
 
 			allowDelayedTextures = false;
 
@@ -1599,7 +1724,6 @@ private void initCoreShaders(GL2GL3 gl, String version) throws RenderException {
 
 	/**
 	 * Returns true if the current thread is this renderer's render thread
-	 * @return
 	 */
 	public boolean isRenderThread() {
 		return (Thread.currentThread() == renderThread);
@@ -1862,21 +1986,6 @@ private static class TransSortable implements Comparable<TransSortable> {
 		// Not supported
 		assert(false);
 		return false;
-	}
-
-	private void checkForIntelDriver() {
-		int res = sharedContext.makeCurrent();
-		assert (res == GLContext.CONTEXT_CURRENT);
-
-		GL2GL3 gl = sharedContext.getGL().getGL2GL3();
-		String vendorString = gl.glGetString(GL2GL3.GL_VENDOR).toLowerCase();
-		boolean intelDriver = vendorString.indexOf("intel") != -1;
-		if (intelDriver) {
-			safeGraphics = true;
-		}
-
-		sharedContext.release();
-
 	}
 
 	public void setDebugInfo(boolean showDebug) {

@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2013 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2018-2019 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,20 +20,22 @@ package com.jaamsim.DisplayModels;
 import java.net.URI;
 import java.util.ArrayList;
 
-import javax.swing.filechooser.FileNameExtensionFilter;
-
 import com.jaamsim.Graphics.DisplayEntity;
 import com.jaamsim.Graphics.OverlayImage;
 import com.jaamsim.basicsim.Entity;
 import com.jaamsim.basicsim.ErrorException;
 import com.jaamsim.datatypes.IntegerVector;
 import com.jaamsim.input.BooleanInput;
+import com.jaamsim.input.ColourInput;
 import com.jaamsim.input.FileInput;
 import com.jaamsim.input.Keyword;
 import com.jaamsim.math.Transform;
+import com.jaamsim.math.Vec2d;
 import com.jaamsim.math.Vec3d;
+import com.jaamsim.render.CachedTexLoader;
 import com.jaamsim.render.DisplayModelBinding;
 import com.jaamsim.render.ImageProxy;
+import com.jaamsim.render.OverlayLineProxy;
 import com.jaamsim.render.OverlayTextureProxy;
 import com.jaamsim.render.RenderProxy;
 import com.jaamsim.render.VisibilityInfo;
@@ -40,47 +43,36 @@ import com.jaamsim.render.VisibilityInfo;
 public class ImageModel extends DisplayModel {
 
 	@Keyword(description = "The file containing the image to show, valid formats are: BMP, JPG, PNG, PCX, GIF.",
-	         example = "Ship3DModel ImageFile { ..\\images\\CompanyIcon.png }")
+	         exampleList = {"../images/CompanyIcon.png"})
 	private final FileInput imageFile;
 
 	@Keyword(description = "Indicates the loaded image has an alpha channel (transparency information) that should be used",
-	         example = "CompanyLogo Transparent { TRUE }")
+	         exampleList = {"TRUE"})
 	private final BooleanInput transparent;
 
 	@Keyword(description = "Indicates the loaded image should use texture compression in video memory",
-	         example = "WorldMap CompressedTexture { TRUE }")
+	         exampleList = {"TRUE"})
 	private final BooleanInput compressedTexture;
 
-	private static final String[] validFileExtensions;
-	private static final String[] validFileDescriptions;
-	static {
-		validFileExtensions = new String[5];
-		validFileDescriptions = new String[5];
-
-		validFileExtensions[0] = "JPG";
-		validFileExtensions[1] = "PNG";
-		validFileExtensions[2] = "GIF";
-		validFileExtensions[3] = "BMP";
-		validFileExtensions[4] = "PCX";
-
-		validFileDescriptions[0] = "JPEG Image (*.jpg)";
-		validFileDescriptions[1] = "Portable Network Graphics (*.png)";
-		validFileDescriptions[2] = "Graphics Interchange Format (*.gif)";
-		validFileDescriptions[3] = "Windows Bitmap (*.bmp)";
-		validFileDescriptions[4] = "Personal Computer Exchange (*.pcx)";
-	}
+	public static final String[] VALID_FILE_EXTENSIONS = {"JPG", "PNG", "GIF", "BMP", "PCX"};
+	public static final String[] VALID_FILE_DESCRIPTIONS = {
+			"JPEG Image (*.jpg)",
+			"Portable Network Graphics (*.png)",
+			"Graphics Interchange Format (*.gif)",
+			"Windows Bitmap (*.bmp)",
+			"Personal Computer Exchange (*.pcx)"};
 
 	{
-		imageFile = new FileInput( "ImageFile", "Key Inputs", null );
+		imageFile = new FileInput( "ImageFile", KEY_INPUTS, null );
 		imageFile.setFileType("Image");
-		imageFile.setValidFileExtensions(validFileExtensions);
-		imageFile.setValidFileDescriptions(validFileDescriptions);
+		imageFile.setValidFileExtensions(VALID_FILE_EXTENSIONS);
+		imageFile.setValidFileDescriptions(VALID_FILE_DESCRIPTIONS);
 		this.addInput( imageFile);
 
-		transparent = new BooleanInput("Transparent", "Key Inputs", false);
+		transparent = new BooleanInput("Transparent", KEY_INPUTS, false);
 		this.addInput(transparent);
 
-		compressedTexture = new BooleanInput("CompressedTexture", "Key Inputs", false);
+		compressedTexture = new BooleanInput("CompressedTexture", KEY_INPUTS, false);
 		this.addInput(compressedTexture);
 
 	}
@@ -112,27 +104,18 @@ public class ImageModel extends DisplayModel {
 	 */
 	public static boolean isValidExtension(String str) {
 
-		for (String ext : validFileExtensions) {
+		for (String ext : VALID_FILE_EXTENSIONS) {
 			if (str.equalsIgnoreCase(ext))
 				return true;
 		}
 		return false;
 	}
 
-	/**
-	 * Returns a file name extension filter for each of the supported file types.
-	 *
-	 * @return an array of file name extension filters.
-	 */
-	public static FileNameExtensionFilter[] getFileNameExtensionFilters() {
-		return FileInput.getFileNameExtensionFilters("Image", validFileExtensions, validFileDescriptions);
-	}
-
 	private class Binding extends DisplayModelBinding {
 
 		private ArrayList<RenderProxy> cachedProxies;
 
-		private DisplayEntity dispEnt;
+		private final DisplayEntity dispEnt;
 
 		private Transform transCache;
 		private Vec3d scaleCache;
@@ -192,9 +175,9 @@ public class ImageModel extends DisplayModel {
 			registerCacheMiss("ImageModel");
 			// Gather some inputs
 
+			CachedTexLoader loader = new CachedTexLoader(imageName, transp, compressed);
 			cachedProxies = new ArrayList<>();
-			cachedProxies.add(new ImageProxy(imageName, trans,
-			                       scale, transp, compressed, vi, pickingID));
+			cachedProxies.add(new ImageProxy(loader, trans, scale, vi, pickingID));
 
 		}
 
@@ -283,7 +266,7 @@ public class ImageModel extends DisplayModel {
 				cachedProxy = new OverlayTextureProxy(pos.get(0), pos.get(1), size.get(0), size.get(1),
 				                                      filename,
 				                                      transp, false,
-				                                      alignRight, alignBottom, vi);
+				                                      alignRight, alignBottom, vi, imageObservee.getEntityNumber());
 
 				out.add(cachedProxy);
 			} catch (ErrorException ex) {
@@ -293,7 +276,25 @@ public class ImageModel extends DisplayModel {
 
 		@Override
 		protected void collectSelectionBox(double simTime, ArrayList<RenderProxy> out) {
-			// No selection widgets for now
+
+			double start = alignRightCache ? posCache.get(0) + sizeCache.get(0) : posCache.get(0);
+			double end = alignRightCache ? posCache.get(0) : posCache.get(0) + sizeCache.get(0);
+			double top = posCache.get(1);
+			double bottom = posCache.get(1) + sizeCache.get(1);
+
+			ArrayList<Vec2d> rect = new ArrayList<>(8);
+			rect.add(new Vec2d( start, bottom ));
+			rect.add(new Vec2d(   end, bottom ));
+			rect.add(new Vec2d(   end, bottom ));
+			rect.add(new Vec2d(   end, top    ));
+			rect.add(new Vec2d(   end, top    ));
+			rect.add(new Vec2d( start, top    ));
+			rect.add(new Vec2d( start, top    ));
+			rect.add(new Vec2d( start, bottom ));
+
+			OverlayLineProxy outline = new OverlayLineProxy(rect, ColourInput.GREEN,
+					!alignBottomCache, alignRightCache, 1, viCache, imageObservee.getEntityNumber());
+			out.add(outline);
 		}
 	}
 

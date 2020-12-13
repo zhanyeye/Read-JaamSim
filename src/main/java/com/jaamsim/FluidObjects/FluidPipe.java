@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2013 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2018-2019 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,12 +17,15 @@
  */
 package com.jaamsim.FluidObjects;
 
-import com.jaamsim.Graphics.PolylineInfo;
+import com.jaamsim.DisplayModels.DisplayModel;
+import com.jaamsim.DisplayModels.PolylineModel;
+import com.jaamsim.Graphics.LineEntity;
 import com.jaamsim.input.ColourInput;
-import com.jaamsim.input.Input;
+import com.jaamsim.input.IntegerInput;
 import com.jaamsim.input.Keyword;
 import com.jaamsim.input.Output;
 import com.jaamsim.input.ValueInput;
+import com.jaamsim.math.Color4d;
 import com.jaamsim.units.DimensionlessUnit;
 import com.jaamsim.units.DistanceUnit;
 
@@ -30,66 +34,73 @@ import com.jaamsim.units.DistanceUnit;
  * @author Harry King
  *
  */
-public class FluidPipe extends FluidComponent {
+public class FluidPipe extends FluidComponent implements LineEntity {
 
 	@Keyword(description = "The length of the pipe.",
-	         example = "Pipe1 Length { 10.0 m }")
+	         exampleList = {"10.0 m"})
 	private final ValueInput lengthInput;
 
-	@Keyword(description = "The height change over the length of the pipe.  " +
-			"Equal to (outlet height - inlet height).",
-	         example = "Pipe1 HeightChange { 0.0 }")
+	@Keyword(description = "The height change over the length of the pipe. "
+	                     + "Equal to (outlet height - inlet height).",
+	         exampleList = {"0.0 m"})
 	private final ValueInput heightChangeInput;
 
-	@Keyword(description = "The roughness height of the inside pipe surface.  " +
-			"Used to calculate the Darcy friction factor for the pipe.",
-	         example = "Pipe1 Roughness { 0.01 m }")
+	@Keyword(description = "The roughness height of the inside pipe surface. "
+	                     + "Used to calculate the Darcy friction factor for the pipe.",
+	         exampleList = {"0.01 m"})
 	private final ValueInput roughnessInput;
 
-	@Keyword(description = "The pressure loss coefficient or 'K-factor' for the pipe.  " +
-			"The factor multiplies the dynamic pressure and is applied as a loss at the pipe outlet.",
-	         example = "Pipe1 PressureLossCoefficient { 0.5 }")
+	@Keyword(description = "The pressure loss coefficient or 'K-factor' for the pipe. "
+	                     + "The factor multiplies the dynamic pressure and is applied as a loss "
+	                     + "at the pipe outlet.",
+	         exampleList = {"0.5"})
 	private final ValueInput pressureLossCoefficientInput;
 
 	@Keyword(description = "The width of the pipe segments in pixels.",
-	         example = "Pipe1 Width { 1 }")
-	private final ValueInput widthInput;
+	         exampleList = {"1"})
+	private final IntegerInput widthInput;
 
-	@Keyword(description = "The colour of the pipe, defined using a colour keyword or RGB values.",
-	         example = "Pipe1 Colour { red }")
+	@Keyword(description = "The colour of the pipe.",
+	         exampleList = {"red"})
 	private final ColourInput colourInput;
 
 	private double darcyFrictionFactor;  // The Darcy Friction Factor for the pipe flow.
 
 	{
-		lengthInput = new ValueInput( "Length", "Key Inputs", 1.0d);
+		displayModelListInput.clearValidClasses();
+		displayModelListInput.addValidClass(PolylineModel.class);
+
+		lengthInput = new ValueInput( "Length", KEY_INPUTS, 1.0d);
 		lengthInput.setValidRange( 0.0, Double.POSITIVE_INFINITY);
 		lengthInput.setUnitType( DistanceUnit.class );
 		this.addInput( lengthInput);
 
-		heightChangeInput = new ValueInput( "HeightChange", "Key Inputs", 0.0d);
+		heightChangeInput = new ValueInput( "HeightChange", KEY_INPUTS, 0.0d);
 		heightChangeInput.setValidRange( Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY);
 		heightChangeInput.setUnitType( DistanceUnit.class );
 		this.addInput( heightChangeInput);
 
-		roughnessInput = new ValueInput( "Roughness", "Key Inputs", 0.0d);
+		roughnessInput = new ValueInput( "Roughness", KEY_INPUTS, 0.0d);
 		roughnessInput.setValidRange( 0.0, Double.POSITIVE_INFINITY);
 		roughnessInput.setUnitType( DistanceUnit.class );
 		this.addInput( roughnessInput);
 
-		pressureLossCoefficientInput = new ValueInput( "PressureLossCoefficient", "Key Inputs", 0.0d);
+		pressureLossCoefficientInput = new ValueInput( "PressureLossCoefficient", KEY_INPUTS, 0.0d);
 		pressureLossCoefficientInput.setValidRange( 0.0, Double.POSITIVE_INFINITY);
 		pressureLossCoefficientInput.setUnitType( DimensionlessUnit.class );
 		this.addInput( pressureLossCoefficientInput);
 
-		widthInput = new ValueInput("Width", "Key Inputs", 1.0d);
-		widthInput.setValidRange(1.0d, Double.POSITIVE_INFINITY);
-		widthInput.setUnitType( DimensionlessUnit.class );
+		widthInput = new IntegerInput("LineWidth", FORMAT, 1);
+		widthInput.setValidRange(1, Integer.MAX_VALUE);
+		widthInput.setDefaultText("PolylineModel");
 		this.addInput(widthInput);
+		this.addSynonym(widthInput, "Width");
 
-		colourInput = new ColourInput("Colour", "Key Inputs", ColourInput.BLACK);
+		colourInput = new ColourInput("LineColour", FORMAT, ColourInput.BLACK);
+		colourInput.setDefaultText("PolylineModel");
 		this.addInput(colourInput);
 		this.addSynonym(colourInput, "Color");
+		this.addSynonym(colourInput, "Colour");
 	}
 
 	@Override
@@ -165,23 +176,32 @@ public class FluidPipe extends FluidComponent {
 		return 1.0 / ( x * x );
 	}
 
-	@Override
-	public void updateForInput( Input<?> in ) {
-		super.updateForInput(in);
-
-		// If Points were input, then use them to set the start and end coordinates
-		if( in == pointsInput || in == colourInput || in == widthInput ) {
-			invalidateScreenPoints();
-			return;
-		}
+	public PolylineModel getPolylineModel() {
+		DisplayModel dm = getDisplayModel();
+		if (dm instanceof PolylineModel)
+			return (PolylineModel) dm;
+		return null;
 	}
 
 	@Override
-	public PolylineInfo[] buildScreenPoints() {
-		int w = Math.max(1, widthInput.getValue().intValue());
-		PolylineInfo[] ret = new PolylineInfo[1];
-		ret[0] = new PolylineInfo(pointsInput.getValue(), colourInput.getValue(), w);
-		return ret;
+	public boolean isOutlined() {
+		return true;
+	}
+
+	@Override
+	public int getLineWidth() {
+		PolylineModel model = getPolylineModel();
+		if (widthInput.isDefault() && model != null)
+			return model.getLineWidth();
+		return widthInput.getValue();
+	}
+
+	@Override
+	public Color4d getLineColour() {
+		PolylineModel model = getPolylineModel();
+		if (colourInput.isDefault() && model != null)
+			return model.getLineColour();
+		return colourInput.getValue();
 	}
 
 	@Output(name = "DarcyFrictionFactor",

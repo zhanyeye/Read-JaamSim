@@ -20,20 +20,16 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.util.ArrayList;
 
-import com.jaamsim.events.EventManager;
 import com.jaamsim.events.EventTraceListener;
 import com.jaamsim.events.ProcessTarget;
 import com.jaamsim.input.InputErrorException;
 
 public class EventRecorder implements EventTraceListener {
 	private BufferedWriter outputStream;
-	private int traceLevel;
-	private final ArrayList<String> traces = new ArrayList<>();
+	private final EventTraceRecord trcRecord = new EventTraceRecord();
 
 	public EventRecorder(String fileName) {
-		traceLevel = 0;
 		try {
 			File backingFileObject = new File(fileName);
 			backingFileObject.createNewFile();
@@ -50,32 +46,12 @@ public class EventRecorder implements EventTraceListener {
 		}
 	}
 
-	private void append(String record) {
-		StringBuilder rec = new StringBuilder();
-
-		for (int i = 0; i < traceLevel; i++) {
-			rec.append("  ");
-		}
-		rec.append(record);
-		traces.add(rec.toString());
-	}
-
-	private void addHeader(String name, long internalTime) {
-		// Don't write anything if not at level 0
-		if (traceLevel != 0)
+	private void finish() {
+		if(trcRecord.traceLevel != 0)
 			return;
 
-		StringBuilder header = new StringBuilder(name).append("\t").append(internalTime);
-		traces.add(header.toString());
-		traceLevel++;
-	}
-
-	private void finish(EventManager e) {
-		if(traceLevel != 1)
-			return;
-
-		traces.add("");
-		for (String each : traces) {
+		trcRecord.add("");
+		for (String each : trcRecord) {
 			try {
 				outputStream.write( each );
 				outputStream.newLine();
@@ -87,115 +63,71 @@ public class EventRecorder implements EventTraceListener {
 		}
 		catch( IOException ioe ) {}
 
-		traces.clear();
-		traceLevel--;
-	}
-
-	private static final String entClassName = Entity.class.getName();
-	private static final String evtManClassName = EventManager.class.getName();
-	static String getWaitDescription() {
-		StackTraceElement[] callStack = Thread.currentThread().getStackTrace();
-		int evtManIdx = -1;
-		// walk out of any EventManager methods
-		for (int i = 0; i < callStack.length; i++) {
-			if (callStack[i].getClassName().equals(evtManClassName)) {
-				evtManIdx = i;
-				continue;
-			}
-
-			// we have walked through the eventManager methods
-			if (evtManIdx != -1)
-				break;
-		}
-
-		// walk past any Entity methods
-		int entIdx = -1;
-		for (int i = evtManIdx + 1; i < callStack.length; i++) {
-			if (callStack[i].getClassName().equals(entClassName)) {
-				entIdx = i;
-				continue;
-			}
-
-			break;
-		}
-
-		StackTraceElement elem;
-		if (entIdx > -1)
-			elem = callStack[entIdx + 1];
-		else
-			elem = callStack[evtManIdx + 1];
-
-		return String.format("%s:%s", elem.getClassName(), elem.getMethodName());
+		trcRecord.clear();
 	}
 
 	@Override
-	public synchronized void traceWait(EventManager e, long curTick, long tick, int priority, ProcessTarget t) {
-		this.addHeader(e.name, curTick);
-		traceLevel--;
+	public void traceEvent(long tick, int priority, ProcessTarget t) {
+		// Don't write anything if not at level 0
+		if (trcRecord.traceLevel != 0)
+			throw new ErrorException("Tracing started incorrectly");
 
-		this.append(String.format("Wait\t%d\t%d\t%s", tick, priority, getWaitDescription()));
-
-		this.finish(e);
+		trcRecord.traceEvent(tick, priority, t);
 	}
 
 	@Override
-	public synchronized void traceEvent(EventManager e, long curTick, long tick, int priority, ProcessTarget t) {
-		this.addHeader(e.name, curTick);
-		this.append(String.format("Event\t%d\t%d\t%s", tick, priority, t.getDescription()));
-		traceLevel++;
-		this.finish(e);
+	public void traceInterrupt(long tick, int priority, ProcessTarget t) {
+		trcRecord.traceInterrupt(tick, priority, t);
 	}
 
 	@Override
-	public synchronized void traceInterrupt(EventManager e, long curTick, long tick, int priority, ProcessTarget t) {
-		this.addHeader(e.name, curTick);
-		this.append(String.format("Int\t%d\t%d\t%s", tick, priority, t.getDescription()));
-		traceLevel++;
-		this.finish(e);
+	public void traceProcessStart(ProcessTarget t) {
+		trcRecord.traceProcessStart(t);
 	}
 
 	@Override
-	public synchronized void traceKill(EventManager e, long curTick, long tick, int priority, ProcessTarget t) {
-		this.addHeader(e.name, curTick);
-		this.append(String.format("Kill\t%d\t%d\t%s", tick, priority, t.getDescription()));
-		this.finish(e);
+	public void traceProcessEnd() {
+		trcRecord.traceProcessEnd();
+		this.finish();
 	}
 
 	@Override
-	public synchronized void traceWaitUntil(EventManager e, long tick) {
-		this.addHeader(e.name, tick);
-		traceLevel--;
-		this.append("WaitUntil");
-		this.finish(e);
+	public void traceWait(long tick, int priority, ProcessTarget t) {
+		trcRecord.traceWait(tick, priority, t);
+		this.finish();
 	}
 
 	@Override
-	public synchronized void traceWaitUntilEnded(EventManager e, long curTick, ProcessTarget t) {
-		this.addHeader(e.name, curTick);
-		this.append(String.format("WaitUntilEnded\t%s", t.getDescription()));
-		this.finish(e);
+	public void traceWaitUntil() {
+		trcRecord.traceWaitUntil();
+		this.finish();
 	}
 
 	@Override
-	public synchronized void traceProcessStart(EventManager e, ProcessTarget t, long tick) {
-		this.addHeader(e.name, tick);
-		this.append(String.format("StartProcess\t%s", t.getDescription()));
-		traceLevel++;
-		this.finish(e);
+	public void traceSchedUntil(ProcessTarget t) {
+		trcRecord.traceSchedUntil(t);
 	}
 
 	@Override
-	public synchronized void traceProcessEnd(EventManager e, long tick) {
-		this.addHeader(e.name, tick);
-		traceLevel--;
-		this.append("Exit");
-		this.finish(e);
+	public void traceSchedProcess(long tick, int priority, ProcessTarget t) {
+		trcRecord.traceSchedProcess(tick, priority, t);
 	}
 
 	@Override
-	public synchronized void traceSchedProcess(EventManager e, long curTick, long tick, int priority, ProcessTarget t) {
-		this.addHeader(e.name, curTick);
-		this.append(String.format("SchedProcess\t%d\t%d\t%s", tick, priority, t.getDescription()));
-		this.finish(e);
+	public void traceKill(long tick, int priority, ProcessTarget t) {
+		trcRecord.traceKill(tick, priority, t);
 	}
+
+	@Override
+	public void traceConditionalEval(ProcessTarget t) {
+		//FIXME: fix conditonal tracing
+		//trcRecord.traceConditionalEval(t);
+	}
+
+	@Override
+	public void traceConditionalEvalEnded(boolean wakeup, ProcessTarget t) {
+		//FIXME: fix conditonal tracing
+		//trcRecord.traceConditionalEvalEnded(wakeup, t);
+	}
+
 }

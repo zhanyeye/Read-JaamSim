@@ -28,16 +28,17 @@ import javax.imageio.ImageIO;
 
 import com.jaamsim.DisplayModels.ColladaModel;
 import com.jaamsim.DisplayModels.DisplayModel;
-import com.jaamsim.DisplayModels.ShapeModel;
 import com.jaamsim.DisplayModels.ImageModel;
+import com.jaamsim.DisplayModels.ShapeModel;
 import com.jaamsim.Graphics.DisplayEntity;
+import com.jaamsim.Graphics.View;
+import com.jaamsim.basicsim.JaamSimModel;
 import com.jaamsim.controllers.RenderManager;
 import com.jaamsim.math.Quaternion;
 import com.jaamsim.math.Transform;
 import com.jaamsim.math.Vec3d;
 import com.jaamsim.math.Vec4d;
 import com.jaamsim.ui.GUIFrame;
-import com.jaamsim.ui.View;
 
 public class PreviewCache {
 
@@ -48,9 +49,11 @@ public class PreviewCache {
 	public PreviewCache() {
 		_imageCache = new HashMap<>();
 
-
-		if (GUIFrame.instance().getSimState() != GUIFrame.SIM_STATE_RUNNING) {
-			dummyEntity = new DisplayEntity();
+		JaamSimModel simModel = GUIFrame.getJaamSimModel();
+		if (simModel.getSimState() != JaamSimModel.SIM_STATE_RUNNING) {
+			dummyEntity = simModel.createInstance(DisplayEntity.class);
+			//FIXME: remove this when models are no longer static
+			dummyEntity.setName("");
 			dummyEntity.kill();
 		}
 	}
@@ -61,9 +64,8 @@ public class PreviewCache {
 
 	/**
 	 * Get the preview image for this, optionally a Runnable can be passed in that will be run when this image is ready
-	 * @param ot
+	 * @param dm
 	 * @param notifier
-	 * @return
 	 */
 	public Future<BufferedImage> getPreview(DisplayModel dm, Runnable notifier) {
 		synchronized (_imageCache) {
@@ -106,8 +108,9 @@ public class PreviewCache {
 			// This will all need to be refactored soonish.
 
 			if (dummyEntity == null) {
-				if (GUIFrame.instance().getSimState() != GUIFrame.SIM_STATE_RUNNING) {
-					dummyEntity = new DisplayEntity();
+				JaamSimModel simModel = GUIFrame.getJaamSimModel();
+				if (simModel.getSimState() != JaamSimModel.SIM_STATE_RUNNING) {
+					dummyEntity = simModel.createInstance(DisplayEntity.class);
 					dummyEntity.kill();
 				} else {
 					// The simulation is running so we can't make the dummy entity
@@ -144,7 +147,7 @@ public class PreviewCache {
 			}
 
 
-			Transform camTrans = new Transform();
+			Transform camTrans;
 			if (!isFlat) {
 				// If this model is 3D, switch to an isometric view
 				Quaternion cameraRot = new Quaternion();

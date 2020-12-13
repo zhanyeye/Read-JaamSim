@@ -18,7 +18,7 @@ package com.jaamsim.BasicObjects;
 
 import com.jaamsim.DisplayModels.ShapeModel;
 import com.jaamsim.Graphics.DisplayEntity;
-import com.jaamsim.Samples.SampleExpInput;
+import com.jaamsim.Samples.SampleInput;
 import com.jaamsim.input.ColourInput;
 import com.jaamsim.input.Keyword;
 import com.jaamsim.input.Output;
@@ -27,45 +27,48 @@ import com.jaamsim.units.DimensionlessUnit;
 
 public class BooleanIndicator extends DisplayEntity {
 
-	@Keyword(description = "An expression returning a boolean value: zero = FALSE, non-zero = TRUE.",
+	@Keyword(description = "An expression returning a boolean value: zero = FALSE, "
+	                     + "non-zero = TRUE.",
 	         exampleList = {"'[Queue1].QueueLength > 2'", "[Server1].Working"})
-	private final SampleExpInput expInput;
+	private final SampleInput expInput;
 
-	@Keyword(description = "The colour of the indicator when the property is true",
+	@Keyword(description = "The colour of the indicator when the DataSource expression is TRUE.",
 	         exampleList = {"green"})
 	private final ColourInput trueColor;
 
-	@Keyword(description = "The colour of the indicator when the property is false",
+	@Keyword(description = "The colour of the indicator when the DataSource expression is FALSE.",
 	         exampleList = {"red"})
 	private final ColourInput falseColor;
 
-	@Keyword(description = "The string displayed by the Text output when the property is true.",
+	@Keyword(description = "The string returned by the Text output when the DataSource expression "
+	                     + "is TRUE.",
 	         exampleList = {"'True text'"})
 	private final StringInput trueText;
 
-	@Keyword(description = "The string displayed by the Text output when the property is false.",
+	@Keyword(description = "The string returned by the Text output when the DataSource expression "
+	                     + "is FALSE.",
 	         exampleList = {"'False text'"})
 	private final StringInput falseText;
 
 	{
-		expInput = new SampleExpInput("OutputName", "Key Inputs", null);
+		expInput = new SampleInput("DataSource", KEY_INPUTS, null);
 		expInput.setUnitType(DimensionlessUnit.class);
-		expInput.setEntity(this);
 		expInput.setRequired(true);
 		this.addInput(expInput);
+		this.addSynonym(expInput, "OutputName");
 
-		trueColor = new ColourInput("TrueColour", "Graphics", ColourInput.GREEN);
+		trueColor = new ColourInput("TrueColour", KEY_INPUTS, ColourInput.GREEN);
 		this.addInput(trueColor);
 		this.addSynonym(trueColor, "TrueColor");
 
-		falseColor = new ColourInput("FalseColour", "Graphics", ColourInput.RED);
+		falseColor = new ColourInput("FalseColour", KEY_INPUTS, ColourInput.RED);
 		this.addInput(falseColor);
 		this.addSynonym(falseColor, "FalseColor");
 
-		trueText = new StringInput("TrueText", "Graphics", "TRUE");
+		trueText = new StringInput("TrueText", KEY_INPUTS, "TRUE");
 		this.addInput(trueText);
 
-		falseText = new StringInput("FalseText", "Graphics", "FALSE");
+		falseText = new StringInput("FalseText", KEY_INPUTS, "FALSE");
 		this.addInput(falseText);
 	}
 
@@ -83,7 +86,8 @@ public class BooleanIndicator extends DisplayEntity {
 	}
 
 	@Output(name = "Text",
-	 description = "If the property is true, then return TrueText.  If the property is false, then return FalseText.",
+	 description = "If the DataSource expression is TRUE, then return TrueText. "
+	             + "If it is FALSE, then return FalseText.",
 	    unitType = DimensionlessUnit.class)
 	public String getText(double simTime) {
 		if (expInput.getValue() == null)

@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2014 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2016-2019 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,15 +20,14 @@ package com.jaamsim.BasicObjects;
 import java.util.ArrayList;
 
 import com.jaamsim.Samples.SampleInput;
-import com.jaamsim.basicsim.Entity;
+import com.jaamsim.Samples.SampleProvider;
 import com.jaamsim.basicsim.EntityTarget;
 import com.jaamsim.events.EventHandle;
 import com.jaamsim.events.EventManager;
 import com.jaamsim.events.ProcessTarget;
 import com.jaamsim.input.BooleanInput;
 import com.jaamsim.input.EntityInput;
-import com.jaamsim.input.EnumInput;
-import com.jaamsim.input.InputErrorException;
+import com.jaamsim.input.IntegerInput;
 import com.jaamsim.input.Keyword;
 import com.jaamsim.input.Output;
 import com.jaamsim.states.DowntimeUser;
@@ -38,52 +38,48 @@ import com.jaamsim.units.TimeUnit;
 
 public class DowntimeEntity extends StateEntity implements StateEntityListener {
 
-	public enum DowntimeTypes {
-		IMMEDIATE,
-		FORCED,
-		OPPORTUNISTIC }
-
-	@Keyword(description = "The simulation time for the first downtime event.  " +
-	                       "The value may be a constant or a probability distribution.  " +
-	                       "If a value is not specified, the Interval keyword is sampled " +
-	                       "to determine the simulation time of the first downtime event.",
+	@Keyword(description = "The calendar or working time for the first planned or unplanned "
+	                     + "maintenance event. If an input is not provided, the first maintenance "
+	                     + "event is determined by the input for the Interval keyword.",
 	         exampleList = {"720 h", "UniformDistribution1" })
 	private final SampleInput firstDowntime;
 
-	@Keyword(description = "The object for which to track working time accumulated in order to schedule a downtime event in objects that have this" +
-	                       "DowntimeEntity defined in their 'DowntimeEntities' keyword.  If this keyword is not set, calendar time will be used to" +
-	                       "determine the IAT.",
-	         exampleList = { "Object1" })
+	@Keyword(description = "The object whose working time determines the occurrence of the "
+	                     + "planned or unplanned maintenance events. Calendar time is used if "
+	                     + "the input is left blank.",
+	         exampleList = {"Object1"})
 	private final EntityInput<StateEntity> iatWorkingEntity;
 
-	@Keyword(description = "The object for which to track working time accumulated in order to complete a downtime event in objects that have this" +
-	                       "DowntimeEntity defined in their 'DowntimeEntities' keyword.  If this keyword is not set, calendar time will be used to" +
-	                       "determine when the downtime will be over.",
-	example = "DowntimeEntity1 DurationWorkingEntity { Object1 }")
+	@Keyword(description = "The object whose working time determines the completion of the "
+	                     + "planned or unplanned maintenance activity. Calendar time is used if "
+	                     + "the input is left blank.",
+	         exampleList = {"Object1"})
 	private final EntityInput<StateEntity> durationWorkingEntity;
 
-	@Keyword(description = "A SampleProvider for the duration of breakdowns.",
-			 exampleList = {"8 h ", "DurationTimeSeries", "DurationDistribution" })
-	private final SampleInput downtimeDurationDistribution;
-
-	@Keyword(description = "A SampleProvider for the time between breakdowns.",
-			 exampleList = {"168 h", "IntervalTimeSeries", "IntervalDistribution" })
+	@Keyword(description = "The calendar or working time between the start of the last planned or "
+	                     + "unplanned maintenance activity and the start of the next maintenance "
+	                     + "activity.",
+	         exampleList = {"168 h", "IntervalValueSequence", "IntervalDistribution" })
 	private final SampleInput downtimeIATDistribution;
 
-	@Keyword(description = "The severity level for the downtime events. The value must be one of the following:\n " +
-             "- IMMEDIATE\n" +
-             "- FORCED\n" +
-             "- OPPORTUNISTIC",
-             example = "DowntimeEntity1 Type { FORCED }")
-	private final EnumInput<DowntimeTypes> type;
+	@Keyword(description = "The calendar or working time required to complete the planned or "
+	                     + "unplanned maintenance activity.",
+	         exampleList = {"8 h ", "DurationValueSequence", "DurationDistribution" })
+	private final SampleInput downtimeDurationDistribution;
 
-	@Keyword(description = "If TRUE, the downtime event will occur in parallel with a present downtime event.",
-	         example = "DowntimeEntity1 Concurrent { FALSE }")
+	@Keyword(description = "If TRUE, the downtime event can occur in parallel with another "
+	                     + "downtime event.",
+	         exampleList = {"FALSE"})
 	protected final BooleanInput concurrent;
 
-	private final ArrayList<DowntimeUser> modelEntityList;  // A list of model entities that have this downtime entity in its DowntimeEntities keyword
+	@Keyword(description = "The maximum number of downtimes pending for the downtime event.",
+            exampleList = {"1"})
+	protected final IntegerInput maxDowntimesPending;
+
+	private final ArrayList<DowntimeUser> downtimeUserList;  // entities that use this downtime entity
 	private boolean down;             // true for the duration of a downtime event
 	private int downtimePendings;    // number of queued downtime events
+	private double downtimePendingStartTime; // the simulation time in seconds at which the downtime pending started
 
 	private double secondsForNextFailure;    // The number of working seconds required before the next downtime event
 	private double secondsForNextRepair;    // The number of working seconds required before the downtime event ends
@@ -91,55 +87,48 @@ public class DowntimeEntity extends StateEntity implements StateEntityListener {
 	private double startTime;        // The start time of the latest downtime event
 	private double endTime;          // the end time of the latest downtime event
 
+	private static final String STATE_DOWNTIME = "Downtime";
+
 	{
-		firstDowntime = new SampleInput("FirstDowntime", "Key Inputs", null);
+		workingStateListInput.setHidden(true);
+
+		firstDowntime = new SampleInput("FirstDowntime", KEY_INPUTS, null);
 		firstDowntime.setUnitType(TimeUnit.class);
 		this.addInput(firstDowntime);
 
-		iatWorkingEntity = new EntityInput<>(StateEntity.class, "IntervalWorkingEntity", "Key Inputs", null);
+		iatWorkingEntity = new EntityInput<>(StateEntity.class, "IntervalWorkingEntity", KEY_INPUTS, null);
 		this.addInput(iatWorkingEntity);
 		this.addSynonym(iatWorkingEntity, "IATWorkingEntity");
 
-		durationWorkingEntity = new EntityInput<>(StateEntity.class, "DurationWorkingEntity", "Key Inputs", null);
+		durationWorkingEntity = new EntityInput<>(StateEntity.class, "DurationWorkingEntity", KEY_INPUTS, null);
 		this.addInput(durationWorkingEntity);
 
-		downtimeIATDistribution = new SampleInput("Interval", "Key Inputs", null);
-		downtimeIATDistribution.setUnitType( TimeUnit.class );
+		downtimeIATDistribution = new SampleInput("Interval", KEY_INPUTS, null);
+		downtimeIATDistribution.setUnitType(TimeUnit.class);
 		downtimeIATDistribution.setRequired(true);
+		downtimeIATDistribution.setValidRange(0.0d, Double.POSITIVE_INFINITY);
 		this.addInput(downtimeIATDistribution);
 		this.addSynonym(downtimeIATDistribution, "IAT");
 		this.addSynonym(downtimeIATDistribution, "TimeBetweenFailures");
 
-		downtimeDurationDistribution = new SampleInput("Duration", "Key Inputs", null);
+		downtimeDurationDistribution = new SampleInput("Duration", KEY_INPUTS, null);
 		downtimeDurationDistribution.setUnitType(TimeUnit.class);
 		downtimeDurationDistribution.setRequired(true);
+		downtimeDurationDistribution.setValidRange(0.0d, Double.POSITIVE_INFINITY);
 		this.addInput(downtimeDurationDistribution);
-		this.addSynonym(downtimeDurationDistribution, "Duration");
+		this.addSynonym(downtimeDurationDistribution, "TimeToRepair");
 
-		type = new EnumInput<> (DowntimeTypes.class, "Type","Key Inputs",null);
-		type.setRequired(true);
-		this.addInput(type);
-
-		concurrent = new BooleanInput("Concurrent", "Key Inputs", false);
+		concurrent = new BooleanInput("Concurrent", KEY_INPUTS, false);
 		concurrent.setHidden(true);
 		this.addInput(concurrent);
 
-		this.addSynonym(downtimeDurationDistribution, "TimeToRepair");
+		maxDowntimesPending = new IntegerInput("MaxDowntimesPending", "Key Inputs", Integer.MAX_VALUE);
+		maxDowntimesPending.setValidRange(1, Integer.MAX_VALUE);
+		this.addInput(maxDowntimesPending);
 	}
 
 	public DowntimeEntity(){
-		modelEntityList = new ArrayList<>();
-	}
-
-	@Override
-	public void validate()
-	throws InputErrorException {
-		super.validate();
-		if( downtimeIATDistribution.getValue() == null && downtimeDurationDistribution.getValue() != null )
-			throw new InputErrorException("When DowntimeDurationDistribution is set, DowntimeIATDistribution must also be set.");
-
-		if( downtimeIATDistribution.getValue() != null && downtimeDurationDistribution.getValue() == null )
-			throw new InputErrorException("When DowntimeIATDistribution is set, DowntimeDurationDistribution must also be set.");
+		downtimeUserList = new ArrayList<>();
 	}
 
 	@Override
@@ -147,22 +136,23 @@ public class DowntimeEntity extends StateEntity implements StateEntityListener {
 		super.earlyInit();
 
 		down = false;
-		modelEntityList.clear();
+		downtimeUserList.clear();
 		downtimePendings = 0;
+		downtimePendingStartTime = 0.0;
 		startTime = 0;
 		endTime = 0;
 
 		if (!this.isActive())
 			return;
 
-		for (StateEntity each : Entity.getClonesOfIterator(StateEntity.class, DowntimeUser.class)) {
+		for (StateEntity each : getJaamSimModel().getClonesOfIterator(StateEntity.class, DowntimeUser.class)) {
 
-			if( ! each.isActive() )
+			if (!each.isActive())
 				continue;
 
 			DowntimeUser du = (DowntimeUser)each;
-			if( du.getMaintenanceEntities().contains(this) || du.getBreakdownEntities().contains(this) )
-				modelEntityList.add(du);
+			if (du.isDowntimeUser(this))
+				downtimeUserList.add(du);
 		}
 	}
 
@@ -171,7 +161,7 @@ public class DowntimeEntity extends StateEntity implements StateEntityListener {
 		super.lateInit();
 
 		// Determine the time for the first downtime event
-		if( firstDowntime.getValue() == null )
+		if (firstDowntime.getValue() == null)
 			secondsForNextFailure = getNextDowntimeIAT();
 		else
 			secondsForNextFailure = firstDowntime.getValue().getNextSample(getSimTime());
@@ -180,47 +170,39 @@ public class DowntimeEntity extends StateEntity implements StateEntityListener {
 	@Override
     public void startUp() {
 		super.startUp();
-
-		if (!this.isActive())
-			return;
-
 		checkProcessNetwork();
-	}
-
-	public DowntimeTypes getType() {
-		return type.getValue();
 	}
 
 	/**
 	 * Get the name of the initial state this Entity will be initialized with.
-	 * @return
 	 */
 	@Override
 	public String getInitialState() {
-		return "Working";
+		return STATE_WORKING;
 	}
 
 	/**
 	 * Tests the given state name to see if it is valid for this Entity.
 	 * @param state
-	 * @return
 	 */
 	@Override
 	public boolean isValidState(String state) {
-		return "Working".equals(state) || "Downtime".equals(state);
+		return STATE_WORKING.equals(state) || STATE_DOWNTIME.equals(state);
 	}
 
 	/**
 	 * Tests the given state name to see if it is counted as working hours when in
 	 * that state..
 	 * @param state
-	 * @return
 	 */
 	@Override
 	public boolean isValidWorkingState(String state) {
-		return "Working".equals(state);
+		return STATE_WORKING.equals(state);
 	}
 
+	/**
+	 * EndDowntimeTarget
+	 */
 	private static class EndDowntimeTarget extends EntityTarget<DowntimeEntity> {
 		EndDowntimeTarget(DowntimeEntity ent) {
 			super(ent, "endDowntime");
@@ -234,6 +216,9 @@ public class DowntimeEntity extends StateEntity implements StateEntityListener {
 	private final ProcessTarget endDowntime = new EndDowntimeTarget(this);
 	private final EventHandle endDowntimeHandle = new EventHandle();
 
+	/**
+	 * ScheduleDowntimeTarget
+	 */
 	private static class ScheduleDowntimeTarget extends EntityTarget<DowntimeEntity> {
 		ScheduleDowntimeTarget(DowntimeEntity ent) {
 			super(ent, "scheduleDowntime");
@@ -247,13 +232,18 @@ public class DowntimeEntity extends StateEntity implements StateEntityListener {
 	private final ProcessTarget scheduleDowntime = new ScheduleDowntimeTarget(this);
 	private final EventHandle scheduleDowntimeHandle = new EventHandle();
 
+	/**
+	 * Monitors the accumulation of time towards the start of the next maintenance activity or
+	 * the completion of the present maintenance activity. This method is called whenever an
+	 * entity affected by this type of maintenance changes state.
+	 */
 	public void checkProcessNetwork() {
 
 		// Schedule the next downtime event
-		if( ! scheduleDowntimeHandle.isScheduled() ) {
+		if (!scheduleDowntimeHandle.isScheduled()) {
 
 			// 1) Calendar time
-			if( iatWorkingEntity.getValue() == null ) {
+			if (iatWorkingEntity.getValue() == null) {
 				double workingSecs = this.getSimTime();
 				double waitSecs = secondsForNextFailure - workingSecs;
 				scheduleProcess(Math.max(waitSecs, 0.0), 5, scheduleDowntime, scheduleDowntimeHandle);
@@ -261,7 +251,7 @@ public class DowntimeEntity extends StateEntity implements StateEntityListener {
 			}
 			// 2) Working time
 			else {
-				if (iatWorkingEntity.getValue().isWorking()) {
+				if (iatWorkingEntity.getValue().isWorkingState()) {
 					double workingSecs = iatWorkingEntity.getValue().getWorkingTime();
 					double waitSecs = secondsForNextFailure - workingSecs;
 					scheduleProcess(Math.max(waitSecs, 0.0), 5, scheduleDowntime, scheduleDowntimeHandle);
@@ -270,7 +260,7 @@ public class DowntimeEntity extends StateEntity implements StateEntityListener {
 		}
 		// the next event is already scheduled.  If the working entity has stopped working, need to cancel the event
 		else {
-			if( iatWorkingEntity.getValue() != null && ! iatWorkingEntity.getValue().isWorking() ) {
+			if (iatWorkingEntity.getValue() != null && !iatWorkingEntity.getValue().isWorkingState()) {
 				EventManager.killEvent(scheduleDowntimeHandle);
 			}
 		}
@@ -278,7 +268,7 @@ public class DowntimeEntity extends StateEntity implements StateEntityListener {
 		// 1) Determine when to end the current downtime event
 		if (down) {
 
-			if( durationWorkingEntity.getValue() == null ) {
+			if (durationWorkingEntity.getValue() == null) {
 
 				if (endDowntimeHandle.isScheduled())
 					return;
@@ -291,7 +281,7 @@ public class DowntimeEntity extends StateEntity implements StateEntityListener {
 			}
 
 			// The Entity is working, schedule the end of the downtime event
-			if (durationWorkingEntity.getValue().isWorking()) {
+			if (durationWorkingEntity.getValue().isWorkingState()) {
 
 				if (endDowntimeHandle.isScheduled())
 					return;
@@ -307,26 +297,24 @@ public class DowntimeEntity extends StateEntity implements StateEntityListener {
 		}
 		// 2) Start the next downtime event if required/possible
 		else {
-			if( downtimePendings > 0 ) {
+			if (downtimePendings > 0) {
 
-				// If all entities can start the downtime
+				// If all entities are ready, start the downtime event
 				boolean allEntitiesCanStart = true;
-
-				// If immediate option is selected, don't have to wait for entities to get ready
-				for( DowntimeUser each : modelEntityList ) {
-					if( ! each.canStartDowntime(this) ) {
+				for (DowntimeUser each : downtimeUserList) {
+					if (!each.canStartDowntime(this)) {
 						allEntitiesCanStart = false;
 						break;
 					}
 				}
-
-				if( allEntitiesCanStart ) {
+				if (allEntitiesCanStart) {
 					this.startDowntime();
 				}
 			}
 		}
 	}
 
+	// PrepareForDowntimeTarget
 	private static final class PrepareForDowntimeTarget extends ProcessTarget {
 		private final DowntimeEntity ent;
 		private final DowntimeUser user;
@@ -348,7 +336,12 @@ public class DowntimeEntity extends StateEntity implements StateEntityListener {
 	}
 
 	public void scheduleDowntime() {
+		if (downtimePendings == maxDowntimesPending.getValue())
+			return;
+
 		downtimePendings++;
+		if( downtimePendings == 1 )
+			downtimePendingStartTime = this.getSimTime();
 
 		// Determine the time the next downtime event is due
 		// Calendar time based
@@ -361,7 +354,7 @@ public class DowntimeEntity extends StateEntity implements StateEntityListener {
 		}
 
 		// prepare all entities for the downtime event
-		for (DowntimeUser each : modelEntityList) {
+		for (DowntimeUser each : downtimeUserList) {
 			EventManager.startProcess(new PrepareForDowntimeTarget(this, each));
 		}
 
@@ -369,7 +362,7 @@ public class DowntimeEntity extends StateEntity implements StateEntityListener {
 	}
 
 	/**
-	 * When enough working hours have been accumulated by WorkingEntity, trigger all entities in modelEntityList to perform downtime
+	 * When enough working hours have been accumulated by WorkingEntity, trigger all entities in downtimeUserList to perform downtime
 	 */
 	private void startDowntime() {
 		setDown(true);
@@ -392,7 +385,7 @@ public class DowntimeEntity extends StateEntity implements StateEntityListener {
 		endTime = startTime + downDuration;
 
 		// Loop through all objects that this object is watching and trigger them to stop working.
-		for (DowntimeUser each : modelEntityList) {
+		for (DowntimeUser each : downtimeUserList) {
 			each.startDowntime(this);
 		}
 
@@ -402,16 +395,16 @@ public class DowntimeEntity extends StateEntity implements StateEntityListener {
 	private void setDown(boolean b) {
 		down = b;
 		if (down)
-			setPresentState("Downtime");
+			setPresentState(STATE_DOWNTIME);
 		else
-			setPresentState("Working");
+			setPresentState(STATE_WORKING);
 	}
 
-	private void endDowntime() {
+	final void endDowntime() {
 		setDown(false);
 
 		// Loop through all objects that this object is watching and try to restart them.
-		for( DowntimeUser each : modelEntityList ) {
+		for (DowntimeUser each : downtimeUserList) {
 			each.endDowntime(this);
 		}
 
@@ -422,28 +415,50 @@ public class DowntimeEntity extends StateEntity implements StateEntityListener {
 	 * Return the time in seconds of the next downtime IAT
 	 */
 	private double getNextDowntimeIAT() {
-		if (downtimeIATDistribution.getValue() == null)
-			return 10e10d;
-
 		return downtimeIATDistribution.getValue().getNextSample(getSimTime());
+	}
+
+	/**
+	 * Return the expected time in seconds of the first downtime
+	 */
+	public double getExpectedFirstDowntime() {
+		return firstDowntime.getValue().getMeanValue( getSimTime() );
+	}
+
+	/**
+	 * Return the expected time in seconds of the downtime IAT
+	 */
+	public double getExpectedDowntimeIAT() {
+		return downtimeIATDistribution.getValue().getMeanValue( getSimTime() );
+	}
+
+	/**
+	 * Return the expected time in seconds of the downtime duration
+	 */
+	public double getExpectedDowntimeDuration() {
+		return downtimeDurationDistribution.getValue().getMeanValue( getSimTime() );
 	}
 
 	/**
 	 * Return the time in seconds of the next downtime duration
 	 */
 	private double getDowntimeDuration() {
-		// If a distribution was specified, then select a duration randomly from the distribution
-		if (downtimeDurationDistribution.getValue() == null)
-			return 0.0d;
-
 		return downtimeDurationDistribution.getValue().getNextSample(getSimTime());
+	}
+
+	public SampleProvider getDowntimeDurationDistribution() {
+		return downtimeDurationDistribution.getValue();
 	}
 
 	public boolean isDown() {
 		return down;
 	}
 
-	public boolean downtimePending() {
+	/**
+	 * Returns whether the downtime event is ready to begin.
+	 * @return true if downtime can begin
+	 */
+	public boolean isDowntimePending() {
 		return downtimePendings > 0;
 	}
 
@@ -458,34 +473,10 @@ public class DowntimeEntity extends StateEntity implements StateEntityListener {
 		if (durationWorkingEntity.getValue() == ent)
 			return true;
 
-		if( modelEntityList.contains(ent) )
+		if (downtimeUserList.contains(ent))
 			return true;
 
 		return false;
-	}
-
-	/**
-	 * Return the amount of time in seconds (from the current time) that the next downtime event is due
-	 * @return
-	 */
-	public double getTimeUntilNextEvent() {
-
-		// 1) Calendar time
-		if( iatWorkingEntity.getValue() == null ) {
-			double workingSecs = this.getSimTime();
-			double waitSecs = secondsForNextFailure - workingSecs;
-			return waitSecs;
-		}
-		// 2) Working time
-		else {
-			if (iatWorkingEntity.getValue().isWorking()) {
-				double workingSecs = iatWorkingEntity.getValue().getWorkingTime();
-				double waitSecs = secondsForNextFailure - workingSecs;
-				return waitSecs;
-			}
-		}
-
-		return Double.POSITIVE_INFINITY;
 	}
 
 	@Override
@@ -497,17 +488,87 @@ public class DowntimeEntity extends StateEntity implements StateEntityListener {
 		return endTime;
 	}
 
+	public double getDowntimePendingStartTime() {
+		return downtimePendingStartTime;
+	}
+
+	public ArrayList<DowntimeUser> getDowntimeUserList() {
+		return downtimeUserList;
+	}
+
+	// ******************************************************************************************************
+	// OUTPUTS
+	// ******************************************************************************************************
+
+	@Output(name = "NumberPending",
+	 description = "The number of downtime events that are backlogged. "
+	             + "If two or more downtime events are pending they will be performed one after "
+	             + "another.",
+	    sequence = 0)
+	public double getNumberPending(double simTime) {
+		return downtimePendings;
+	}
+
 	@Output(name = "StartTime",
-			description = "The time that the current event started.",
-			unitType = TimeUnit.class)
-	public double getStartTime( double simTime ) {
+	 description = "The time that the most recent downtime event started.",
+	    unitType = TimeUnit.class,
+	    sequence = 1)
+	public double getStartTime(double simTime) {
 		return startTime;
 	}
 
 	@Output(name = "EndTime",
-			description = "The time that the current event will finish.",
-			unitType = TimeUnit.class)
-	public double getEndTime( double simTime ) {
+	 description = "The time that the most recent downtime event finished or will finish.",
+	    unitType = TimeUnit.class,
+	    sequence = 2)
+	public double getEndTime(double simTime) {
 		return endTime;
 	}
+
+	@Output(name = "NextStartTime",
+	 description = "The time at which the next downtime event will begin. "
+	             + "If downtime is based on the working time for an entity, then the next start "
+	             + "time is estimated assuming that it will work continuously until the downtime "
+	             + "event occurs.",
+	    unitType = TimeUnit.class,
+	    sequence = 3)
+	public double getNextStartTime(double simTime) {
+		StateEntity ent = iatWorkingEntity.getValue();
+
+		// 1) Calendar time
+		if (ent == null) {
+			return secondsForNextFailure;
+		}
+
+		// 2) Working time
+		if (isDown())
+			return endTime + (secondsForNextFailure - ent.getWorkingTime(simTime));
+		return simTime + (secondsForNextFailure - ent.getWorkingTime(simTime));
+	}
+
+	@Output(name = "CalculatedDowntimeRatio",
+	 description = "The value calculated directly from model inputs for:\n"
+	             + "(avg. downtime duration)/(avg. downtime interval)",
+	    sequence = 4)
+	public double getCalculatedDowntimeRatio(double simTime) {
+		if (downtimeDurationDistribution.getValue() == null
+				|| downtimeIATDistribution.getValue() == null)
+			return Double.NaN;
+		double dur = downtimeDurationDistribution.getValue().getMeanValue(simTime);
+		double iat = downtimeIATDistribution.getValue().getMeanValue(simTime);
+		return dur/iat;
+	}
+
+	@Output(name = "Availability",
+	 description = "The fraction of calendar time (excluding the initialisation period) during "
+	             + "which this type of downtime did not occur.",
+	    sequence = 5)
+	public double getAvailability(double simTime) {
+		double total = simTime;
+		if (simTime > getSimulation().getInitializationTime())
+			total -= getSimulation().getInitializationTime();
+		double down = this.getTimeInState(simTime, STATE_DOWNTIME);
+		return 1.0d - down/total;
+	}
+
 }

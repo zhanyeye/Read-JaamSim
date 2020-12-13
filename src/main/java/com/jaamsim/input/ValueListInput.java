@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2013 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2017-2020 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +17,8 @@
  */
 package com.jaamsim.input;
 
+import com.jaamsim.basicsim.Entity;
+import com.jaamsim.basicsim.JaamSimModel;
 import com.jaamsim.datatypes.DoubleVector;
 import com.jaamsim.units.DimensionlessUnit;
 import com.jaamsim.units.Unit;
@@ -26,6 +29,8 @@ public class ValueListInput extends ListInput<DoubleVector> {
 	private double maxValue = Double.POSITIVE_INFINITY;
 	private double sumValue = Double.NaN;
 	private double sumTolerance = 1e-10d;
+	private double sumMin = Double.NEGATIVE_INFINITY;
+	private double sumMax = Double.POSITIVE_INFINITY;
 	private int[] validCounts = null; // valid list sizes not including units
 	private int monotonic = 0;  // -1 = monotonically decreasing, +1 = monotonically increasing
 
@@ -40,16 +45,25 @@ public class ValueListInput extends ListInput<DoubleVector> {
 	}
 
 	@Override
-	public void parse(KeywordIndex kw)
+	public void parse(Entity thisEnt, KeywordIndex kw)
 	throws InputErrorException {
-		DoubleVector temp = Input.parseDoubles(kw, minValue, maxValue, unitType);
+		DoubleVector temp = Input.parseDoubles(thisEnt.getJaamSimModel(), kw, minValue, maxValue, unitType);
 		Input.assertCount(temp, validCounts);
 		Input.assertCountRange(temp, minCount, maxCount);
 		Input.assertMonotonic(temp, monotonic);
 		if (!Double.isNaN(sumValue))
 			Input.assertSumTolerance(temp, sumValue, sumTolerance);
+		Input.assertSumRange(temp, sumMin, sumMax);
 
 		value = temp;
+	}
+
+	@Override
+	public String getValidInputDesc() {
+		if (unitType == DimensionlessUnit.class) {
+			return Input.VALID_VALUE_LIST_DIMLESS;
+		}
+		return Input.VALID_VALUE_LIST;
 	}
 
 	@Override
@@ -70,6 +84,11 @@ public class ValueListInput extends ListInput<DoubleVector> {
 		sumTolerance = tol;
 	}
 
+	public void setValidSumRange(double min, double max) {
+		sumMin = min;
+		sumMax = max;
+	}
+
 	public void setValidCounts(int... list) {
 		validCounts = list;
 	}
@@ -79,7 +98,7 @@ public class ValueListInput extends ListInput<DoubleVector> {
 	}
 
 	@Override
-	public String getDefaultString() {
+	public String getDefaultString(JaamSimModel simModel) {
 		if (defValue == null || defValue.size() == 0)
 			return "";
 
@@ -87,12 +106,12 @@ public class ValueListInput extends ListInput<DoubleVector> {
 		for (int i = 0; i < defValue.size(); i++) {
 			if (i > 0)
 				tmp.append(SEPARATOR);
-			tmp.append(defValue.get(i));
+			tmp.append(defValue.get(i)/simModel.getDisplayedUnitFactor(unitType));
 		}
 
 		if (unitType != Unit.class) {
 			tmp.append(SEPARATOR);
-			tmp.append(Unit.getSIUnit(unitType));
+			tmp.append(simModel.getDisplayedUnit(unitType));
 		}
 
 		return tmp.toString();

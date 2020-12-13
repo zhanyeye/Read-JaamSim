@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2013 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2020 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,20 +27,20 @@ import com.jaamsim.units.TimeUnit;
 public class EntityTracer extends Entity {
 
 @Keyword(description = "The time at which to start tracing Entities",
-         example = "Trace1 StartTime { 500 h }")
+         exampleList = {"500 h"})
 private final ValueInput startTime;
 
 @Keyword(description = "The Entities to trace",
-         example = "Trace1 Entities { Ent1 Ent2 Ent3 }")
+         exampleList = {"Ent1 Ent2 Ent3"})
 private final EntityListInput<Entity> entities;
 
 {
-	startTime = new ValueInput("StartTime", "Key Inputs", 0.0d);
+	startTime = new ValueInput("StartTime", KEY_INPUTS, 0.0d);
 	startTime.setUnitType(TimeUnit.class);
 	startTime.setValidRange(0.0d, Double.POSITIVE_INFINITY);
 	this.addInput(startTime);
 
-	entities = new EntityListInput<>(Entity.class, "Entities", "Key Inputs", new ArrayList<Entity>(0));
+	entities = new EntityListInput<>(Entity.class, "Entities", KEY_INPUTS, new ArrayList<Entity>(0));
 	this.addInput(entities);
 }
 
@@ -47,6 +48,8 @@ public EntityTracer() {}
 
 @Override
 public void startUp() {
+	super.startUp();
+
 	if (entities.getValue().isEmpty() || startTime.getValue() == 0.0d)
 		return;
 

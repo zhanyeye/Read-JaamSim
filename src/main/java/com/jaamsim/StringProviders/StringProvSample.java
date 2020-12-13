@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2015 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2017-2018 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,6 +27,26 @@ public class StringProvSample implements StringProvider {
 	}
 
 	@Override
+	public String getNextString(double simTime) {
+		return Double.toString(samp.getNextSample(simTime));
+	}
+
+	@Override
+	public String getNextString(double simTime, double siFactor) {
+		return Double.toString(samp.getNextSample(simTime)/siFactor);
+	}
+
+	@Override
+	public String getNextString(double simTime, double siFactor, boolean integerValue) {
+		if (integerValue) {
+			return Double.toString((int)(samp.getNextSample(simTime)/siFactor));
+		}
+		else {
+			return Double.toString(samp.getNextSample(simTime)/siFactor);
+		}
+	}
+
+	@Override
 	public String getNextString(double simTime, String fmt, double siFactor) {
 		return String.format(fmt, samp.getNextSample(simTime)/siFactor);
 	}
@@ -33,6 +54,10 @@ public class StringProvSample implements StringProvider {
 	@Override
 	public String toString() {
 		return samp.toString();
+	}
+
+	public SampleProvider getSampleProvider() {
+		return samp;
 	}
 
 }

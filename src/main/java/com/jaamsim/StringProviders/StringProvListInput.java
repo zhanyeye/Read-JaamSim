@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2015 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2017-2020 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,49 +22,17 @@ import java.util.Collections;
 
 import com.jaamsim.Samples.SampleProvider;
 import com.jaamsim.basicsim.Entity;
+import com.jaamsim.basicsim.JaamSimModel;
 import com.jaamsim.input.Input;
 import com.jaamsim.input.InputErrorException;
 import com.jaamsim.input.KeywordIndex;
 import com.jaamsim.input.ListInput;
-import com.jaamsim.units.Unit;
+import com.jaamsim.units.DimensionlessUnit;
 
 public class StringProvListInput extends ListInput<ArrayList<StringProvider>> {
 
-	private ArrayList<Class<? extends Unit>> unitTypeList;
-	private Entity thisEnt;
-
 	public StringProvListInput(String key, String cat, ArrayList<StringProvider> def) {
 		super(key, cat, def);
-		// TODO Auto-generated constructor stub
-	}
-
-	public void setUnitTypeList(ArrayList<Class<? extends Unit>> utList) {
-		unitTypeList = new ArrayList<>(utList);
-	}
-
-	public void setUnitType(Class<? extends Unit> u) {
-		ArrayList<Class<? extends Unit>> utList = new ArrayList<>(1);
-		utList.add(u);
-		this.setUnitTypeList(utList);
-	}
-
-	/**
-	 * Returns the unit type for the specified expression.
-	 * <p>
-	 * If the number of expressions exceeds the number of unit types
-	 * then the last unit type in the list is returned.
-	 * @param i - index of the expression
-	 * @return unit type for the expression
-	 */
-	public Class<? extends Unit> getUnitType(int i) {
-		if (unitTypeList.isEmpty())
-			return null;
-		int k = Math.min(i, unitTypeList.size()-1);
-		return unitTypeList.get(k);
-	}
-
-	public void setEntity(Entity ent) {
-		thisEnt = ent;
 	}
 
 	@Override
@@ -75,35 +44,125 @@ public class StringProvListInput extends ListInput<ArrayList<StringProvider>> {
 	}
 
 	@Override
-	public void parse(KeywordIndex kw) throws InputErrorException {
+	public void copyFrom(Entity thisEnt, Input<?> in) {
+		super.copyFrom(thisEnt, in);
+
+		// An expression input must be re-parsed to reset the entity referred to by "this"
+		parseFrom(thisEnt, in);
+	}
+
+	@Override
+	public void parse(Entity thisEnt, KeywordIndex kw) throws InputErrorException {
 		ArrayList<KeywordIndex> subArgs = kw.getSubArgs();
 		ArrayList<StringProvider> temp = new ArrayList<>(subArgs.size());
 		for (int i = 0; i < subArgs.size(); i++) {
 			KeywordIndex subArg = subArgs.get(i);
 			try {
-				StringProvider sp = Input.parseStringProvider(subArg, thisEnt, getUnitType(i));
+				StringProvider sp = Input.parseStringProvider(subArg, thisEnt, DimensionlessUnit.class);
 				temp.add(sp);
 			}
 			catch (InputErrorException e) {
 				if (subArgs.size() == 1)
 					throw new InputErrorException(e.getMessage());
 				else
-					throw new InputErrorException(INP_ERR_ELEMENT, i, e.getMessage());
+					throw new InputErrorException(INP_ERR_ELEMENT, i+1, e.getMessage());
 			}
 		}
 		value = temp;
+		this.setValid(true);
 	}
 
 	@Override
-	public ArrayList<String> getValidOptions() {
+	public String getValidInputDesc() {
+		return Input.VALID_STRING_PROV_LIST;
+	}
+
+	@Override
+	public ArrayList<String> getValidOptions(Entity ent) {
 		ArrayList<String> list = new ArrayList<>();
-		for (Entity each : Entity.getClonesOfIterator(Entity.class, SampleProvider.class)) {
+		JaamSimModel simModel = ent.getJaamSimModel();
+		for (Entity each : simModel.getClonesOfIterator(Entity.class, SampleProvider.class)) {
 			SampleProvider samp = (SampleProvider)each;
-			if (unitTypeList.contains(samp.getUnitType()))
+			if (samp.getUnitType() == DimensionlessUnit.class)
 				list.add(each.getName());
 		}
-		Collections.sort(list);
+		Collections.sort(list, Input.uiSortOrder);
 		return list;
+	}
+
+	@Override
+	public void getValueTokens(ArrayList<String> toks) {
+		if (value == null) return;
+
+		for (int i = 0; i < value.size(); i++) {
+			toks.add("{");
+			toks.add(value.get(i).toString());
+			toks.add("}");
+		}
+	}
+
+	@Override
+	public String getDefaultString() {
+		if (defValue == null || defValue.isEmpty()) {
+			return "";
+		}
+
+		StringBuilder tmp = new StringBuilder();
+		for (int i = 0; i < defValue.size(); i++) {
+			if (i > 0)
+				tmp.append(SEPARATOR);
+
+			tmp.append("{ ");
+			tmp.append(defValue.get(i));
+			tmp.append(" }");
+		}
+
+		return tmp.toString();
+	}
+
+	@Override
+	public boolean removeReferences(Entity ent) {
+		if (value == null)
+			return false;
+
+		ArrayList<StringProvider> list = new ArrayList<>();
+		for (StringProvider samp : value) {
+			if (samp instanceof StringProvSample) {
+				StringProvSample spsamp = (StringProvSample) samp;
+				if (spsamp.getSampleProvider() == ent) {
+					list.add(samp);
+				}
+			}
+		}
+		boolean ret = value.removeAll(list);
+		return ret;
+	}
+
+	@Override
+	public boolean useExpressionBuilder() {
+		return true;
+	}
+
+	@Override
+	public String getPresentValueString(JaamSimModel simModel, double simTime) {
+		if (value == null)
+			return "";
+
+		StringBuilder sb = new StringBuilder();
+		boolean first = true;
+		for (int i = 0; i < value.size(); i++) {
+			StringProvider prov = value.get(i);
+			if (!first) {
+				first = false;
+			}
+			else {
+				sb.append(Input.SEPARATOR);
+			}
+			sb.append("{").append(Input.BRACE_SEPARATOR);
+			sb.append(prov.getNextString(simTime));
+			sb.append(Input.BRACE_SEPARATOR).append("}");
+		}
+		return sb.toString();
 	}
 
 }

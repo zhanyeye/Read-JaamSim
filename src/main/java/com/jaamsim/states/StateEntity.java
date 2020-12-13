@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2014 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2018-2020 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,34 +17,44 @@
  */
 package com.jaamsim.states;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.Map.Entry;
 
 import com.jaamsim.Graphics.DisplayEntity;
 import com.jaamsim.basicsim.Entity;
 import com.jaamsim.basicsim.FileEntity;
+import com.jaamsim.basicsim.JaamSimModel;
 import com.jaamsim.events.EventManager;
 import com.jaamsim.input.BooleanInput;
-import com.jaamsim.input.InputAgent;
+import com.jaamsim.input.ColourInput;
 import com.jaamsim.input.Keyword;
 import com.jaamsim.input.Output;
 import com.jaamsim.input.StringKeyInput;
+import com.jaamsim.input.StringListInput;
+import com.jaamsim.math.Color4d;
 import com.jaamsim.units.DimensionlessUnit;
 import com.jaamsim.units.TimeUnit;
 
-public class StateEntity extends DisplayEntity {
+public abstract class StateEntity extends DisplayEntity implements StateUser {
 
-	@Keyword(description = "A list of state/DisplayEntity pairs. For each state," +
-			" the graphics will be changed to those for the corresponding DisplayEntity.",
-	         example = "Object1  StateGraphics { { idle DisplayEntity1 } { working DisplayEntity2 }")
+	@Keyword(description = "A list of state/DisplayEntity pairs. For each state, the graphics "
+	                     + "will be changed to those for the corresponding DisplayEntity.",
+	         exampleList = {"{ idle DisplayEntity1 } { working DisplayEntity2 }"})
 	protected final StringKeyInput<DisplayEntity> stateGraphics;
 
 	@Keyword(description = "If TRUE, a log file (.trc) will be printed with the time of every state change during the run.",
-	         example = "Object1  TraceState { TRUE }")
+	         exampleList = {"TRUE"})
 	private final BooleanInput traceState;
+
+	@Keyword(description = "A list of states for which the entity is considered working.",
+		     exampleList = "'Transit - Seg1L' 'Transit - Seg1B'")
+	protected final StringListInput workingStateListInput;
 
 	private StateRecord presentState; // The present state of the entity
 	private final HashMap<String, StateRecord> states;
@@ -51,17 +62,29 @@ public class StateEntity extends DisplayEntity {
 
 	private long lastStateCollectionTick;
 	private long workingTicks;
+	private boolean useCurrentCycle;
 
 	protected FileEntity stateReportFile;        // The file to store the state information
 
+	protected static final String STATE_IDLE = "Idle";
+	protected static final String STATE_WORKING = "Working";
+	protected static final String STATE_INACTIVE = "Inactive";
+
+	protected static final Color4d COL_IDLE = ColourInput.LIGHT_GREY;
+	protected static final Color4d COL_WORKING = ColourInput.GREEN;
+	protected static final Color4d COL_INACTIVE = ColourInput.WHITE;
+
 	{
-		stateGraphics = new StringKeyInput<>(DisplayEntity.class, "StateGraphics", "Key Inputs");
+		stateGraphics = new StringKeyInput<>(DisplayEntity.class, "StateGraphics", FORMAT);
 		stateGraphics.setHidden(true);
 		this.addInput(stateGraphics);
 
-		traceState = new BooleanInput("TraceState", "Key Inputs", false);
+		traceState = new BooleanInput("TraceState", KEY_INPUTS, false);
 		traceState.setHidden(true);
 		this.addInput(traceState);
+
+		workingStateListInput = new StringListInput("WorkingStateList", MAINTENANCE, new ArrayList<String>(0));
+		this.addInput(workingStateListInput);
 	}
 
 	public StateEntity() {
@@ -75,13 +98,17 @@ public class StateEntity extends DisplayEntity {
 
 		this.initStateData();
 
-		if (testFlag(FLAG_GENERATED))
+		if (this.isGenerated())
 			return;
 
 		// Create state trace file if required
 		if (traceState.getValue()) {
-			String fileName = InputAgent.getReportFileName(InputAgent.getRunName() + "-" + this.getName() + ".trc");
-			stateReportFile = new FileEntity( fileName);
+			JaamSimModel simModel = getJaamSimModel();
+			String fileName = simModel.getReportFileName(simModel.getRunName() + "-" + this.getName() + ".trc");
+			File f = new File(fileName);
+			if (f.exists() && !f.delete())
+				error("Cannot delete the existing trace file %s", f);
+			stateReportFile = new FileEntity(f);
 		}
 	}
 
@@ -90,14 +117,10 @@ public class StateEntity extends DisplayEntity {
 		super.lateInit();
 
 		stateListeners.clear();
-		/**
-		 * 过滤实现了StateEntityListener接口的Entity类
-		 */
-		for (Entity ent : Entity.getClonesOfIterator(Entity.class, StateEntityListener.class)) {
+		for (Entity ent : getJaamSimModel().getClonesOfIterator(Entity.class, StateEntityListener.class)) {
 			StateEntityListener sel = (StateEntityListener)ent;
-			if (sel.isWatching(this)) {
+			if (sel.isWatching(this))
 				stateListeners.add(sel);
-			}
 		}
 	}
 
@@ -107,14 +130,14 @@ public class StateEntity extends DisplayEntity {
 			lastStateCollectionTick = getSimTicks();
 		workingTicks = 0;
 		states.clear();
+		useCurrentCycle = false;
 
-		String initState = getInitialState().intern();
-		StateRecord init = new StateRecord(initState, isValidWorkingState(initState));
-		init.startTick = lastStateCollectionTick;
+		StateRecord init = this.createRecord(getInitialState());
+		init.setStartTick(lastStateCollectionTick);
 		presentState = init;
-		states.put(init.name, init);
+		states.put(init.getName(), init);
 
-		this.setGraphicsForState(initState);
+		this.setGraphicsForState(init.getName());
 	}
 
 	public ArrayList<StateEntityListener> getStateListeners() {
@@ -123,39 +146,39 @@ public class StateEntity extends DisplayEntity {
 
 	/**
 	 * Get the name of the initial state this Entity will be initialized with.
-	 * @return
 	 */
 	public String getInitialState() {
-		return "Idle";
+		return isActive() ? STATE_IDLE : STATE_INACTIVE;
 	}
 
 	/**
 	 * Tests the given state name to see if it is valid for this Entity.
 	 * @param state
-	 * @return
 	 */
 	public boolean isValidState(String state) {
-		return "Idle".equals(state) || "Working".equals(state);
+		return STATE_IDLE.equals(state) || STATE_WORKING.equals(state)
+				|| STATE_INACTIVE.equals(state);
 	}
 
 	/**
 	 * Tests the given state name to see if it is counted as working hours when in
 	 * that state..
 	 * @param state
-	 * @return
 	 */
 	public boolean isValidWorkingState(String state) {
-		return "Working".equals(state);
+
+		if( workingStateListInput.getValue().size() > 0 )
+			return workingStateListInput.getValue().contains( state );
+
+		return STATE_WORKING.equals(state);
 	}
 
-	/**
-	 * Sets the state of this Entity to the given state.
-	 */
+	@Override
 	public final void setPresentState( String state ) {
 		if (presentState == null)
 			this.initStateData();
 
-		if (presentState.name.equals(state))
+		if (presentState.getName().equals(state))
 			return;
 
 		StateRecord nextState = states.get(state);
@@ -163,15 +186,14 @@ public class StateEntity extends DisplayEntity {
 			if (!isValidState(state))
 				error("Specified state: %s is not valid", state);
 
-			String intState = state.intern();
-			nextState = new StateRecord(intState, isValidWorkingState(intState));
-			states.put(nextState.name, nextState);
+			nextState = this.createRecord(state);
+			states.put(nextState.getName(), nextState);
 		}
 
 		this.setGraphicsForState(state);
 
 		updateStateStats();
-		nextState.startTick = lastStateCollectionTick;
+		nextState.setStartTick(lastStateCollectionTick);
 
 		StateRecord prev = presentState;
 		presentState = nextState;
@@ -211,7 +233,7 @@ public class StateEntity extends DisplayEntity {
 			double timeOfPrevStart = evt.ticksToSeconds(prev.getStartTick());
 			stateReportFile.format("%.5f  %s.setState( \"%s\" ) dt = %g\n",
 			                       timeOfPrevStart, this.getName(),
-			                       prev.name, duration);
+			                       prev.getName(), duration);
 			stateReportFile.flush();
 		}
 
@@ -231,9 +253,8 @@ public class StateEntity extends DisplayEntity {
 		long durTicks = curTick - lastStateCollectionTick;
 		lastStateCollectionTick = curTick;
 
-		presentState.totalTicks += durTicks;
-		presentState.currentCycleTicks += durTicks;
-		if (presentState.working)
+		presentState.addTicks(durTicks);
+		if (presentState.isWorking())
 			workingTicks += durTicks;
 	}
 
@@ -242,11 +263,8 @@ public class StateEntity extends DisplayEntity {
 	 */
 	public void collectInitializationStats() {
 		updateStateStats();
-
 		for (StateRecord each : states.values()) {
-			each.initTicks = each.totalTicks;
-			each.totalTicks = 0;
-			each.completedCycleTicks = 0;
+			each.finishWarmUp();
 		}
 	}
 
@@ -255,11 +273,8 @@ public class StateEntity extends DisplayEntity {
 	 */
 	public void clearReportStats() {
 		updateStateStats();
-
-		// clear totalHours for each state record
 		for (StateRecord each : states.values()) {
-			each.totalTicks = 0;
-			each.completedCycleTicks = 0;
+			each.clearStats();
 		}
 	}
 
@@ -268,10 +283,8 @@ public class StateEntity extends DisplayEntity {
 	 */
 	public void clearCurrentCycleStats() {
 		updateStateStats();
-
-		// clear current cycle hours for each state record
 		for (StateRecord each : states.values()) {
-			each.currentCycleTicks = 0;
+			each.clearCurrentCycleStats();
 		}
 	}
 
@@ -280,12 +293,15 @@ public class StateEntity extends DisplayEntity {
 	 */
 	public void collectCycleStats() {
 		updateStateStats();
-
-		// finalize cycle for each state record
+		useCurrentCycle = true;
 		for (StateRecord each : states.values()) {
-			each.completedCycleTicks += each.currentCycleTicks;
-			each.currentCycleTicks = 0;
+			each.finishCycle();
 		}
+	}
+
+	private StateRecord createRecord(String state) {
+		String stateName = getJaamSimModel().internString(state);
+		return new StateRecord(stateName, isValidWorkingState(stateName));
 	}
 
 	public void addState(String str) {
@@ -294,9 +310,8 @@ public class StateEntity extends DisplayEntity {
 		if (!isValidState(str))
 			error("Specified state: %s is not valid", str);
 
-		String state = str.intern();
-		StateRecord stateRec = new StateRecord(state, isValidWorkingState(state));
-		states.put(stateRec.name, stateRec);
+		StateRecord stateRec = this.createRecord(str);
+		states.put(stateRec.getName(), stateRec);
 	}
 
 	public StateRecord getState(String state) {
@@ -310,7 +325,7 @@ public class StateEntity extends DisplayEntity {
 	private static class StateRecSort implements Comparator<StateRecord> {
 		@Override
 		public int compare(StateRecord sr1, StateRecord sr2) {
-			return sr1.name.compareTo(sr2.name);
+			return sr1.getName().compareTo(sr2.getName());
 		}
 	}
 
@@ -322,11 +337,9 @@ public class StateEntity extends DisplayEntity {
 		return recs;
 	}
 
-	/**
-	 * Return true if the entity is working
-	 */
-	public boolean isWorking() {
-		return presentState.working;
+	@Override
+	public boolean isWorkingState() {
+		return presentState.isWorking();
 	}
 
 	/**
@@ -334,48 +347,52 @@ public class StateEntity extends DisplayEntity {
 	 * useful for model code.
 	 * @param simTicks
 	 * @param state
-	 * @return
 	 */
 	public long getTicksInState(long simTicks, StateRecord state) {
 		if (state == null)
 			return 0;
 
-		long ticks = state.totalTicks;
+		long ticks = state.getTotalTicks();
 		if (getState() == state)
 			ticks += (simTicks - lastStateCollectionTick);
 		return ticks;
 	}
 
 	public long getTicksInState(StateRecord state) {
+		return getTicksInState(getSimTicks(), state);
+	}
+
+	public long getCurrentCycleTicks(long simTicks, StateRecord state) {
 		if (state == null)
 			return 0;
 
-		long ticks = state.totalTicks;
+		long ticks = state.getCurrentCycleTicks();
 		if (getState() == state)
-			ticks += (getSimTicks() - lastStateCollectionTick);
+			ticks += (simTicks - lastStateCollectionTick);
 		return ticks;
 	}
 
 	public long getCurrentCycleTicks(StateRecord state) {
-		if (state == null)
-			return 0;
-
-		long ticks = state.currentCycleTicks;
-		if (getState() == state)
-			ticks += (getSimTicks() - lastStateCollectionTick);
-		return ticks;
+		return getCurrentCycleTicks(getSimTicks(), state);
 	}
 
 	public long getCompletedCycleTicks(StateRecord state) {
 		if (state == null)
 			return 0;
 
-		return state.completedCycleTicks;
+		return state.getCompletedCycleTicks();
+	}
+
+	public long getInitTicks(StateRecord state) {
+		if (state == null)
+			return 0;
+
+		return state.getInitTicks();
 	}
 
 	private long getWorkingTicks(long simTicks) {
 		long ticks = workingTicks;
-		if (presentState.working)
+		if (presentState.isWorking())
 			ticks += (simTicks - lastStateCollectionTick);
 
 		return ticks;
@@ -386,10 +403,61 @@ public class StateEntity extends DisplayEntity {
 	 */
 	public double getWorkingTime() {
 		long ticks = getWorkingTicks(getSimTicks());
-		return EventManager.ticksToSecs(ticks);
+		return EventManager.current().ticksToSeconds(ticks);
 	}
 
-	public void setPresentState() {}
+	/**
+	 * Returns the elapsed time in seconds after the completion of the initialisation period
+	 * that the entity has been in the specified state.
+	 * @param simTime - present simulation time
+	 * @param state - string representing the state
+	 */
+	public double getTimeInState(double simTime, String state) {
+		EventManager evt = this.getJaamSimModel().getEventManager();
+		long simTicks = evt.secondsToNearestTick(simTime);
+		StateRecord rec = states.get(state);
+		if (rec == null)
+			return 0.0;
+		long ticks = getTicksInState(simTicks, rec);
+		return evt.ticksToSeconds(ticks);
+	}
+
+	/**
+	 * Returns the total elapsed time in seconds after the completion of the initialisation period
+	 * the entity has been in any state that ends in the specified string.
+	 * @param simTime - present simulation time
+	 * @param state - string representing the specified type of state
+	 * @return total time
+	 */
+	public double getTotalTimeInState(double simTime, String state) {
+		EventManager evt = this.getJaamSimModel().getEventManager();
+		long simTicks = evt.secondsToNearestTick(simTime);
+		long ticks = 0L;
+		Iterator<Entry<String, StateRecord>> itr = states.entrySet().iterator();
+		while (itr.hasNext()) {
+			Entry<String, StateRecord> pair = itr.next();
+			if (pair.getKey().endsWith(state)) {
+				ticks += getTicksInState(simTicks, pair.getValue());
+			}
+		}
+		return evt.ticksToSeconds(ticks);
+	}
+
+	/**
+	 * Returns the total elapsed time in seconds after the completion of the initialisation period.
+	 * Includes the time in any completed cycles.
+	 * @param simTime - present simulation time
+	 * @return total time in any state
+	 */
+	public double getTotalTime(double simTime) {
+		EventManager evt = this.getJaamSimModel().getEventManager();
+		long simTicks = evt.secondsToNearestTick(simTime);
+		long ticks = 0L;
+		for (StateRecord rec : states.values()) {
+			ticks += getTicksInState(simTicks, rec);
+		}
+		return evt.ticksToSeconds(ticks);
+	}
 
 	@Output(name = "State",
 	 description = "The present state for the object.",
@@ -399,7 +467,7 @@ public class StateEntity extends DisplayEntity {
 		if (presentState == null) {
 			return this.getInitialState();
 		}
-		return presentState.name;
+		return presentState.getName();
 	}
 
 	@Output(name = "WorkingState",
@@ -409,7 +477,7 @@ public class StateEntity extends DisplayEntity {
 		if (presentState == null) {
 			return this.isValidWorkingState(this.getInitialState());
 		}
-		return presentState.working;
+		return presentState.isWorking();
 	}
 
 	@Output(name = "WorkingTime",
@@ -422,26 +490,52 @@ public class StateEntity extends DisplayEntity {
 		if (presentState == null) {
 			return 0.0;
 		}
-		long simTicks = EventManager.secsToNearestTick(simTime);
+		EventManager evt = this.getJaamSimModel().getEventManager();
+		long simTicks = evt.secondsToNearestTick(simTime);
 		long ticks = getWorkingTicks(simTicks);
-		return EventManager.ticksToSecs(ticks);
+		return evt.ticksToSeconds(ticks);
 	}
 
 	@Output(name = "StateTimes",
 	 description = "The total time recorded for each state after the completion of "
-	             + "the initialisation period.",
+	             + "the initialisation period. Includes only the present cycle, if applicable.",
 	    unitType = TimeUnit.class,
 	  reportable = true,
 	    sequence = 3)
 	public LinkedHashMap<String, Double> getStateTimes(double simTime) {
-		long simTicks = EventManager.secsToNearestTick(simTime);
+		EventManager evt = this.getJaamSimModel().getEventManager();
+		long simTicks = evt.secondsToNearestTick(simTime);
 		LinkedHashMap<String, Double> ret = new LinkedHashMap<>(states.size());
 		for (StateRecord stateRec : this.getStateRecs()) {
 			long ticks = getTicksInState(simTicks, stateRec);
-			Double t = EventManager.ticksToSecs(ticks);
-			ret.put(stateRec.name, t);
+			if (useCurrentCycle)
+				ticks = getCurrentCycleTicks(simTicks, stateRec);
+			Double t = evt.ticksToSeconds(ticks);
+			ret.put(stateRec.getName(), t);
 		}
 		return ret;
+	}
+
+	@Output(name = "TotalTime",
+	 description = "The total time the entity has spent in the model after the completion of "
+	             + "the initialisation period. It is equal to the sum of the state times. "
+	             + "Includes only the present cycle, if applicable.",
+	    unitType = TimeUnit.class,
+	  reportable = true,
+	    sequence = 4)
+	public double getTotalTimeInCycle(double simTime) {
+		EventManager evt = this.getJaamSimModel().getEventManager();
+		long simTicks = evt.secondsToNearestTick(simTime);
+		long ticks = 0L;
+		for (StateRecord stateRec : states.values()) {
+			if (useCurrentCycle) {
+				ticks += getCurrentCycleTicks(simTicks, stateRec);
+			}
+			else {
+				ticks += getTicksInState(simTicks, stateRec);
+			}
+		}
+		return evt.ticksToSeconds(ticks);
 	}
 
 }

@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2015 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2019 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,31 +21,28 @@ import java.util.ArrayList;
 import java.util.Collections;
 
 import com.jaamsim.Graphics.DisplayEntity;
+import com.jaamsim.Graphics.EntityLabel;
+import com.jaamsim.Graphics.OverlayEntity;
+import com.jaamsim.Graphics.Region;
 import com.jaamsim.basicsim.Entity;
-import com.jaamsim.input.EntityInput;
+import com.jaamsim.basicsim.JaamSimModel;
 
 public class RelativeEntityInput extends EntityInput<DisplayEntity> {
-
-	private DisplayEntity thisEnt;  // entity that owns this input
-
 	public RelativeEntityInput(String key, String cat, DisplayEntity def) {
 		super(DisplayEntity.class, key, cat, def);
 	}
 
-	public void setEntity(DisplayEntity ent) {
-		thisEnt = ent;
-	}
-
 	@Override
-	public void parse(KeywordIndex kw) throws InputErrorException {
+	public void parse(Entity thisEnt, KeywordIndex kw) throws InputErrorException {
 		Input.assertCount(kw, 1);
-		DisplayEntity ent = Input.parseEntity(kw.getArg(0), DisplayEntity.class);
-		if (isCircular(ent))
+		DisplayEntity ent = Input.parseEntity(thisEnt.getJaamSimModel(), kw.getArg(0), DisplayEntity.class);
+		if (isCircular(thisEnt, ent))
 			throw new InputErrorException("The assignment of %s to RelativeEntity would create a circular loop.", ent);
 		value = ent;
 	}
 
-	private boolean isCircular(DisplayEntity ent) {
+	private boolean isCircular(Entity thisEnt, DisplayEntity e) {
+		DisplayEntity ent = e;
 		while (ent != null) {
 			if (ent == thisEnt)
 				return true;
@@ -54,18 +52,22 @@ public class RelativeEntityInput extends EntityInput<DisplayEntity> {
 	}
 
 	@Override
-	public ArrayList<String> getValidOptions() {
+	public ArrayList<String> getValidOptions(Entity ent) {
 		ArrayList<String> list = new ArrayList<>();
-		for (DisplayEntity each: Entity.getClonesOfIterator(DisplayEntity.class)) {
-			if (each.testFlag(Entity.FLAG_GENERATED))
+		JaamSimModel simModel = ent.getJaamSimModel();
+		for (DisplayEntity each: simModel.getClonesOfIterator(DisplayEntity.class)) {
+			if (each.isGenerated())
 				continue;
 
-			if (isCircular(each))
+			if (each instanceof OverlayEntity || each instanceof Region || each instanceof EntityLabel)
+				continue;
+
+			if (isCircular(ent, each))
 				continue;
 
 			list.add(each.getName());
 		}
-		Collections.sort(list);
+		Collections.sort(list, Input.uiSortOrder);
 		return list;
 	}
 

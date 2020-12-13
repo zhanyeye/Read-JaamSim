@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2012 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2019 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,6 +28,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -36,10 +38,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
 import javax.imageio.stream.ImageInputStream;
+
+import com.jaamsim.ui.GUIFrame;
+import com.jaamsim.ui.LogBox;
 import com.jogamp.opengl.GL2GL3;
 import com.jogamp.opengl.GLException;
-
-import com.jaamsim.ui.LogBox;
 import com.jogamp.opengl.GLExtensions;
 
 /**
@@ -91,7 +94,7 @@ public class TexCache {
 
 	private final EntryLoaderRunner entryLoader = new EntryLoaderRunner();
 
-	private Renderer _renderer;
+	private final Renderer _renderer;
 
 	public static final URI BAD_TEXTURE;
 	private int badTextureID = -1;
@@ -197,7 +200,10 @@ public class TexCache {
 		Dimension dim = getImageDimension(imageURI);
 		if (dim == null) {
 			// Could not load image
-			LogBox.formatRenderLog("Could not load image URL: %s\n", imageURI.toString());
+			String path = Paths.get(imageURI).toString();  // decode %20 as blank character
+			GUIFrame.invokeErrorDialog("3D Loader Error",
+					String.format("Could not load texture file:\n %s", path));
+			LogBox.formatRenderLog("Could not load texture file: %s\n", path);
 			return null;
 		}
 

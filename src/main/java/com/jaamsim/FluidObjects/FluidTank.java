@@ -17,6 +17,7 @@
 package com.jaamsim.FluidObjects;
 
 import com.jaamsim.DisplayModels.ShapeModel;
+import com.jaamsim.input.ColourInput;
 import com.jaamsim.input.Keyword;
 import com.jaamsim.input.Output;
 import com.jaamsim.input.ValueInput;
@@ -32,40 +33,42 @@ import com.jaamsim.units.VolumeUnit;
 public class FluidTank extends FluidComponent {
 
 	@Keyword(description = "The total volume of fluid that can be stored in the tank.",
-	         example = "Tank1 Capacity { 1.0 m3 }")
+	         exampleList = {"1.0 m3"})
 	private final ValueInput capacityInput;
 
-	@Keyword(description = "The volume of fluid in the tank at the start of the simulation.",
-	         example = "Tank1 InitialVolume { 1.0 m3 }")
+	@Keyword(description = "The volume of fluid in the tank at the start of the simulation run.",
+	         exampleList = {"1.0 m3"})
 	private final ValueInput initialVolumeInput;
 
-	@Keyword(description = "The ambient pressure in the tank.",
-	         example = "Tank1 AmbientPressure { 1.0 Pa }")
+	@Keyword(description = "The atmospheric pressure acting on the surface of the fluid in the "
+	                     + "tank.",
+	         exampleList = {"1.0 Pa"})
 	private final ValueInput ambientPressureInput;
 
-	@Keyword(description = "The height of the inlet to the tank above its outlet.",
-	         example = "Tank1 InletHeight { 1.0 m }")
+	@Keyword(description = "The height of the flow feeding the tank. Measured relative to the "
+	                     + "bottom of the tank.",
+	         exampleList = {"1.0 m"})
 	private final ValueInput inletHeightInput;
 
 	private double fluidVolume;  // The present volume of the fluid in the tank.
 	private double fluidLevel;  // The height of the fluid in the tank.
 
 	{
-		capacityInput = new ValueInput( "Capacity", "Key Inputs", 1.0d);
+		capacityInput = new ValueInput( "Capacity", KEY_INPUTS, 1.0d);
 		capacityInput.setValidRange( 0.0, Double.POSITIVE_INFINITY);
 		capacityInput.setUnitType( VolumeUnit.class );
 		this.addInput( capacityInput);
 
-		initialVolumeInput = new ValueInput( "InitialVolume", "Key Inputs", 0.0d);
+		initialVolumeInput = new ValueInput( "InitialVolume", KEY_INPUTS, 0.0d);
 		initialVolumeInput.setValidRange( 0.0, Double.POSITIVE_INFINITY);
 		initialVolumeInput.setUnitType( VolumeUnit.class );
 		this.addInput( initialVolumeInput);
 
-		ambientPressureInput = new ValueInput( "AmbientPressure", "Key Inputs", 0.0d);
+		ambientPressureInput = new ValueInput( "AmbientPressure", KEY_INPUTS, 0.0d);
 		ambientPressureInput.setUnitType( PressureUnit.class );
 		this.addInput( ambientPressureInput);
 
-		inletHeightInput = new ValueInput( "InletHeight", "Key Inputs", 0.0d);
+		inletHeightInput = new ValueInput( "InletHeight", KEY_INPUTS, 0.0d);
 		inletHeightInput.setValidRange( 0.0, Double.POSITIVE_INFINITY);
 		inletHeightInput.setUnitType( DistanceUnit.class );
 		this.addInput( inletHeightInput);
@@ -123,6 +126,8 @@ public class FluidTank extends FluidComponent {
 
 		if( this.getFluid() != null )
 			setTagColour(ShapeModel.TAG_CONTENTS, this.getFluid().getColour());
+		else
+			setTagColour(ShapeModel.TAG_CONTENTS, ColourInput.getColorWithName("black"));
 	}
 
 	@Output(name = "FluidVolume",

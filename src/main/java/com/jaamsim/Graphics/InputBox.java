@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2015 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2018-2019 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,16 +17,14 @@
  */
 package com.jaamsim.Graphics;
 
-import java.util.ArrayList;
-
+import com.jaamsim.Commands.KeywordCommand;
+import com.jaamsim.basicsim.GUIListener;
 import com.jaamsim.input.Input;
 import com.jaamsim.input.InputAgent;
 import com.jaamsim.input.InputErrorException;
 import com.jaamsim.input.Keyword;
 import com.jaamsim.input.KeywordIndex;
 import com.jaamsim.input.KeywordInput;
-import com.jaamsim.input.Parser;
-import com.jaamsim.ui.GUIFrame;
 
 public class InputBox extends TextBasics {
 
@@ -34,7 +33,7 @@ public class InputBox extends TextBasics {
 	protected final KeywordInput target;
 
 	{
-		target = new KeywordInput("TargetInput", "Key Inputs", null);
+		target = new KeywordInput("TargetInput", KEY_INPUTS, null);
 		target.setRequired(true);
 		this.addInput(target);
 	}
@@ -44,7 +43,7 @@ public class InputBox extends TextBasics {
 	@Override
 	public void setInputsForDragAndDrop() {
 		super.setInputsForDragAndDrop();
-		this.setSavedText(this.getName());
+		this.setText(this.getName());
 	}
 
 	@Override
@@ -64,23 +63,15 @@ public class InputBox extends TextBasics {
 			return;
 		}
 		try {
-			ArrayList<String> tokens = new ArrayList<>();
-			Parser.tokenize(tokens, getEditText(), true);
-			KeywordIndex kw = new KeywordIndex(target.getValue(), tokens, null);
-			InputAgent.apply(target.getTargetEntity(), kw);
+			KeywordIndex kw = InputAgent.formatInput(target.getValue(), getText());
+			InputAgent.storeAndExecute(new KeywordCommand(target.getTargetEntity(), kw));
 			super.acceptEdits();
 		}
 		catch (InputErrorException e) {
-			GUIFrame.invokeErrorDialog("Input Error", e.getMessage());
+			GUIListener gui = getJaamSimModel().getGUIListener();
+			if (gui != null)
+				gui.invokeErrorDialogBox("Input Error", e.getMessage());
 		}
-	}
-
-	@Override
-	public void handleSelectionLost() {
-		super.handleSelectionLost();
-
-		// Stop editing, even if the inputs were not accepted successfully
-		cancelEdits();
 	}
 
 	@Override
@@ -89,10 +80,10 @@ public class InputBox extends TextBasics {
 		if (!isEditMode() && targetInput != null) {
 			String str = targetInput.getValueString();
 			if (str.isEmpty())
-				str = targetInput.getDefaultString();
-			this.setSavedText(str);
+				str = targetInput.getDefaultString(getJaamSimModel());
+			this.setText(str);
 		}
-		return getEditText();
+		return getText();
 	}
 
 }

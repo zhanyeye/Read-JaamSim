@@ -29,9 +29,9 @@ public class TestFrameworkHelpers {
 		@Override
 		public void tickUpdate(long tick) {}
 		@Override
-		public void timeRunning(boolean running) {
+		public void timeRunning() {
 			synchronized (this) {
-				if (running) return;
+				if (EventManager.current().isRunning()) return;
 
 				if (waitThread != null)
 					waitThread.interrupt();
@@ -50,10 +50,19 @@ public class TestFrameworkHelpers {
 					evt.setTimeListener(null);
 					return;
 				}
-
-				evt.setTimeListener(null);
 				waitThread = null;
-				throw new RuntimeException("Test not complete before timeout");
+			}
+
+			evt.pause();
+			evt.setTimeListener(null);
+			throw new RuntimeException("Test not complete before timeout");
+		}
+
+		@Override
+		public void handleError(Throwable t) {
+			synchronized (this) {
+				if (waitThread != null)
+					waitThread.interrupt();
 			}
 		}
 	}

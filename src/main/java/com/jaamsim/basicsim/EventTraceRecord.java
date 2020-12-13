@@ -23,7 +23,6 @@ import com.jaamsim.events.EventTraceListener;
 import com.jaamsim.events.ProcessTarget;
 
 class EventTraceRecord extends ArrayList<String> implements EventTraceListener {
-	private String eventManagerName;
 	private long internalTime;
 	private String targetName;
 	int traceLevel;
@@ -35,120 +34,90 @@ class EventTraceRecord extends ArrayList<String> implements EventTraceListener {
 	void parse() {
 		String[] temp;
 
-		// The first line of the trace is always <eventManagerName>\t<InternalSimulationTime>
+		// The first line of the trace is always Event\ttime
 		temp = this.get(0).split("\t");
-		eventManagerName = temp[0];
 		internalTime = Long.parseLong(temp[1]);
 
-		// Try to parse a target entity and method form the second line
-		temp = this.get(1).split("\t");
-
 		// A regular event wakeup, parse target/method
-		if (temp[0].endsWith("Event")) {
+		if (temp[0].equals("Event")) {
 			targetName = temp[3];
 			return;
 		}
 
-		if (temp[0].endsWith("WaitUntilEnded")) {
-			targetName = temp[3];
-			return;
-		}
-
-		if (temp[0].endsWith("StartProcess")) {
-			targetName = temp[1];
-			return;
-		}
-
-		if (temp[0].endsWith("SchedProcess")) {
-			targetName = temp[3];
-			return;
-		}
+		throw new ErrorException("All events must start with an event record");
 	}
 
 	private void append(String record) {
 		StringBuilder rec = new StringBuilder();
 
 		for (int i = 0; i < traceLevel; i++) {
-			rec.append("  ");
+			rec.append("\t");
 		}
 		rec.append(record);
 		this.add(rec.toString());
 	}
 
-	private void addHeader(String name, long internalTime) {
-		// Don't write anything if not at level 0
-		if (traceLevel != 0)
-			return;
-
-		StringBuilder header = new StringBuilder(name).append("\t").append(internalTime);
-		this.add(header.toString());
-		traceLevel++;
-	}
-
 	@Override
-	public void traceWait(EventManager e, long curTick, long tick, int priority, ProcessTarget t) {
-		this.addHeader(e.name, curTick);
+	public final void traceWait(long tick, int priority, ProcessTarget t) {
 		traceLevel--;
-
-		this.append(String.format("Wait\t%d\t%d\t%s", tick, priority, EventRecorder.getWaitDescription()));
+		this.append(String.format("Wait\t%d\t%d\t%s", tick, priority, getWaitDescription()));
 	}
 
 	@Override
-	public void traceEvent(EventManager e, long curTick, long tick, int priority, ProcessTarget t) {
-		this.addHeader(e.name, curTick);
+	public final void traceEvent(long tick, int priority, ProcessTarget t) {
 		this.append(String.format("Event\t%d\t%d\t%s", tick, priority, t.getDescription()));
-
 		traceLevel++;
 	}
 
 	@Override
-	public void traceInterrupt(EventManager e, long curTick, long tick, int priority, ProcessTarget t) {
-		this.addHeader(e.name, curTick);
+	public final void traceInterrupt(long tick, int priority, ProcessTarget t) {
 		this.append(String.format("Int\t%d\t%d\t%s", tick, priority, t.getDescription()));
 		traceLevel++;
 	}
 
 	@Override
-	public void traceKill(EventManager e, long curTick, long tick, int priority, ProcessTarget t) {
-		this.addHeader(e.name, curTick);
+	public final void traceKill(long tick, int priority, ProcessTarget t) {
 		this.append(String.format("Kill\t%d\t%d\t%s", tick, priority, t.getDescription()));
 	}
 
 	@Override
-	public void traceWaitUntil(EventManager e, long tick) {
-		this.addHeader(e.name, tick);
+	public final void traceWaitUntil() {
 		traceLevel--;
 		this.append("WaitUntil");
 	}
 
 	@Override
-	public void traceWaitUntilEnded(EventManager e, long curTick, ProcessTarget t) {
-		this.addHeader(e.name, curTick);
-		this.append(String.format("WaitUntilEnded\t%s", t.getDescription()));
+	public final void traceSchedUntil(ProcessTarget t) {
+		this.append(String.format("SchedUntil\t%s", t.getDescription()));
 	}
 
 	@Override
-	public void traceProcessStart(EventManager e, ProcessTarget t, long tick) {
-		this.addHeader(e.name, tick);
+	public final void traceProcessStart(ProcessTarget t) {
 		this.append(String.format("StartProcess\t%s", t.getDescription()));
 		traceLevel++;
 	}
 
 	@Override
-	public void traceProcessEnd(EventManager e, long tick) {
-		this.addHeader(e.name, tick);
+	public final void traceProcessEnd() {
 		traceLevel--;
 		this.append("Exit");
 	}
 
 	@Override
-	public void traceSchedProcess(EventManager e, long curTick, long tick, int priority, ProcessTarget t) {
-		this.addHeader(e.name, curTick);
+	public final void traceSchedProcess(long tick, int priority, ProcessTarget t) {
 		this.append(String.format("SchedProcess\t%d\t%d\t%s", tick, priority, t.getDescription()));
 	}
 
-	boolean isDefaultEventManager() {
-		return eventManagerName.equals("DefaultEventManager");
+	@Override
+	public final void traceConditionalEval(ProcessTarget t) {}
+
+	@Override
+	public final void traceConditionalEvalEnded(boolean wakeup, ProcessTarget t) {
+		//if (!wakeup)
+		//	return;
+		//EventManager e = EventManager.current();
+		//this.addHeader(e.name, e.getTicks());
+		//this.append(String.format("WaitUntilEnded\t%s", t.getDescription()));
 	}
 
 	long getInternalTime() {
@@ -170,5 +139,42 @@ class EventTraceRecord extends ArrayList<String> implements EventTraceListener {
 			return false;
 
 		return true;
+	}
+
+	private static final String entClassName = Entity.class.getName();
+	private static final String evtManClassName = EventManager.class.getName();
+	static String getWaitDescription() {
+		StackTraceElement[] callStack = Thread.currentThread().getStackTrace();
+		int evtManIdx = -1;
+		// walk out of any EventManager methods
+		for (int i = 0; i < callStack.length; i++) {
+			if (callStack[i].getClassName().equals(evtManClassName)) {
+				evtManIdx = i;
+				continue;
+			}
+
+			// we have walked through the eventManager methods
+			if (evtManIdx != -1)
+				break;
+		}
+
+		// walk past any Entity methods
+		int entIdx = -1;
+		for (int i = evtManIdx + 1; i < callStack.length; i++) {
+			if (callStack[i].getClassName().equals(entClassName)) {
+				entIdx = i;
+				continue;
+			}
+
+			break;
+		}
+
+		StackTraceElement elem;
+		if (entIdx > -1)
+			elem = callStack[entIdx + 1];
+		else
+			elem = callStack[evtManIdx + 1];
+
+		return String.format("%s:%s", elem.getClassName(), elem.getMethodName());
 	}
 }

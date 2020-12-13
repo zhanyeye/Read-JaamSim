@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2014 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2019 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +17,7 @@
  */
 package com.jaamsim.Thresholds;
 
+import com.jaamsim.Samples.TimeSeries;
 import com.jaamsim.Samples.TimeSeriesConstantDouble;
 import com.jaamsim.basicsim.EntityTarget;
 import com.jaamsim.events.EventManager;
@@ -24,6 +26,7 @@ import com.jaamsim.input.Input;
 import com.jaamsim.input.InputAgent;
 import com.jaamsim.input.InputErrorException;
 import com.jaamsim.input.Keyword;
+import com.jaamsim.input.Output;
 import com.jaamsim.input.TimeSeriesInput;
 import com.jaamsim.input.UnitTypeInput;
 import com.jaamsim.input.ValueInput;
@@ -33,27 +36,35 @@ import com.jaamsim.units.UserSpecifiedUnit;
 
 public class TimeSeriesThreshold extends Threshold {
 
-	@Keyword(description = "The name of time series for which the threshold applies.",
+	@Keyword(description = "The TimeSeries object whose values are to be tested.",
 	         exampleList = {"TimeSeries1"})
 	private final TimeSeriesInput timeSeries;
 
-	@Keyword(description = "The limit over which the threshold is closed.  " +
-			"The limit must be specified after the time series and " +
-			"will use the same unit type as the threshold.",
+	@Keyword(description = "The largest TimeSeries value for which the threshold is open. "
+	                     + "The threshold is closed for TimeSeries values greater than "
+	                     + "MaxOpenLimit.",
 	         exampleList = {"2.0 m", "TimeSeries2"})
 	private final TimeSeriesInput maxOpenLimit;
 
-	@Keyword(description = "The limit under which the threshold is closed.  " +
-			"The limit must be specified after the time series and " +
-			"will use the same unit type as the threshold.",
+	@Keyword(description = "The smallest TimeSeries value for which the threshold is open. "
+	                     + "The threshold is closed for TimeSeries values smaller than "
+	                     + "MinOpenLimit.",
 	         exampleList = {"2.0 m", "TimeSeries3"})
 	private final TimeSeriesInput minOpenLimit;
 
-	@Keyword(description = "The amount of time that the threshold must remain within minOpenLimit and maxOpenLimit to be considered open.",
+	@Keyword(description = "The length of time over which the TimeSeries values must be "
+	                     + ">= MinOpenLimit and <= MaxOpenLimit.\n"
+	                     + "The threshold is open if the TimeSeries values x(t) satisfy "
+	                     + "MinOpenLimit <= x(t) <= MaxOpenLimit for simulation times t from "
+	                     + "(SimTime + Offset) to (SimTime + Offset + LookAhead).",
 	         exampleList = {"5.0 h"})
 	private final ValueInput lookAhead;
 
-	@Keyword(description = "The amount of time that the threshold adds on to every time series lookup.",
+	@Keyword(description = "The amount of time that the threshold adds on to every time series "
+	                     + "lookup.\n"
+	                     + "The threshold is open if the TimeSeries values x(t) satisfy "
+	                     + "MinOpenLimit <= x(t) <= MaxOpenLimit for simulation times t from "
+	                     + "(SimTime + Offset) to (SimTime + Offset + LookAhead).",
 	         exampleList = {"5.0 h"})
 	private final ValueInput offset;
 
@@ -62,28 +73,28 @@ public class TimeSeriesThreshold extends Threshold {
 	private final UnitTypeInput unitType;
 
 	{
-		unitType = new UnitTypeInput("UnitType", "Key Inputs", UserSpecifiedUnit.class);
+		unitType = new UnitTypeInput("UnitType", KEY_INPUTS, UserSpecifiedUnit.class);
 		unitType.setRequired(true);
 		this.addInput(unitType);
 
-		timeSeries = new TimeSeriesInput("TimeSeries", "Key Inputs", null);
+		timeSeries = new TimeSeriesInput("TimeSeries", KEY_INPUTS, null);
 		timeSeries.setUnitType(UserSpecifiedUnit.class);
 		timeSeries.setRequired(true);
 		this.addInput(timeSeries);
 
-		maxOpenLimit = new TimeSeriesInput("MaxOpenLimit", "Key Inputs", new TimeSeriesConstantDouble(Double.POSITIVE_INFINITY));
+		maxOpenLimit = new TimeSeriesInput("MaxOpenLimit", KEY_INPUTS, new TimeSeriesConstantDouble(Double.POSITIVE_INFINITY));
 		maxOpenLimit.setUnitType(UserSpecifiedUnit.class);
 		this.addInput( maxOpenLimit );
 
-		minOpenLimit = new TimeSeriesInput("MinOpenLimit", "Key Inputs", new TimeSeriesConstantDouble(Double.NEGATIVE_INFINITY));
+		minOpenLimit = new TimeSeriesInput("MinOpenLimit", KEY_INPUTS, new TimeSeriesConstantDouble(Double.NEGATIVE_INFINITY));
 		minOpenLimit.setUnitType(UserSpecifiedUnit.class);
 		this.addInput( minOpenLimit );
 
-		lookAhead = new ValueInput( "LookAhead", "Key Inputs", 0.0d );
+		lookAhead = new ValueInput( "LookAhead", KEY_INPUTS, 0.0d );
 		lookAhead.setUnitType(TimeUnit.class);
 		this.addInput( lookAhead );
 
-		offset = new ValueInput( "Offset", "Key Inputs", 0.0d );
+		offset = new ValueInput( "Offset", KEY_INPUTS, 0.0d );
 		offset.setUnitType(TimeUnit.class);
 		this.addInput( offset );
 	}
@@ -116,11 +127,13 @@ public class TimeSeriesThreshold extends Threshold {
 					timeSeries.getValue().getUnitType(), this.getUnitType());
 
 		if (timeSeries.getValue().getMinValue() > maxOpenLimit.getValue().getMaxValue())
-			InputAgent.logWarning("Threshold %s is closed forever.  MaxOpenLimit = %f Max TimeSeries Value = %f",
+			InputAgent.logWarning(getJaamSimModel(),
+					"Threshold %s is closed forever.  MaxOpenLimit = %f Max TimeSeries Value = %f",
 					this, maxOpenLimit.getValue().getMaxValue(), timeSeries.getValue().getMaxValue());
 
 		if (timeSeries.getValue().getMaxValue() < minOpenLimit.getValue().getMaxValue())
-			InputAgent.logWarning("Threshold %s is closed forever.  MinOpenLimit = %f Min TimeSeries Value = %f",
+			InputAgent.logWarning(getJaamSimModel(),
+					"Threshold %s is closed forever.  MinOpenLimit = %f Min TimeSeries Value = %f",
 					this, minOpenLimit.getValue().getMaxValue(), timeSeries.getValue().getMinValue());
 	}
 
@@ -128,6 +141,11 @@ public class TimeSeriesThreshold extends Threshold {
 	public void startUp() {
 		super.startUp();
 		this.doOpenClose();
+	}
+
+	@Override
+	public Class<? extends Unit> getUserUnitType() {
+		return unitType.getUnitType();
 	}
 
 	public Class<? extends Unit> getUnitType() {
@@ -173,7 +191,8 @@ public class TimeSeriesThreshold extends Threshold {
 	 * @return TRUE if open, FALSE if closed
 	 */
 	public boolean isOpenAtTime(double simTime) {
-		return isOpenAtTicks(EventManager.secsToNearestTick(simTime));
+		EventManager evt = this.getJaamSimModel().getEventManager();
+		return isOpenAtTicks(evt.secondsToNearestTick(simTime));
 	}
 
 	/**
@@ -187,7 +206,8 @@ public class TimeSeriesThreshold extends Threshold {
 	private boolean isOpenAtTicks(long ticks) {
 
 		// Add offset from input
-		ticks += EventManager.secsToNearestTick(offset.getValue());
+		EventManager evt = this.getJaamSimModel().getEventManager();
+		ticks += evt.secondsToNearestTick(offset.getValue());
 		ticks = Math.max(ticks, 0);
 
 		long changeTime = ticks;
@@ -197,7 +217,7 @@ public class TimeSeriesThreshold extends Threshold {
 			return false;
 
 		// If there is no lookahead, then the threshold is open
-		long lookAheadInTicks = EventManager.secsToNearestTick(lookAhead.getValue());
+		long lookAheadInTicks = evt.secondsToNearestTick(lookAhead.getValue());
 		if (lookAheadInTicks == 0)
 			return true;
 
@@ -234,15 +254,16 @@ public class TimeSeriesThreshold extends Threshold {
 		if (this.isOpenAtTicks(ticks))
 			return 0;
 
+		EventManager evt = this.getJaamSimModel().getEventManager();
 		// Add offset from input
-		ticks += EventManager.secsToNearestTick(offset.getValue());
+		ticks += evt.secondsToNearestTick(offset.getValue());
 		ticks = Math.max(ticks, 0);
 
 		// Threshold is currently closed. Find the next open point
 		long openTime = -1;
 		long changeTime = ticks;
 		long maxTicksValueFromTimeSeries = this.getMaxTicksValueFromTimeSeries();
-		long lookAheadInTicks = EventManager.secsToNearestTick(lookAhead.getValue());
+		long lookAheadInTicks = evt.secondsToNearestTick(lookAhead.getValue());
 		while( true ) {
 			changeTime = this.getNextChangeAfterTicks(changeTime);
 
@@ -324,13 +345,14 @@ public class TimeSeriesThreshold extends Threshold {
 			return 0;
 
 		// Add offset from input
-		ticks += EventManager.secsToNearestTick(offset.getValue());
+		EventManager evt = this.getJaamSimModel().getEventManager();
+		ticks += evt.secondsToNearestTick(offset.getValue());
 		ticks = Math.max(ticks, 0);
 
 		// Find the next change point after startTime
 		long changeTime = ticks;
 		long maxTicksValueFromTimeSeries = this.getMaxTicksValueFromTimeSeries();
-		long lookAheadInTicks = EventManager.secsToNearestTick(lookAhead.getValue());
+		long lookAheadInTicks = evt.secondsToNearestTick(lookAhead.getValue());
 		while( true ) {
 			changeTime = this.getNextChangeAfterTicks(changeTime);
 
@@ -349,6 +371,89 @@ public class TimeSeriesThreshold extends Threshold {
 					return changeTime - lookAheadInTicks - ticks + 1;
 			}
 		}
+	}
+
+	/**
+	 * Return the time in seconds during which the threshold is open
+	 * from the given start time to the given end time
+	 * @param startTime - simulation start time in seconds
+	 * @param endTime - simulation end time in seconds
+	 * @return the time in seconds that the threshold is open
+	 */
+	public double calcOpenTimeFromTimeToTime(double startTime, double endTime) {
+
+		// If the series is always outside the limits, the threshold is closed forever
+		if (isAlwaysClosed())
+			return 0;
+
+		// If the series is always within the limits, the threshold is open forever
+		if (this.isAlwaysOpen())
+			return endTime - startTime;
+
+		EventManager evt = this.getJaamSimModel().getEventManager();
+		long ticks = evt.secondsToNearestTick(startTime);
+		long endTicks = evt.secondsToNearestTick(endTime);
+		long openTicks = 0;
+
+		boolean done = false;
+		while (! done) {
+			if (this.isOpenAtTicks(ticks)) {
+				long tempTicks = this.calcOpenTicksFromTicks(ticks);
+				if (ticks + tempTicks >= endTicks) {
+					openTicks += Math.min( tempTicks, endTicks - ticks);
+					done = true;
+				}
+				else {
+					openTicks += tempTicks;
+					ticks += tempTicks;
+				}
+			}
+			else {
+				long tempTicks = this.calcClosedTicksFromTicks(ticks);
+				if (ticks + tempTicks >= endTicks) {
+					done = true;
+				}
+				else {
+					ticks += tempTicks;
+				}
+			}
+		}
+		return evt.ticksToSeconds(openTicks);
+	}
+
+	/**
+	 * Returns the last time that one of the parameters TimeSeries, MaxOpenLimit, or MinOpenLimit
+	 * changed, before the given time.
+	 * @param simTime - simulation time in seconds
+	 * @return the last simulation time in seconds that a change occurred
+	 */
+	public double getLastChangeBeforeTime(double simTime) {
+		EventManager evt = this.getJaamSimModel().getEventManager();
+		return evt.ticksToSeconds(getLastChangeBeforeTicks(evt.secondsToNearestTick(simTime)));
+	}
+
+	/**
+	 * Returns the last time that one of the parameters TimeSeries, MaxOpenLimit, or MinOpenLimit
+	 * changed, before the given time.
+	 * @param ticks - simulation time in clock ticks.
+	 * @return the last time in clock ticks that a change occurred
+	 */
+	private long getLastChangeBeforeTicks(long ticks) {
+		long lastChange = timeSeries.getValue().getLastChangeBeforeTicks(ticks);
+		lastChange = Math.min(lastChange, maxOpenLimit.getValue().getLastChangeBeforeTicks(ticks));
+		lastChange = Math.min(lastChange, minOpenLimit.getValue().getLastChangeBeforeTicks(ticks));
+		return lastChange;
+	}
+
+	/**
+	 * Returns the next time that one of the parameters TimeSeries, MaxOpenLimit, or MinOpenLimit
+	 * will change, after the given time.
+	 * @param simTime - simulation time in seconds
+	 * @return the next simulation time in seconds that a change will occur
+	 */
+	public double getNextChangeAfterTime(double simTime) {
+		EventManager evt = this.getJaamSimModel().getEventManager();
+		return evt.ticksToSeconds(getNextChangeAfterTicks(evt.secondsToNearestTick(simTime)));
 	}
 
 	/**
@@ -389,11 +494,48 @@ public class TimeSeriesThreshold extends Threshold {
 		double maxOpenLimitVal = maxOpenLimit.getValue().getValueForTicks(ticks);
 
 		// Error check that threshold limits remain consistent
-		if (minOpenLimitVal > maxOpenLimitVal)
+		if (minOpenLimitVal > maxOpenLimitVal) {
+			EventManager evt = this.getJaamSimModel().getEventManager();
 			error("MaxOpenLimit must be larger than MinOpenLimit. MaxOpenLimit: %s, MinOpenLimit: %s, time: %s",
-					maxOpenLimitVal, minOpenLimitVal, EventManager.ticksToSecs(ticks));
-
+					maxOpenLimitVal, minOpenLimitVal, evt.ticksToSeconds(ticks));
+		}
 		return (value >= minOpenLimitVal) && (value <= maxOpenLimitVal);
+	}
+
+	@Output(name = "TimeSeriesValue",
+	 description = "The value of the TimeSeries object at the present time plus the offset.",
+	    unitType = UserSpecifiedUnit.class,
+	    sequence = 5)
+	public double getTimeSeriesValue(double simTime) {
+		if (timeSeries.getValue() == null)
+			return Double.NaN;
+		return ((TimeSeries)timeSeries.getValue()).getPresentValue(simTime + offset.getValue());
+	}
+
+	@Output(name = "NextOpenTime",
+	 description = "The next time at which the threshold will be open.",
+	    unitType = TimeUnit.class,
+	    sequence = 6)
+	public double getNextOpenTime(double simTime) {
+		if (timeSeries.getValue() == null)
+			return Double.NaN;
+		EventManager evt = this.getJaamSimModel().getEventManager();
+		long simTicks = evt.secondsToNearestTick(simTime);
+		long ticks = simTicks + calcClosedTicksFromTicks(simTicks);
+		return evt.ticksToSeconds(ticks);
+	}
+
+	@Output(name = "NextCloseTime",
+	 description = "The next time at which the threshold will be closed.",
+	    unitType = TimeUnit.class,
+	    sequence = 7)
+	public double getNextCloseTime(double simTime) {
+		if (timeSeries.getValue() == null)
+			return Double.NaN;
+		EventManager evt = this.getJaamSimModel().getEventManager();
+		long simTicks = evt.secondsToNearestTick(simTime);
+		long ticks = simTicks + calcOpenTicksFromTicks(simTicks);
+		return evt.ticksToSeconds(ticks);
 	}
 
 }

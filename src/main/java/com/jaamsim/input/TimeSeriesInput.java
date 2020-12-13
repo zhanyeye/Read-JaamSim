@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2013 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2018-2020 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +23,7 @@ import java.util.Collections;
 import com.jaamsim.Samples.TimeSeriesConstantDouble;
 import com.jaamsim.Samples.TimeSeriesProvider;
 import com.jaamsim.basicsim.Entity;
+import com.jaamsim.basicsim.JaamSimModel;
 import com.jaamsim.datatypes.DoubleVector;
 import com.jaamsim.units.DimensionlessUnit;
 import com.jaamsim.units.Unit;
@@ -43,13 +45,13 @@ public class TimeSeriesInput extends Input<TimeSeriesProvider> {
 	}
 
 	@Override
-	public void parse(KeywordIndex kw)
+	public void parse(Entity thisEnt, KeywordIndex kw)
 	throws InputErrorException {
 		Input.assertCountRange(kw, 1, 2);
 
 		// Try to parse as a constant value
 		try {
-			DoubleVector tmp = Input.parseDoubles(kw, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, unitType);
+			DoubleVector tmp = Input.parseDoubles(thisEnt.getJaamSimModel(), kw, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, unitType);
 			Input.assertCount(tmp, 1);
 			value = new TimeSeriesConstantDouble(unitType, tmp.get(0));
 			return;
@@ -58,7 +60,7 @@ public class TimeSeriesInput extends Input<TimeSeriesProvider> {
 
 		// If not a constant, try parsing a TimeSeriesProvider
 		Input.assertCount(kw, 1);
-		Entity ent = Input.parseEntity(kw.getArg(0), Entity.class);
+		Entity ent = Input.parseEntity(thisEnt.getJaamSimModel(), kw.getArg(0), Entity.class);
 		TimeSeriesProvider s = Input.castImplements(ent, TimeSeriesProvider.class);
 		if( s.getUnitType() != UserSpecifiedUnit.class )
 			Input.assertUnitsMatch(unitType, s.getUnitType());
@@ -66,14 +68,15 @@ public class TimeSeriesInput extends Input<TimeSeriesProvider> {
 	}
 
 	@Override
-	public ArrayList<String> getValidOptions() {
+	public ArrayList<String> getValidOptions(Entity ent) {
 		ArrayList<String> list = new ArrayList<>();
-		for (Entity each : Entity.getClonesOfIterator(Entity.class, TimeSeriesProvider.class)) {
+		JaamSimModel simModel = ent.getJaamSimModel();
+		for (Entity each : simModel.getClonesOfIterator(Entity.class, TimeSeriesProvider.class)) {
 			TimeSeriesProvider tsp = (TimeSeriesProvider)each;
 			if (tsp.getUnitType() == unitType)
 				list.add(each.getName());
 		}
-		Collections.sort(list);
+		Collections.sort(list, Input.uiSortOrder);
 		return list;
 	}
 
@@ -89,4 +92,22 @@ public class TimeSeriesInput extends Input<TimeSeriesProvider> {
 			toks.add(((Entity)value).getName());
 		}
 	}
+
+	@Override
+	public boolean removeReferences(Entity ent) {
+		if (value == ent) {
+			this.reset();
+			return true;
+		}
+		return false;
+	}
+
+	@Override
+	public String getDefaultString(JaamSimModel simModel) {
+		if (defValue instanceof TimeSeriesConstantDouble) {
+			return ((TimeSeriesConstantDouble) defValue).getValueString(simModel);
+		}
+		return getDefaultString();
+	}
+
 }

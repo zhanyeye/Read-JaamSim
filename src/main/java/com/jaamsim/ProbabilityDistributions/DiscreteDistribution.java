@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2013 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2016 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,13 +37,16 @@ import com.jaamsim.units.UserSpecifiedUnit;
  */
 public class DiscreteDistribution extends Distribution {
 
-	@Keyword(description = "The list of discrete values that can be returned by the distribution.  " +
-			"The values can be any positive or negative and can be listed in any order.  " +
-			"No interpolation is performed between these values.",
-	         exampleList = {"6.2 10.1"})
+	@Keyword(description = "The discrete values that can be returned by the distribution. "
+	                     + "The values can be any positive or negative and can be listed in any "
+	                     + "order. "
+	                     + "No interpolation is performed between the values.",
+	         exampleList = {"6.2 10.1", "3.5 4.5 6.5 km"})
 	private final ValueListInput valueListInput;
 
-	@Keyword(description = "The list of probabilities corresponding to the discrete values in the ValueList.  Must sum to 1.0.",
+	@Keyword(description = "The probabilities corresponding to the values in the 'ValueList' "
+	                     + "input. "
+	                     + "Must sum to 1.0.",
 	         exampleList = {"0.3  0.7"})
 	private final ValueListInput probabilityListInput;
 
@@ -52,19 +56,24 @@ public class DiscreteDistribution extends Distribution {
 	private double[] cumProbList;
 
 	{
-		valueListInput = new ValueListInput( "ValueList", "Key Inputs", null);
+		valueListInput = new ValueListInput( "ValueList", KEY_INPUTS, null);
 		valueListInput.setUnitType(UserSpecifiedUnit.class);
 		valueListInput.setRequired(true);
 		this.addInput( valueListInput);
 
-		probabilityListInput = new ValueListInput( "ProbabilityList", "Key Inputs", null);
+		probabilityListInput = new ValueListInput( "ProbabilityList", KEY_INPUTS, null);
 		probabilityListInput.setUnitType(DimensionlessUnit.class);
 		probabilityListInput.setValidSum(1.0d, 0.001d);
+		probabilityListInput.setValidRange(0.0d, 1.0d);
 		probabilityListInput.setRequired(true);
 		this.addInput( probabilityListInput);
 	}
 
-	public DiscreteDistribution() {}
+	public DiscreteDistribution() {
+		sampleCount = new int[0];
+		valueList = new double[0];
+		cumProbList = new double[0];
+	}
 
 	@Override
 	public void validate() {
@@ -102,7 +111,7 @@ public class DiscreteDistribution extends Distribution {
 	}
 
 	@Override
-	protected double getNextSample() {
+	protected double getSample(double simTime) {
 
 		double rand = rng.nextUniform();
 		int index = -1;
@@ -123,6 +132,8 @@ public class DiscreteDistribution extends Distribution {
 
 	@Override
 	public double getMinValue() {
+		if (probabilityListInput.getValue() == null || valueListInput.getValue() == null)
+			return Double.NaN;
 		double ret = Double.POSITIVE_INFINITY;
 		for( int i = 0; i < probabilityListInput.getValue().size(); i++ ) {
 			if( probabilityListInput.getValue().get(i) > 0.0 ) {
@@ -131,11 +142,13 @@ public class DiscreteDistribution extends Distribution {
 				}
 			}
 		}
-		return Math.max(ret, minValueInput.getValue());
+		return Math.max(ret, super.getMinValue());
 	}
 
 	@Override
 	public double getMaxValue() {
+		if (probabilityListInput.getValue() == null || valueListInput.getValue() == null)
+			return Double.NaN;
 		double ret = Double.NEGATIVE_INFINITY;
 		for( int i = 0; i < probabilityListInput.getValue().size(); i++ ) {
 			if( probabilityListInput.getValue().get(i) > 0.0 ) {
@@ -144,11 +157,13 @@ public class DiscreteDistribution extends Distribution {
 				}
 			}
 		}
-		return Math.min(ret,  maxValueInput.getValue());
+		return Math.min(ret, super.getMaxValue());
 	}
 
 	@Override
-	protected double getMeanValue() {
+	protected double getMean(double simTime) {
+		if (probabilityListInput.getValue() == null || valueListInput.getValue() == null)
+			return Double.NaN;
 		double ret = 0.0;
 		for( int i=0; i<probabilityListInput.getValue().size(); i++) {
 			ret += probabilityListInput.getValue().get(i) * valueListInput.getValue().get(i);
@@ -157,13 +172,15 @@ public class DiscreteDistribution extends Distribution {
 	}
 
 	@Override
-	protected double getStandardDeviation() {
+	protected double getStandardDev(double simTime) {
+		if (probabilityListInput.getValue() == null || valueListInput.getValue() == null)
+			return Double.NaN;
 		double sum = 0.0;
 		for( int i=0; i<probabilityListInput.getValue().size(); i++) {
 			double val = valueListInput.getValue().get(i);
 			sum += probabilityListInput.getValue().get(i) * val * val;
 		}
-		double mean = getMeanValue();
+		double mean = getMean(simTime);
 		return  Math.sqrt( sum - (mean * mean) );
 	}
 

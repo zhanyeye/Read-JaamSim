@@ -16,10 +16,13 @@
  */
 package com.jaamsim.render;
 
+import java.util.ArrayList;
+
 import com.jaamsim.math.AABB;
 import com.jaamsim.math.Mat4d;
 import com.jaamsim.math.MathUtils;
 import com.jaamsim.math.Plane;
+import com.jaamsim.math.Ray;
 import com.jaamsim.math.Sphere;
 import com.jaamsim.math.Transform;
 import com.jaamsim.math.Vec3d;
@@ -59,7 +62,8 @@ private Mat4d _projMat;
 private boolean _projMatDirty = true;
 
 /**
- * An array of 6 Planes that represent the view frustum in world coordinates
+ * An array of 4 Planes that represent the view frustum in world coordinates
+ * Thanks to the logarithmic depth buffer the near and far planes are excluded
  */
 private final Plane[] _frustum;
 private boolean _frustumDirty = true;
@@ -68,24 +72,6 @@ private boolean _frustumDirty = true;
 	_frustum = new Plane[4];
 	for (int i = 0; i < _frustum.length; i++)
 		_frustum[i] = new Plane();
-}
-
-/**
- * Construct a new camera, the parameters provided are needed to determine the view frustum and the
- * project matrix. Default camera is the openGL camera, at the origin looking in the -Z direction
- * @param FOV
- * @param aspectRatio
- * @param near
- * @param far
- */
-public Camera(double FOV, double aspectRatio, double near, double far) {
-	_info = new CameraInfo(FOV, Transform.ident, null);
-
-	_aspectRatio = aspectRatio;
-	_info.trans.inverse(invTrans);
-
-	_frustumDirty = true;
-	_projMatDirty = true;
 }
 
 public Camera(CameraInfo camInfo, double aspectRatio) {
@@ -161,7 +147,6 @@ private void updateProjMat() {
 
 /**
  * Gets a reference to the projection matrix for this camera
- * @return
  */
 public Mat4d getProjMat4d() {
 	if (_projMatDirty) {
@@ -194,7 +179,6 @@ public double getAspectRatio() {
 }
 /**
  * Get the camera FOV in the y direction in radians
- * @return
  */
 public double getFOV() {
 	return _info.FOV;
@@ -226,7 +210,6 @@ public void getViewDir(Vec4d dirOut) {
 /**
  * Test frustum collision with sphere s
  * @param s
- * @return
  */
 public boolean collides(Sphere s) {
 	updateFrustum();
@@ -351,6 +334,51 @@ public void setInfo(CameraInfo newInfo) {
 
 	_frustumDirty = dirty || _frustumDirty;
 	_projMatDirty = dirty || _projMatDirty;
+}
+
+/**
+ * Clip the polygon against the view frustum, returns a new polygon that is entirely inside the view
+ * area. This is an implementation of the Sutherland-Hodgman_algorithm.
+ * @param verts - A list of vertices defining a polygon, with edges being defined by adjacent points
+ * @return - A list of vertices defining a new polygon
+ */
+public ArrayList<Vec4d> clipPolygon(ArrayList<Vec4d> verts) {
+	updateFrustum();
+
+	ArrayList<Vec4d> input = verts;
+	ArrayList<Vec4d> output = null;
+	assert(_frustum.length == 4);
+	for (Plane p : _frustum) {
+		output = new ArrayList<>();
+		for (int i = 0; i < input.size(); ++i) {
+			Vec4d start = input.get(i);
+			Vec4d end = input.get((i+1)%input.size());
+			Vec4d dir = new Vec4d();
+			dir.sub3(end, start);
+			dir.w = 0.0;
+			Ray edgeRay = new Ray(start, dir);
+
+			boolean startInside = p.getNormalDist(start) > 0;
+			boolean endInside = p.getNormalDist(end) > 0;
+
+			double edgeDist = p.collisionDist(edgeRay);
+			Vec4d inter = new Vec4d(edgeRay.getPointAtDist(edgeDist), 1.0);
+
+			if (startInside) {
+				output.add(start);
+				if (!endInside) {
+					output.add(inter);
+				}
+			} else { // !startInside
+				if (endInside) {
+					output.add(inter);
+				}
+			}
+
+		}
+		input = output;
+	}
+	return output;
 }
 
 } // class Camera

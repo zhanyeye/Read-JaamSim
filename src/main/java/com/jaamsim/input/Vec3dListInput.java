@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2011 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2020 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +19,8 @@ package com.jaamsim.input;
 
 import java.util.ArrayList;
 
+import com.jaamsim.basicsim.Entity;
+import com.jaamsim.basicsim.JaamSimModel;
 import com.jaamsim.datatypes.DoubleVector;
 import com.jaamsim.math.Vec3d;
 import com.jaamsim.units.DimensionlessUnit;
@@ -35,7 +38,7 @@ public class Vec3dListInput extends ListInput<ArrayList<Vec3d>> {
 	}
 
 	@Override
-	public void parse(KeywordIndex kw)
+	public void parse(Entity thisEnt, KeywordIndex kw)
 	throws InputErrorException {
 
 		// Check if number of outer lists violate minCount or maxCount
@@ -48,7 +51,7 @@ public class Vec3dListInput extends ListInput<ArrayList<Vec3d>> {
 
 		ArrayList<Vec3d> tempValue = new ArrayList<>(subArgs.size());
 		for (KeywordIndex subArg : subArgs) {
-			DoubleVector temp = Input.parseDoubles(subArg, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, unitType);
+			DoubleVector temp = Input.parseDoubles(thisEnt.getJaamSimModel(), subArg, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, unitType);
 			// pad the vector to have 3 elements
 			while (temp.size() < 3) {
 				temp.add(0.0d);
@@ -61,6 +64,11 @@ public class Vec3dListInput extends ListInput<ArrayList<Vec3d>> {
 	}
 
 	@Override
+	public String getValidInputDesc() {
+		return String.format(Input.VALID_VEC3D_LIST, unitType.getSimpleName());
+	}
+
+	@Override
 	public int getListSize() {
 		if (value == null)
 			return 0;
@@ -69,19 +77,19 @@ public class Vec3dListInput extends ListInput<ArrayList<Vec3d>> {
 	}
 
 	@Override
-	public String getDefaultString() {
-		if (defValue == null)
+	public String getDefaultString(JaamSimModel simModel) {
+		if (defValue == null || defValue.isEmpty())
 			return "";
 
-		if (defValue.size() == 0)
-			return "";
+		double factor = simModel.getDisplayedUnitFactor(unitType);
+		String unitStr = simModel.getDisplayedUnit(unitType);
 
 		StringBuilder tmp = new StringBuilder();
 		for (Vec3d each: defValue) {
 
 			// blank space between elements
 			if (tmp.length() > 0)
-				tmp.append(SEPARATOR);
+				tmp.append(BRACE_SEPARATOR);
 
 			if (each == null) {
 				tmp.append("");
@@ -89,19 +97,20 @@ public class Vec3dListInput extends ListInput<ArrayList<Vec3d>> {
 			}
 
 			tmp.append("{");
+			tmp.append(BRACE_SEPARATOR);
+			tmp.append(each.x/factor);
 			tmp.append(SEPARATOR);
-			tmp.append(each.x);
+			tmp.append(each.y/factor);
 			tmp.append(SEPARATOR);
-			tmp.append(each.y);
-			tmp.append(SEPARATOR);
-			tmp.append(each.z);
-			tmp.append(SEPARATOR);
-			if (unitType != Unit.class) {
-				tmp.append(Unit.getSIUnit(unitType));
+			tmp.append(each.z/factor);
+			if (!unitStr.isEmpty()) {
 				tmp.append(SEPARATOR);
+				tmp.append(unitStr);
 			}
+			tmp.append(BRACE_SEPARATOR);
 			tmp.append("}");
 		}
 		return tmp.toString();
 	}
+
 }

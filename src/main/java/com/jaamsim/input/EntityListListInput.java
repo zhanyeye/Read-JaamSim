@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2011 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2018 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +18,7 @@
 package com.jaamsim.input;
 
 import java.util.ArrayList;
+import java.util.Collections;
 
 import com.jaamsim.basicsim.Entity;
 
@@ -31,14 +33,14 @@ public class EntityListListInput<T extends Entity> extends ListInput<ArrayList<A
 	}
 
 	@Override
-	public void parse(KeywordIndex kw)
+	public void parse(Entity thisEnt, KeywordIndex kw)
 	throws InputErrorException {
 		ArrayList<KeywordIndex> subArgs = kw.getSubArgs();
 		// Check if number of outer lists violate minCount or maxCount
 		if (subArgs.size() < minCount || subArgs.size() > maxCount)
 			throw new InputErrorException(INP_ERR_RANGECOUNT, minCount, maxCount, kw.argString());
 
-		value = Input.parseListOfEntityLists(kw, entClass, unique);
+		value = Input.parseListOfEntityLists(thisEnt.getJaamSimModel(), kw, entClass, unique);
 	}
 
 	@Override
@@ -55,10 +57,7 @@ public class EntityListListInput<T extends Entity> extends ListInput<ArrayList<A
 
 	@Override
 	public String getDefaultString() {
-		if (defValue == null)
-			return "";
-
-		if (defValue.size() ==0)
+		if (defValue == null || defValue.isEmpty())
 			return "";
 
 		StringBuilder tmp = new StringBuilder();
@@ -87,4 +86,18 @@ public class EntityListListInput<T extends Entity> extends ListInput<ArrayList<A
 		}
 		return tmp.toString();
 	}
+
+	@Override
+	public boolean removeReferences(Entity ent) {
+		if (value == null)
+			return false;
+
+		boolean ret = false;
+		for (ArrayList<T> list : value) {
+			boolean changed = list.removeAll(Collections.singleton(ent));
+			ret = ret || changed;
+		}
+		return ret;
+	}
+
 }

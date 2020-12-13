@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2011 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2018-2019 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,26 +17,30 @@
  */
 package com.jaamsim.units;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 
 import com.jaamsim.basicsim.Entity;
+import com.jaamsim.basicsim.JaamSimModel;
+import com.jaamsim.basicsim.ObjectType;
+import com.jaamsim.input.Input;
 import com.jaamsim.input.Keyword;
 
 public abstract class Unit extends Entity {
-	@Keyword(description = "Factor to convert from the specified unit to the System International (SI) unit. " +
-					"The factor is entered as A / B, where A is the first entry and B is the second. " +
-					"For example, to convert from miles per hour to m/s, the first factor is 1609.344 (meters in one mile) and " +
-					"the second factor is 3600 (seconds in one hour).",
-			example = "mph  ConversionFactorToSI { 1609.344  3600 }")
+	@Keyword(description = "Factor to convert from the specified unit to the System International "
+	                     + "(SI) unit. The factor is entered as A / B, where A is the first entry "
+	                     + "and B is the second. For example, to convert from miles per hour to "
+	                     + "m/s, the first factor is 1609.344 (meters in one mile) and the second "
+	                     + "factor is 3600 (seconds in one hour).",
+	         exampleList = {"1609.344  3600"})
 	private final SIUnitFactorInput conversionFactorToSI;
 
 	{
-		conversionFactorToSI = new SIUnitFactorInput("ConversionFactorToSI", "Key Inputs");
+		conversionFactorToSI = new SIUnitFactorInput("ConversionFactorToSI", KEY_INPUTS);
 		this.addInput(conversionFactorToSI);
 	}
-
-	private static final HashMap<Class<? extends Unit>, Unit>
-		preferredUnit = new HashMap<>();
 
 	public Unit() {}
 
@@ -59,28 +64,6 @@ public abstract class Unit extends Entity {
 		return "SI";
 	}
 
-	public static final void setPreferredUnit(Class<? extends Unit> type, Unit u) {
-		preferredUnit.put(type, u);
-	}
-
-	public static final <T extends Unit> Unit getPreferredUnit(Class<T> type) {
-		return preferredUnit.get(type);
-	}
-
-	public static final <T extends Unit> String getDisplayedUnit(Class<T> ut) {
-		Unit u = Unit.getPreferredUnit(ut);
-		if (u == null)
-			return Unit.getSIUnit(ut);
-		return u.getName();
-	}
-
-	public static final <T extends Unit> double getDisplayedUnitFactor(Class<T> ut) {
-		Unit u = Unit.getPreferredUnit(ut);
-		if (u == null)
-			return 1.0;
-		return u.getConversionFactorToSI();
-	}
-
 	/**
 	 * Return the conversion factor to SI units
 	 */
@@ -96,6 +79,38 @@ public abstract class Unit extends Entity {
 		double f2 = unit.getConversionFactorToSI();
 		return f1 / f2 ;
 	}
+
+	public static ArrayList<String> getUnitTypeList(JaamSimModel simModel) {
+		ArrayList<String> list = new ArrayList<>();
+		for (ObjectType each: simModel.getClonesOfIterator(ObjectType.class)) {
+			Class<? extends Entity> klass = each.getJavaClass();
+			if (klass == null)
+				continue;
+
+			if (Unit.class.isAssignableFrom(klass))
+				list.add(each.getName());
+		}
+		Collections.sort(list, Input.uiSortOrder);
+		return list;
+	}
+
+	public static <T extends Unit> ArrayList<T> getUnitList(JaamSimModel model, Class<T> ut) {
+		ArrayList<T> ret = new ArrayList<>();
+		for (T u: model.getClonesOfIterator(ut)) {
+			ret.add(u);
+		}
+		Collections.sort(ret, Unit.unitSortOrder);
+		return ret;
+	}
+
+	// Sorts by increasing SI conversion factor (i.e. smallest unit first)
+	private static class UnitSortOrder implements Comparator<Unit> {
+		@Override
+		public int compare(Unit u1, Unit u2) {
+			return Double.compare(u1.getConversionFactorToSI(), u2.getConversionFactorToSI());
+		}
+	}
+	public static final UnitSortOrder unitSortOrder = new UnitSortOrder();
 
 	private static class MultPair {
 		Class<? extends Unit> a;

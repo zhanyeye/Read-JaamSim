@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2011 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2019-2020 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,13 +26,17 @@ import java.awt.dnd.DnDConstants;
 import java.awt.dnd.DragGestureEvent;
 import java.awt.dnd.DragGestureListener;
 import java.awt.dnd.DragSource;
+import java.awt.event.KeyEvent;
+import java.awt.event.KeyListener;
 import java.awt.event.MouseEvent;
+import java.util.Enumeration;
 import java.util.HashMap;
 
 import javax.swing.ImageIcon;
 import javax.swing.JFrame;
 import javax.swing.JScrollPane;
 import javax.swing.JTree;
+import javax.swing.SwingUtilities;
 import javax.swing.ToolTipManager;
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeCellRenderer;
@@ -39,10 +44,11 @@ import javax.swing.tree.DefaultTreeModel;
 import javax.swing.tree.TreePath;
 import javax.swing.tree.TreeSelectionModel;
 
+import com.jaamsim.basicsim.JaamSimModel;
 import com.jaamsim.basicsim.ObjectType;
 import com.jaamsim.controllers.RenderManager;
 
-public class EntityPallet extends JFrame implements DragGestureListener {
+public class EntityPallet extends OSFixJFrame implements DragGestureListener {
 
 	private static EntityPallet myInstance;  // only one instance allowed to be open
 
@@ -81,8 +87,29 @@ public class EntityPallet extends JFrame implements DragGestureListener {
 		ToolTipManager.sharedInstance().registerComponent(tree);
 		ToolTipManager.sharedInstance().setDismissDelay(600000);
 
-		setLocation(GUIFrame.COL1_START, GUIFrame.TOP_START);
-		setSize(GUIFrame.COL1_WIDTH, GUIFrame.HALF_TOP);
+		addComponentListener(FrameBox.getSizePosAdapter(this, "ModelBuilderSize", "ModelBuilderPos"));
+
+		tree.addKeyListener(new KeyListener() {
+			@Override
+			public void keyTyped(KeyEvent e) {}
+
+			@Override
+			public void keyPressed(KeyEvent e) {
+				int keyCode = e.getKeyCode();
+				if (keyCode == KeyEvent.VK_F1) {
+					TreePath path = tree.getSelectionPath();
+					if (path == null || !(path.getLastPathComponent() instanceof DefaultMutableTreeNode))
+						return;
+					DefaultMutableTreeNode treeNode = (DefaultMutableTreeNode) path.getLastPathComponent();
+					if(treeNode.getUserObject() instanceof ObjectType) {
+						HelpBox.getInstance().showDialog(treeNode.getUserObject().toString());
+					}
+				}
+			}
+
+			@Override
+			public void keyReleased(KeyEvent e) {}
+		});
 	}
 
 	@Override
@@ -116,12 +143,28 @@ public class EntityPallet extends JFrame implements DragGestureListener {
 		}
 	}
 
+	public static void update() {
+		SwingUtilities.invokeLater(new RunnableUpdater());
+	}
+
+	private static class RunnableUpdater implements Runnable {
+
+		@Override
+		public void run() {
+			EntityPallet.getInstance().updateTree();
+		}
+	}
+
 	private void updateTree() {
+
+		// Store all the expanded paths
+		Enumeration<TreePath> expandedPaths = tree.getExpandedDescendants(new TreePath(top));
 
 		// Create a tree that allows one selection at a time
 		top.removeAllChildren();
 		HashMap<String, DefaultMutableTreeNode> paletteNodes = new HashMap<>();
-		for (ObjectType type : ObjectType.getAll()) {
+		JaamSimModel simModel = GUIFrame.getJaamSimModel();
+		for (ObjectType type : simModel.getObjectTypes()) {
 			if (!type.isDragAndDrop())
 				continue;
 
@@ -137,6 +180,26 @@ public class EntityPallet extends JFrame implements DragGestureListener {
 			palNode.add(classNode);
 		}
 		treeModel.reload(top);
+
+		// Restore all the expanded paths
+		while (expandedPaths != null && expandedPaths.hasMoreElements()) {
+			TreePath oldPath = expandedPaths.nextElement();
+			if (oldPath.getPathCount() < 2)
+				continue;
+			DefaultMutableTreeNode oldPaletteNode = (DefaultMutableTreeNode) (oldPath.getPath())[1];
+			String paletteName = (String) (oldPaletteNode.getUserObject());
+
+			// Find and expand the new tree node with this name
+			Enumeration<?> enumeration = top.children();
+			while (enumeration.hasMoreElements()) {
+				DefaultMutableTreeNode eachNode = (DefaultMutableTreeNode) enumeration.nextElement();
+				if (paletteName.equals(eachNode.getUserObject())) {
+					Object[] nodeList = {top, eachNode};
+					tree.expandPath(new TreePath(nodeList));
+					break;
+				}
+			}
+		}
 	}
 
 	public synchronized static EntityPallet getInstance() {

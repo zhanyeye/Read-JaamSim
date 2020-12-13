@@ -17,9 +17,6 @@
 package com.jaamsim.math;
 
 public class Plane {
-
-	public static Plane XY_PLANE = new Plane();
-
 /**
  * The normal direction of the plane, should always be of unit length
  */
@@ -83,7 +80,6 @@ public void set(Vec3d p0, Vec3d p1, Vec3d p2) {
 /**
  * Get the shortest distance from the plane to this point, effectively just a convenient dot product
  * @param point
- * @return
  */
 public double getNormalDist(Vec3d point) {
 	double dot = point.dot3(normal);
@@ -134,7 +130,7 @@ public boolean equals(Object o) {
 
 @Override
 public int hashCode() {
-	assert false : "hashCode not designed";
+	//assert false : "hashCode not designed";
 	return 42; // any arbitrary constant will do
 }
 
@@ -142,7 +138,6 @@ public int hashCode() {
  * Get the distance along a ray that it collides with this plane, this can return
  * infinity if the ray is parallel
  * @param r
- * @return
  */
 public double collisionDist(Ray r) {
 
@@ -158,10 +153,38 @@ public double collisionDist(Ray r) {
 
 }
 
+// Return the 'ray' resulting from colliding two planes, or null if the planes are parallel
+public Ray collide(Plane p) {
+	double normDot = normal.dot3(p.normal);
+	if (MathUtils.near(normDot, 1.0) || MathUtils.near(normDot, -1.0)) {
+		return null; // These planes are parallel
+	}
+
+	// Ray dir is the direction of the new ray
+	Vec3d rayDir = new Vec3d();
+	rayDir.cross3(normal, p.normal);
+	rayDir.normalize3();
+
+	// Now, we need a point on both planes, so we will find any ray in this plane and intersect it with the other
+	Vec3d intDir = new Vec3d();
+	intDir.cross3(rayDir, normal); // Take the cross of our new direction and the normal, this must be in the plane
+	intDir.normalize3();
+	Vec3d intStart = new Vec3d(normal);
+	intStart.scale3(_dist); // intStart is in this plane
+	Ray intersectRay = new Ray(new Vec4d(intStart, 1.0),
+	                           new Vec4d(intDir, 0.0));
+	double intDist = p.collisionDist(intersectRay);
+	Vec3d intPoint = new Vec3d(intDir);
+	intPoint.scale3(intDist);
+	intPoint.add3(intStart);
+
+	return new Ray(new Vec4d(intPoint, 1.0),
+	               new Vec4d(rayDir, 0.0));
+}
+
 /**
  * Returns if ray 'r' collides with the back of the plane
  * @param r
- * @return
  */
 public boolean backFaceCollision(Ray r) {
 

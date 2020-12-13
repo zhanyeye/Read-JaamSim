@@ -16,6 +16,7 @@
  */
 package com.jaamsim.input;
 
+import com.jaamsim.basicsim.Entity;
 import com.jaamsim.datatypes.IntegerVector;
 
 public class IntegerListInput extends ListInput<IntegerVector> {
@@ -28,8 +29,16 @@ public class IntegerListInput extends ListInput<IntegerVector> {
 		validCounts = new int[] { };
 	}
 
+	public void setDefaultValue(int... args) {
+		IntegerVector def = new IntegerVector(args.length);
+		for (int each : args) {
+			def.add(each);
+		}
+		setDefaultValue(def);
+	}
+
 	@Override
-	public void parse(KeywordIndex kw)
+	public void parse(Entity thisEnt, KeywordIndex kw)
 	throws InputErrorException {
 		Input.assertCountRange(kw, minCount, maxCount);
 		Input.assertCount(kw, validCounts);
@@ -55,10 +64,7 @@ public class IntegerListInput extends ListInput<IntegerVector> {
 
 	@Override
 	public String getDefaultString() {
-		if (defValue == null)
-			return "";
-
-		if (defValue.size() == 0)
+		if (defValue == null || defValue.size() == 0)
 			return "";
 
 		StringBuilder tmp = new StringBuilder();

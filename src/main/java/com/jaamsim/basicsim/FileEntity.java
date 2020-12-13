@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2002-2011 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2020 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,35 +22,40 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 
+import com.jaamsim.input.InputAgent;
 import com.jaamsim.input.InputErrorException;
-import com.jaamsim.ui.LogBox;
 
 /**
  * Class encapsulating file input/output methods and file access.
  */
 public class FileEntity {
+
 	private File backingFileObject;
 	private BufferedWriter outputStream;
 
-	public FileEntity(String fileName) {
-		this(fileName, false);
+	public FileEntity(File file) {
+		this(file, false);
 	}
 
-	public FileEntity(String fileName, boolean append) {
-		backingFileObject = new File( fileName);
+	public FileEntity(File file, boolean append) {
+		backingFileObject = file;
 
 		try {
 			backingFileObject.createNewFile();
-			outputStream = new BufferedWriter( new FileWriter( backingFileObject, append ) );
+			outputStream = new BufferedWriter( new FileWriter(backingFileObject, append) );
 		}
-		catch( IOException e ) {
-			throw new InputErrorException( "IOException thrown trying to open FileEntity: " + e );
+		catch (IOException e) {
+			throw new InputErrorException("IOException thrown trying to open file: '%s'%n%s",
+					file.getPath(), e.getMessage());
 		}
-		catch( IllegalArgumentException e ) {
-			throw new InputErrorException( "IllegalArgumentException thrown trying to open FileEntity (Should not happen): " + e );
+		catch (IllegalArgumentException e) {
+			throw new InputErrorException("IllegalArgumentException thrown trying to open file: "
+					+ "'%s'%n%s",
+					file.getPath(), e.getMessage());
 		}
-		catch( SecurityException e ) {
-			throw new InputErrorException( "SecurityException thrown trying to open FileEntity: " + e );
+		catch (SecurityException e) {
+			throw new InputErrorException("SecurityException thrown trying to open file: '%s'%n%s",
+					file.getPath(), e.getMessage());
 		}
 	}
 
@@ -63,7 +69,7 @@ public class FileEntity {
 		}
 		catch( IOException e ) {
 			outputStream = null;
-			LogBox.logLine( "Unable to close FileEntity: " + backingFileObject.getName() );
+			InputAgent.logMessage( "Unable to close FileEntity: " + backingFileObject.getName() );
 		}
 	}
 

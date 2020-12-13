@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2013 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2016-2020 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,59 +21,93 @@ import java.util.ArrayList;
 import java.util.Collections;
 
 import com.jaamsim.basicsim.Entity;
-import com.jaamsim.datatypes.DoubleVector;
+import com.jaamsim.basicsim.JaamSimModel;
 import com.jaamsim.input.Input;
 import com.jaamsim.input.InputErrorException;
 import com.jaamsim.input.KeywordIndex;
+import com.jaamsim.input.Parser;
 import com.jaamsim.units.DimensionlessUnit;
 import com.jaamsim.units.Unit;
 import com.jaamsim.units.UserSpecifiedUnit;
 
 public class SampleInput extends Input<SampleProvider> {
-	private Class<? extends Unit> unitType = DimensionlessUnit.class;
+	private Class<? extends Unit> unitType;
+	private double minValue = Double.NEGATIVE_INFINITY;
+	private double maxValue = Double.POSITIVE_INFINITY;
 
 	public SampleInput(String key, String cat, SampleProvider def) {
 		super(key, cat, def);
 	}
 
 	public void setUnitType(Class<? extends Unit> u) {
-		if (u != unitType)
-			this.reset();
+
+		if (u == unitType)
+			return;
+
 		unitType = u;
+		this.setValid(false);
+
 		if (defValue instanceof SampleConstant)
 			((SampleConstant)defValue).setUnitType(unitType);
+		if (defValue instanceof TimeSeriesConstantDouble)
+			((TimeSeriesConstantDouble)defValue).setUnitType(unitType);
+	}
+
+	public void setValidRange(double min, double max) {
+		minValue = min;
+		maxValue = max;
 	}
 
 	@Override
-	public void parse(KeywordIndex kw)
-	throws InputErrorException {
-		// Try to parse as a constant value
-		try {
-			DoubleVector tmp = Input.parseDoubles(kw, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, unitType);
-			Input.assertCount(tmp, 1);
-			value = new SampleConstant(unitType, tmp.get(0));
-			return;
+	public void copyFrom(Entity thisEnt, Input<?> in) {
+		super.copyFrom(thisEnt, in);
+
+		// SampleExpressions must be re-parsed to reset the entity referred to by "this"
+		if (value instanceof SampleExpression) {
+			parseFrom(thisEnt, in);
 		}
-		catch (InputErrorException e) {}
-
-		// If not a constant, try parsing a SampleProvider
-		Input.assertCount(kw, 1);
-		Entity ent = Input.parseEntity(kw.getArg(0), Entity.class);
-		SampleProvider s = Input.castImplements(ent, SampleProvider.class);
-		if( s.getUnitType() != UserSpecifiedUnit.class )
-			Input.assertUnitsMatch(unitType, s.getUnitType());
-		value = s;
 	}
 
 	@Override
-	public ArrayList<String> getValidOptions() {
+	public String applyConditioning(String str) {
+
+		// No changes required if the input is a number and unit
+		ArrayList<String> tokens = new ArrayList<>();
+		Parser.tokenize(tokens, str, true);
+		if (tokens.size() == 2 && isDouble(tokens.get(0)))
+			return str;
+
+		return Parser.addQuotesIfNeeded(str);
+	}
+
+	@Override
+	public void parse(Entity thisEnt, KeywordIndex kw)
+	throws InputErrorException {
+		value = Input.parseSampleExp(kw, thisEnt, minValue, maxValue, unitType);
+		this.setValid(true);
+	}
+
+	@Override
+	public String getValidInputDesc() {
+		if (unitType == UserSpecifiedUnit.class) {
+			return Input.VALID_SAMPLE_PROV_UNIT;
+		}
+		if (unitType == DimensionlessUnit.class) {
+			return Input.VALID_SAMPLE_PROV_DIMLESS;
+		}
+		return String.format(Input.VALID_SAMPLE_PROV, unitType.getSimpleName());
+	}
+
+	@Override
+	public ArrayList<String> getValidOptions(Entity ent) {
 		ArrayList<String> list = new ArrayList<>();
-		for (Entity each : Entity.getClonesOfIterator(Entity.class, SampleProvider.class)) {
+		JaamSimModel simModel = ent.getJaamSimModel();
+		for (Entity each : simModel.getClonesOfIterator(Entity.class, SampleProvider.class)) {
 			SampleProvider sp = (SampleProvider)each;
-			if (sp.getUnitType() == unitType)
+			if (sp.getUnitType() == unitType && sp != ent)
 				list.add(each.getName());
 		}
-		Collections.sort(list);
+		Collections.sort(list, Input.uiSortOrder);
 		return list;
 	}
 
@@ -80,16 +115,55 @@ public class SampleInput extends Input<SampleProvider> {
 	public void getValueTokens(ArrayList<String> toks) {
 		if (value == null) return;
 
+		// Preserve the exact text for a constant value input
 		if (value instanceof SampleConstant) {
 			super.getValueTokens(toks);
 			return;
 		}
-		else {
-			toks.add(((Entity)value).getName());
-		}
+
+		// All other inputs can be built from scratch
+		toks.add(value.toString());
 	}
 
-	public void verifyUnit() {
-		Input.assertUnitsMatch( unitType, value.getUnitType());
+	@Override
+	public boolean removeReferences(Entity ent) {
+		if (value == ent) {
+			this.reset();
+			return true;
+		}
+		return false;
 	}
+
+	@Override
+	public boolean useExpressionBuilder() {
+		return true;
+	}
+
+	@Override
+	public String getDefaultString(JaamSimModel simModel) {
+		if (defValue instanceof SampleConstant) {
+			return ((SampleConstant) defValue).getValueString(simModel);
+		}
+		return getDefaultString();
+	}
+
+	@Override
+	public String getPresentValueString(JaamSimModel simModel, double simTime) {
+		if (value == null)
+			return "";
+
+		StringBuilder sb = new StringBuilder();
+		Class<? extends Unit> ut = value.getUnitType();
+		if (ut == DimensionlessUnit.class) {
+			sb.append(Double.toString(value.getNextSample(simTime)));
+		}
+		else {
+			String unitString = simModel.getDisplayedUnit(ut);
+			double sifactor = simModel.getDisplayedUnitFactor(ut);
+			sb.append(Double.toString(value.getNextSample(simTime)/sifactor));
+			sb.append("[").append(unitString).append("]");
+		}
+		return sb.toString();
+	}
+
 }

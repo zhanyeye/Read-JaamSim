@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2012 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2020 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,6 +25,7 @@ import javax.swing.JTable;
 import javax.swing.border.Border;
 import javax.swing.table.DefaultTableCellRenderer;
 
+import com.jaamsim.basicsim.JaamSimModel;
 import com.jaamsim.input.Input;
 
 public class EditBoxColumnRenderer extends DefaultTableCellRenderer {
@@ -47,23 +49,34 @@ public Component getTableCellRendererComponent(JTable table, Object value,
                                                int row, int column) {
 
 	Input<?> in = (Input<?>)value;
-
 	String str;
-	if (column == 0)
+	JaamSimModel simModel = EditBox.getInstance().getCurrentEntity().getJaamSimModel();
+
+	// 1) Keyword
+	if (column == 0) {
 		str = in.getKeyword();
+	}
+
+	// 2) Default value
 	else if (column == 1) {
 		if (in.getDefaultText() != null)
 			str = EditBox.formatEditorText(in.getDefaultText());
 		else {
-			str = in.getDefaultString();
-			if (str.isEmpty())
+			str = in.getDefaultString(simModel);
+			if (str == null || str.isEmpty())
 				str = EditBox.NONE;
 		}
 	}
+
+	// 3) Present value
 	else {
 		str = in.getValueString();
-		if (str.isEmpty() && in.isRequired())
+		if (!in.isValid())
+			str = EditBox.formatErrorText(str);
+		if (in.isDefault() && in.isRequired())
 			str = EditBox.REQD;
+		if (in.isLocked())
+			str = EditBox.formatLockedText(str);
 	}
 
 	// Pass along the keyword string, not the input itself

@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2002-2011 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2019 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -38,17 +39,17 @@ public class Group extends Entity {
 	private final ArrayList<Entity> list; // list of objects in group
 
 	@Keyword(description = "The list of objects included in the group.",
-	         example = "Group1 List { DisplayEntity1 DisplayEntity2 }")
+	         exampleList = {"DisplayEntity1 DisplayEntity2"})
 	private final GroupListInput groupListInput;
 
 	@Keyword(description = "A list of additional objects to be included in " +
 			 		"the already existing list of group objects.  The added " +
 			 		"objects will inherit all inputs previously set for the group.",
-	         example = "Group1 AppendList { DisplayEntity3 DisplayEntity4 }")
+	         exampleList = {"DisplayEntity3 DisplayEntity4"})
 	private final GroupAppendListInput groupAppendListInput;
 
 	@Keyword(description = "The object type for the group.",
-	         example = "Group1 GroupType { DisplayEntity }")
+	         exampleList = {"DisplayEntity"})
 	private final GroupTypeInput groupTypeInput;
 
 	{
@@ -60,6 +61,8 @@ public class Group extends Entity {
 
 		groupTypeInput = new Group.GroupTypeInput();
 		this.addInput(groupTypeInput);
+
+		this.removeInput(active);
 	}
 
 	public Group() {
@@ -70,18 +73,16 @@ public class Group extends Entity {
 
 	private class GroupListInput extends Input<String> {
 		public GroupListInput() {
-			super("List", "Key Inputs", null);
+			super("List", KEY_INPUTS, null);
 		}
 
 		@Override
-		public void parse(KeywordIndex kw) {
+		public void parse(Entity thisEnt, KeywordIndex kw) {
 			// If adding to the list
 			if( kw.getArg( 0 ).equals( "++" ) ) {
-				ArrayList<String> input = new ArrayList<>(kw.numArgs()-1);
-				for (int i = 1; i < kw.numArgs(); i++)
-					input.add(kw.getArg(i));
+				KeywordIndex subKw = new KeywordIndex(kw, 1);
 
-				ArrayList<Entity> addedValues = Input.parseEntityList(input, Entity.class, true);
+				ArrayList<Entity> addedValues = Input.parseEntityList(thisEnt.getJaamSimModel(), subKw, Entity.class, true);
 				for( Entity ent : addedValues ) {
 					if( list.contains( ent ) )
 						throw new InputErrorException(INP_ERR_NOTUNIQUE, ent.getName());
@@ -98,36 +99,61 @@ public class Group extends Entity {
 			}
 			// If removing from the list
 			else if( kw.getArg( 0 ).equals( "--" ) ) {
-				ArrayList<String> input = new ArrayList<>(kw.numArgs()-1);
-				for (int i = 1; i < kw.numArgs(); i++)
-					input.add(kw.getArg(i));
+				KeywordIndex subKw = new KeywordIndex(kw, 1);
 
-				ArrayList<Entity> removedValues = Input.parseEntityList(input, Entity.class, true);
+				ArrayList<Entity> removedValues = Input.parseEntityList(thisEnt.getJaamSimModel(), subKw, Entity.class, true);
 				for( Entity ent : removedValues ) {
 					if( ! list.contains( ent ) )
-						InputAgent.logWarning( "Could not remove " + ent + " from " + this.getKeyword() );
+						InputAgent.logWarning(thisEnt.getJaamSimModel(),
+								"Could not remove " + ent + " from " + this.getKeyword() );
 					list.remove( ent );
 				}
 			}
 			// Otherwise, just set the list normally
 			else {
-				ArrayList<Entity> temp = Input.parseEntityList(kw, Entity.class, true);
+				ArrayList<Entity> temp = Input.parseEntityList(thisEnt.getJaamSimModel(), kw, Entity.class, true);
 				list.clear();
 				list.addAll(temp);
 			}
 			Group.this.checkType();
 		}
+
+		@Override
+		public void setTokens(KeywordIndex kw) {
+			isDef = false;
+
+			String[] args = kw.getArgArray();
+			if (args.length > 0) {
+
+				// Consider the following input case:
+				// Group1 List { ++ Entity1 ...
+				if (args[0].equals( "++" )) {
+
+					this.addTokens(args);
+					return;
+				}
+
+				// Consider the following input case:
+				// Group1 List { -- Entity1 ...
+				if (args[0].equals( "--" )) {
+					if (this.removeTokens(args))
+						return;
+				}
+			}
+
+			valueTokens = args;
+		}
 	}
 
 	private class GroupAppendListInput extends Input<String> {
 		public GroupAppendListInput() {
-			super("AppendList", "Key Inputs", null);
+			super("AppendList", KEY_INPUTS, null);
 		}
 
 		@Override
-		public void parse(KeywordIndex kw) {
+		public void parse(Entity thisEnt, KeywordIndex kw) {
 			int originalListSize = list.size();
-			ArrayList<Entity> temp = Input.parseEntityList(kw, Entity.class, true);
+			ArrayList<Entity> temp = Input.parseEntityList(thisEnt.getJaamSimModel(), kw, Entity.class, true);
 			for (Entity each : temp) {
 				if (!list.contains(each))
 					list.add(each);
@@ -148,19 +174,19 @@ public class Group extends Entity {
 
 	private class GroupTypeInput extends Input<String> {
 		public GroupTypeInput() {
-			super("GroupType", "Key Inputs", null);
+			super("GroupType", KEY_INPUTS, null);
 		}
 
 		@Override
-		public void parse(KeywordIndex kw) {
+		public void parse(Entity thisEnt, KeywordIndex kw) {
 			Input.assertCount(kw, 1);
-			type = Input.parseEntityType(kw.getArg(0));
+			type = Input.parseEntityType(thisEnt.getJaamSimModel(), kw.getArg(0));
 			Group.this.checkType();
 		}
 	}
 
 
-	public void saveGroupKeyword(KeywordIndex kw) {
+	public void saveGroupKeyword(JaamSimModel simModel, KeywordIndex kw) {
 		ArrayList<String> toks = new ArrayList<>(kw.numArgs());
 		for (int i = 0; i < kw.numArgs(); i++)
 			toks.add(kw.getArg(i));
@@ -170,7 +196,8 @@ public class Group extends Entity {
 
 		// If there can never be elements in the group, throw a warning
 		if( type == null && list.size() == 0 ) {
-			InputAgent.logWarning("The group %s has no elements to apply keyword: %s", this, kw.keyword);
+			InputAgent.logWarning(simModel,
+					"The group %s has no elements to apply keyword: %s", this, kw.keyword);
 		}
 	}
 

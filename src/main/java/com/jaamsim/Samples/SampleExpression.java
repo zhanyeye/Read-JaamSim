@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2014 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2016-2019 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,22 +18,35 @@
 package com.jaamsim.Samples;
 
 import com.jaamsim.basicsim.Entity;
-import com.jaamsim.basicsim.ObjectType;
+import com.jaamsim.basicsim.ErrorException;
 import com.jaamsim.input.ExpError;
 import com.jaamsim.input.ExpEvaluator;
 import com.jaamsim.input.ExpParser;
+import com.jaamsim.input.ExpResType;
 import com.jaamsim.input.ExpResult;
+import com.jaamsim.input.InputErrorException;
 import com.jaamsim.units.Unit;
+import com.jaamsim.units.UserSpecifiedUnit;
 
 public class SampleExpression implements SampleProvider {
 	private final ExpParser.Expression exp;
 	private final Entity thisEnt;
 	private final Class<? extends Unit> unitType;
+	private final ExpEvaluator.EntityParseContext parseContext;
 
-	public SampleExpression(ExpParser.Expression e, Entity ent, Class<? extends Unit> ut) {
-		exp = e;
+	public SampleExpression(String expString, Entity ent, Class<? extends Unit> ut) throws ExpError {
+
+		// Check that a unit type has been specified
+		if (ut == UserSpecifiedUnit.class) {
+			throw new InputErrorException("Unit type has not been specified");
+		}
+
 		thisEnt = ent;
 		unitType = ut;
+		parseContext = ExpEvaluator.getParseContext(thisEnt, expString);
+		exp = ExpParser.parseExpression(parseContext, expString);
+		ExpParser.assertUnitType(exp, unitType);
+		ExpParser.assertResultType(exp, ExpResType.NUMBER);
 	}
 
 	@Override
@@ -44,17 +58,17 @@ public class SampleExpression implements SampleProvider {
 	public double getNextSample(double simTime) {
 		double ret = 0.0;
 		try {
-			ExpResult res = ExpEvaluator.evaluateExpression(exp, simTime, thisEnt);
+			ExpResult res = ExpEvaluator.evaluateExpression(exp, simTime);
 			if (res.unitType != unitType)
 				thisEnt.error("Invalid unit returned by an expression: '%s'%n"
 						+ "Received: %s, expected: %s",
-						exp, ObjectType.getObjectTypeForClass(res.unitType),
-						ObjectType.getObjectTypeForClass(unitType));
+						exp, thisEnt.getJaamSimModel().getObjectTypeForClass(res.unitType),
+						thisEnt.getJaamSimModel().getObjectTypeForClass(unitType));
 
 			ret = res.value;
 		}
 		catch(ExpError e) {
-			thisEnt.error("%s", e.getMessage());
+			throw new ErrorException(thisEnt, e);
 		}
 		return ret;
 	}
@@ -74,9 +88,13 @@ public class SampleExpression implements SampleProvider {
 		return Double.POSITIVE_INFINITY;
 	}
 
+	public String getExpressionString() {
+		return parseContext.getUpdatedSource();
+	}
+
 	@Override
 	public String toString() {
-		return exp.toString();
+		return getExpressionString();
 	}
 
 }

@@ -116,7 +116,12 @@ public abstract class DisplayModelBinding {
 		rotateHandlePoints = RenderUtils.transformPoints(mat, ROTATE_POINTS, 0);
 	}
 
-	// Collect the proxies for the selection box
+	/**
+	 * Collects the proxies for the green box and handles that are shown around the selected
+	 * entity.
+	 * @param simTime - present simulation time
+	 * @param out - array to which the render proxies are appended
+	 */
 	public void collectSelectionProxies(double simTime, ArrayList<RenderProxy> out) {
 		collectSelectionBox(simTime, out);
 	}
@@ -150,6 +155,8 @@ public abstract class DisplayModelBinding {
 			pl.add(handlePoints.get(i));
 			PointProxy point = new PointProxy(pl, ColourInput.GREEN, 8, getVisibilityInfo(), RenderManager.RESIZE_POSX_PICK_ID - i);
 			point.setHoverColour(ColourInput.LIGHT_GREY);
+			point.setCollisionAngle(0.004363); // 0.25 degrees in radians
+
 			out.add(point);
 		}
 
@@ -238,6 +245,14 @@ public abstract class DisplayModelBinding {
 	}
 
 	public VisibilityInfo getVisibilityInfo() {
+
+		// If set, the DisplayEntity overrides the visibility info for the DisplayModel
+		if (observee instanceof DisplayEntity) {
+			DisplayEntity de = (DisplayEntity)observee;
+			if (de.getVisibilityInfo() != null) {
+				return de.getVisibilityInfo();
+			}
+		}
 
 		return dm.getVisibilityInfo();
 	}

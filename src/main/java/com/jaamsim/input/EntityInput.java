@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2010-2011 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2018-2020 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +20,7 @@ package com.jaamsim.input;
 import java.util.ArrayList;
 import java.util.Collections;
 
+import com.jaamsim.Graphics.DisplayEntity;
 import com.jaamsim.basicsim.Entity;
 
 public class EntityInput<T extends Entity> extends Input<T> {
@@ -43,23 +45,31 @@ public class EntityInput<T extends Entity> extends Input<T> {
 	}
 
 	@Override
-	public void parse(KeywordIndex kw)
+	public void parse(Entity thisEnt, KeywordIndex kw)
 	throws InputErrorException {
 		Input.assertCount(kw, 1);
-		T tmp = Input.parseEntity(kw.getArg(0), entClass);
+		T tmp = Input.parseEntity(thisEnt.getJaamSimModel(), kw.getArg(0), entClass);
 		if (!isValid(tmp))
 			throw new InputErrorException("%s is not a valid entity", tmp.getName());
 		value = tmp;
 	}
 
 	@Override
-	public ArrayList<String> getValidOptions() {
+	public String getValidInputDesc() {
+		if (entClass == DisplayEntity.class) {
+			return Input.VALID_ENTITY;
+		}
+		return String.format(Input.VALID_ENTITY_TYPE, entClass.getSimpleName());
+	}
+
+	@Override
+	public ArrayList<String> getValidOptions(Entity ent) {
 		ArrayList<String> list = new ArrayList<>();
 		if (entSubClass == null)
 			return list;
 
-		for (T each: Entity.getClonesOfIterator(entSubClass)) {
-			if (each.testFlag(Entity.FLAG_GENERATED))
+		for (T each: ent.getJaamSimModel().getClonesOfIterator(entSubClass)) {
+			if (!each.isRegistered())
 				continue;
 
 			if (!isValid(each))
@@ -67,7 +77,7 @@ public class EntityInput<T extends Entity> extends Input<T> {
 
 			list.add(each.getName());
 		}
-		Collections.sort(list);
+		Collections.sort(list, Input.uiSortOrder);
 		return list;
 	}
 
@@ -98,8 +108,17 @@ public class EntityInput<T extends Entity> extends Input<T> {
 		this.includeSubclasses = bool;
 	}
 
-	public void setInvalidClasses(ArrayList<Class<? extends Entity>> classes ) {
-		invalidClasses = classes;
+	public void addInvalidClass(Class<? extends Entity> aClass ) {
+		invalidClasses.add(aClass);
+	}
+
+	@Override
+	public boolean removeReferences(Entity ent) {
+		if (value == ent) {
+			this.reset();
+			return true;
+		}
+		return false;
 	}
 
 }

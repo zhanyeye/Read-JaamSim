@@ -32,13 +32,6 @@ import com.jaamsim.render.RenderUtils;
  *
  */
 public class ConvexHull {
-
-	public static long filterTime;
-	public static long buildTime;
-	public static long finalizeTime;
-	public static long sortTime;
-
-
 	private ArrayList<Vec3d> _verts;
 
 	private boolean _isDegenerate = false;
@@ -47,9 +40,7 @@ public class ConvexHull {
 
 	public static ConvexHull TryBuildHull(ArrayList<Vec3d> verts, int numAttempts, int maxNumPoints, Vec3dInterner interner) {
 
-		long filterStart = System.nanoTime();
 		ArrayList<Vec3d> baseVerts = removeDoubles(verts);
-		filterTime += System.nanoTime() - filterStart;
 
 		assert(numAttempts > 0);
 
@@ -73,14 +64,11 @@ public class ConvexHull {
 
 	/**
 	 * Initialize this hull from the vertices provided. This is an implementation of the QuickHull algorithm (or close enough to it)
-	 * @param verts
 	 */
 	public ConvexHull(ArrayList<Vec3d> baseVerts, int seed, int maxNumPoints, Vec3dInterner interner) {
 
 		assert(seed >= 0);
 		assert(seed < 1);
-
-		long buildStart = System.nanoTime();
 
 		if (baseVerts.size() < 3) {
 			// This mesh is too small, so just create an empty Hull... or should we throw?
@@ -197,7 +185,7 @@ public class ConvexHull {
 			for (Iterator<TempHullFace> it = tempFaces.iterator(); it.hasNext(); ) {
 				TempHullFace tempFace = it.next();
 
-				if (tempFace.plane.getNormalDist(farVert) > -0.000000001) { // Non zero to allow a bit of floating point round off and avoid degenerate faces
+				if (tempFace.plane.getNormalDist(farVert) > -0.00001) { // Non zero to allow a bit of floating point round off and avoid degenerate faces
 					// This face can see this point, and is therefore not part of the hull
 					deadFaces.add(tempFace);
 					it.remove();
@@ -275,9 +263,6 @@ public class ConvexHull {
 
 		} // End of main loop
 
-		long finalizeStart = System.nanoTime();
-		buildTime += finalizeStart - buildStart;
-
 		// Now that we have all the faces we can create a real subset of points we care about
 		ArrayList<Vec3d> realVerts = new ArrayList<>();
 		for (TempHullFace tf : tempFaces) {
@@ -309,9 +294,6 @@ public class ConvexHull {
 
 		// swap out our vertex list to the real one
 		_verts = realVerts;
-
-		finalizeTime += System.nanoTime() - finalizeStart;
-
 	} // End of ConvexHull() Constructor
 
 	private ConvexHull() {
@@ -348,11 +330,7 @@ public class ConvexHull {
 
 		final ArrayList<Vec3d> copy = new ArrayList<>(orig);
 
-		long sortStart = System.nanoTime();
-
 		Collections.sort(copy, COMP);
-
-		sortTime += System.nanoTime() - sortStart;
 
 		ret.add(copy.get(0));
 		int outIndex = 0; // An updated index of the last element of the returned set, this may be
@@ -412,15 +390,12 @@ public class ConvexHull {
 				seenIndices[numSeen++] = e.ind1;
 		}
 
-
-		//assert(seenIndices.size() == edges.size());
 		return numSeen == edges.size();
 
 	}
 
 	/**
 	 * Return the list of faces (a list of triplets of indices into the vertices) for this mesh
-	 * @return
 	 */
 	public List<HullFace> getFaces() {
 		return _faces;
@@ -514,7 +489,14 @@ public class ConvexHull {
 			return 0.0;
 		}
 
-		return front;
+		// Scale the distance back to global coords
+		Vec3d collisionPoint = hullRay.getPointAtDist(front);
+		// Convert to global space
+		collisionPoint.multAndTrans3(mat, collisionPoint);
+		Vec3d diff = new Vec3d();
+		diff.sub3(r.getStartRef(), collisionPoint);
+
+		return diff.mag3();
 	}
 
 	/**
@@ -589,8 +571,7 @@ public class ConvexHull {
 
 	/**
 	 * Get an world space AABB if this hull were transformed by 't'
-	 * @param t
-	 * @return
+	 * @param mat
 	 */
 	public AABB getAABB(Mat4d mat) {
 		return new AABB(_verts, mat);

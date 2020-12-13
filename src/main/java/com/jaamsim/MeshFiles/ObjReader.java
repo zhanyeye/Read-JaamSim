@@ -1,7 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2013 Ausenco Engineering Canada Inc.
- * Copyright (C) 2015 KMA Technologies
+ * Copyright (C) 2015 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,6 +26,7 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.regex.Pattern;
 
 import com.jaamsim.math.Color4d;
 import com.jaamsim.math.Mat4d;
@@ -124,6 +125,11 @@ public class ObjReader {
 		}
 
 		finishCurrentMesh();
+
+		MeshData.TreeNode root = new MeshData.TreeNode();
+		root.trans = new MeshData.StaticTrans(new Mat4d());
+
+		data.setTree(root);
 
 		data.finalizeData();
 	}
@@ -318,6 +324,7 @@ public class ObjReader {
 		}
 	}
 
+	private static final Pattern whitespace = Pattern.compile("\\s+");
 	private void parseMaterial(String[] tokens) {
 		parseAssert(tokens.length == 2);
 		String mtlFile = tokens[1];
@@ -332,7 +339,7 @@ public class ObjReader {
 
 				if (line.isEmpty() || line.charAt(0) == '#') continue;
 
-				String[] mtlTokens = line.trim().split("\\s+");
+				String[] mtlTokens = whitespace.split(line.trim());
 				parseMTLLine(mtlTokens);
 			}
 
@@ -371,7 +378,7 @@ public class ObjReader {
 			if (tokens.length == 1) return; // Ignore empty tags
 			parseAssert(tokens.length == 2);
 			parseAssert(parsingMat != null);
-			parsingMat.alpha = 1.0 - Double.parseDouble(tokens[1]);
+			parsingMat.alpha = Double.parseDouble(tokens[1]);
 		} else if (tokens[0].equals("map_Kd")) {
 			if (tokens.length == 1) return; // Ignore empty tags
 			parseAssert(tokens.length == 2);

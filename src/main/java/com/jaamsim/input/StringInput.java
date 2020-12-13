@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2011 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2018 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +17,7 @@
  */
 package com.jaamsim.input;
 
+import com.jaamsim.basicsim.Entity;
 
 public class StringInput extends Input<String> {
 
@@ -24,8 +26,19 @@ public class StringInput extends Input<String> {
 	}
 
 	@Override
-	public void parse(KeywordIndex kw) throws InputErrorException {
+	public String applyConditioning(String str) {
+		return Parser.addQuotesIfNeeded(str);
+	}
+
+	@Override
+	public void parse(Entity thisEnt, KeywordIndex kw) throws InputErrorException {
 		Input.assertCount(kw, 1);
 		value = kw.getArg(0);
 	}
+
+	@Override
+	public String getValidInputDesc() {
+		return Input.VALID_STRING;
+	}
+
 }

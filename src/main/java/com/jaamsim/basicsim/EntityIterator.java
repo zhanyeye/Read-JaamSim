@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2014 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2019 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,59 +17,67 @@
  */
 package com.jaamsim.basicsim;
 
-import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
 
 public abstract class EntityIterator<T extends Entity> implements Iterable<T>, Iterator<T> {
-	private final ArrayList<? extends Entity> allInstances = Entity.getAll();
+	private boolean needAdvance = true;
 	protected final Class<T> entClass;
-	private int curPos;
-	private int nextPos;
+	private EntityListNode curNode;
+	private EntityListNode endNode;
 
-	public EntityIterator(Class<T> aClass) {
+	public EntityIterator(JaamSimModel simModel, Class<T> aClass) {
+		endNode = simModel.getEntityList();
+		curNode = endNode;
 		entClass = aClass;
-		curPos = -1;
-		nextPos = -1;
 	}
 
 	abstract boolean matches(Class<?> entklass);
 
-	private void updatePos() {
-		if (nextPos >= allInstances.size())
+	// Advance the current pointer past any dead entities, or entities that do not match
+	private void advance() {
+		if (!needAdvance) {
 			return;
+		}
+		curNode = curNode.next;
+		needAdvance = false;
 
-		while (++nextPos < allInstances.size()) {
-			// If we find a match, break out
-			if (matches(allInstances.get(nextPos).getClass()))
-				break;
+		while (true) {
+			if (curNode == endNode) {
+				return;
+			}
+			if (curNode == null) {
+				// This is likely a race condition but unrecoverable
+				// Terminate iteration
+				return;
+			}
+
+			if (matches(curNode.entClass) && curNode.ent != null) {
+				return;
+			}
+			curNode = curNode.next;
 		}
 	}
 
 	@Override
 	public boolean hasNext() {
-		if (curPos == nextPos)
-			updatePos();
-
-		if (nextPos < allInstances.size())
-			return true;
-		else
-			return false;
+		advance();
+		return curNode != null && curNode != endNode;
 	}
 
+	// Note, this warning is suppressed because the cast is effectively checked by match()
+	@SuppressWarnings("unchecked")
 	@Override
 	public T next() {
-		if (curPos == nextPos)
-			updatePos();
-
-		if (nextPos < allInstances.size()) {
-			curPos = nextPos;
-			return entClass.cast(allInstances.get(curPos));
-		}
-		else {
+		advance();
+		Entity nextEnt = curNode.ent;
+		if (nextEnt == null || curNode == endNode) {
 			throw new NoSuchElementException();
 		}
+
+		needAdvance = true;
+		return (T)nextEnt;
 	}
 
 	@Override

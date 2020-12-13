@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2013 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2019 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,27 +18,25 @@
 package com.jaamsim.render;
 
 import java.net.URISyntaxException;
+import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.jaamsim.MeshFiles.BlockReader;
-import com.jaamsim.MeshFiles.DataBlock;
 import com.jaamsim.MeshFiles.MeshData;
 import com.jaamsim.MeshFiles.MeshReader;
 import com.jaamsim.MeshFiles.ObjReader;
 import com.jaamsim.collada.ColParser;
+import com.jaamsim.ui.GUIFrame;
 import com.jaamsim.ui.LogBox;
 
 public class MeshDataCache {
-	private static HashMap<MeshProtoKey, MeshData> dataMap = new HashMap<>();
-	private static Object mapLock = new Object();
+	private static final HashMap<MeshProtoKey, MeshData> dataMap = new HashMap<>();
 
-	private static HashMap<MeshProtoKey, AtomicBoolean> loadingMap = new HashMap<>();
-	private static Object loadingLock = new Object();
+	private static final HashMap<MeshProtoKey, MeshDataLoader> loadingMap = new HashMap<>();
 
-	private static HashSet<MeshProtoKey> badMeshSet = new HashSet<>();
-	private static Object badMeshLock = new Object();
+	private static final HashSet<MeshProtoKey> badMeshSet = new HashSet<>();
 	private static MeshData badMesh = null;
 
 	public static final MeshProtoKey BAD_MESH_KEY;
@@ -52,33 +51,28 @@ public class MeshDataCache {
 
 	// Fetch, or lazily initialize the mesh data
 	public static MeshData getMeshData(MeshProtoKey key) {
-		synchronized (mapLock) {
+		synchronized (dataMap) {
 			MeshData data = dataMap.get(key);
 			if (data != null) {
 				return data;
 			}
 		}
-		synchronized (badMeshLock) {
+		synchronized (badMeshSet) {
 			if (badMeshSet.contains(key)) {
 				return getBadMesh();
 			}
 		}
 
-		AtomicBoolean loadingFlag = null;
-		synchronized (loadingLock) {
-			loadingFlag = loadingMap.get(key);
+		MeshDataLoader ml = null;
+		synchronized (loadingMap) {
+			ml = loadingMap.get(key);
 		}
 
-		if (loadingFlag != null) {
-			// Someone already triggered a delayed load for this mesh, let's just wait for that one...
-			synchronized (loadingFlag) {
-				while (!loadingFlag.get()) {
-					try {
-						loadingFlag.wait();
-					} catch (InterruptedException ex) {}
-				}
+		if (ml != null) {
+			ml.waitForLoading();
+			synchronized (dataMap) {
+				return dataMap.get(key);
 			}
-			return dataMap.get(key);
 		}
 
 		// Release the lock long enough to load the model
@@ -92,58 +86,82 @@ public class MeshDataCache {
 			} else if (ext.toUpperCase().equals("JSM")) {
 				data = MeshReader.parse(key.getURI());
 			} else if (ext.toUpperCase().equals("JSB")) {
-				DataBlock block = BlockReader.readBlockFromURI(key.getURI());
-				data = new MeshData(false, block, key.getURI().toURL());
+				data = BlockReader.parse(key.getURI());
 			} else if (ext.toUpperCase().equals("OBJ")) {
 				data = ObjReader.parse(key.getURI());
 			} else {
 				assert(false);
 			}
 		} catch (Exception ex) {
-			LogBox.formatRenderLog("Could not load mesh: %s \n Error: %s\n", key.getURI().toString(), ex.getMessage());
-			synchronized (badMeshLock) {
+			String path = Paths.get(key.getURI()).toString();  // decode %20 as blank character
+			GUIFrame.invokeErrorDialog("3D Loader Error",
+					String.format("Could not load 3D data file:\n %s \n\n %s",
+							path, ex.getMessage()));
+			LogBox.formatRenderLog("Could not load 3D data file: %s\nError: %s\n", path, ex.getMessage());
+			synchronized (badMeshSet) {
 				badMeshSet.add(key);
 				return getBadMesh();
 			}
 		}
 
-		synchronized (mapLock) {
+		synchronized (dataMap) {
 			dataMap.put(key, data);
 		}
 		return data;
 	}
 
 	public static boolean isMeshLoaded(MeshProtoKey key) {
-		synchronized (mapLock) {
+		synchronized (dataMap) {
 			return dataMap.containsKey(key);
+		}
+	}
+
+	private static class MeshDataLoader implements Runnable {
+		final AtomicBoolean loaded = new AtomicBoolean();
+		final MeshProtoKey key;
+
+		MeshDataLoader(MeshProtoKey key) {
+			this.key = key;
+		}
+
+		@Override
+		public void run() {
+			getMeshData(key); // Cause the lazy initializer to load the mesh (or return quickly if already loaded)
+
+			loaded.set(true);
+
+			synchronized(this) {
+				this.notifyAll();
+			}
+
+		}
+
+		public void waitForLoading() {
+			if (loaded.get())
+				return;
+
+			// Someone already triggered a delayed load for this mesh, let's just wait for that one...
+			synchronized (this) {
+				while (!loaded.get()) {
+					try {
+						this.wait();
+					} catch (InterruptedException ex) {}
+				}
+			}
 		}
 	}
 
 	/**
 	 * Load the mesh in a new thread, then notify on 'notifier'
 	 * @param key
-	 * @param notifier
 	 */
-	public static void loadMesh(final MeshProtoKey key, final AtomicBoolean notifier) {
-		assert(notifier != null);
-
-		synchronized (loadingLock) {
-			loadingMap.put(key, notifier);
+	public static void loadMesh(final MeshProtoKey key) {
+		MeshDataLoader ml = new MeshDataLoader(key);
+		synchronized (loadingMap) {
+			loadingMap.put(key, ml);
 		}
 
-		new Thread() {
-			@Override
-			public void run() {
-
-				getMeshData(key); // Cause the lazy initializer to load the mesh (or return quickly if already loaded)
-
-				notifier.set(true);
-
-				synchronized(notifier) {
-					notifier.notifyAll();
-				}
-			}
-		}.start();
+		new Thread(ml).start();
 	}
 
 	// Lazily load the bad mesh data

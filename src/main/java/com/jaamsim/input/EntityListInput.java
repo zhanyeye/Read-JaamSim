@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2010-2011 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2018-2020 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,6 +29,7 @@ public class EntityListInput<T extends Entity> extends ListInput<ArrayList<T>> {
 	private boolean includeSubclasses;  // flag to determine if subclasses are valid
 	private boolean includeSelf; // flag to determine whether to include the calling entity in the entityList
 	private ArrayList<Class<? extends Entity>> validClasses; // list of valid classes (including subclasses).  if empty, then all classes are valid
+	private ArrayList<Class<? extends Entity>> invalidClasses; // list of invalid classes (including subclasses).
 
 	public EntityListInput(Class<T> aClass, String key, String cat, ArrayList<T> def) {
 		super(key, cat, def);
@@ -37,17 +39,16 @@ public class EntityListInput<T extends Entity> extends ListInput<ArrayList<T>> {
 		includeSubclasses = true;
 		includeSelf = true;
 		validClasses = new ArrayList<>();
+		invalidClasses = new ArrayList<>();
 	}
 
 	@Override
-	public void parse(KeywordIndex kw)
+	public void parse(Entity thisEnt, KeywordIndex kw)
 	throws InputErrorException {
 
 		// If adding to the list
 		if( kw.getArg( 0 ).equals( "++" ) ) {
-			ArrayList<String> input = new ArrayList<>(kw.numArgs()-1);
-			for (int i = 1; i < kw.numArgs(); i++)
-				input.add(kw.getArg(i));
+			KeywordIndex subKw = new KeywordIndex(kw, 1);
 
 			ArrayList<T> newValue;
 			if( value == null )
@@ -55,49 +56,55 @@ public class EntityListInput<T extends Entity> extends ListInput<ArrayList<T>> {
 			else
 				newValue = new ArrayList<>( value );
 
-			Input.assertCountRange(input, 0, maxCount - newValue.size());
+			Input.assertCountRange(subKw, 0, maxCount - newValue.size());
 			if( even ) {
 				if ((kw.numArgs() % 2) == 0)
 					throw new InputErrorException(INP_ERR_EVENCOUNT, kw.argString());
 			}
 
-			ArrayList<T> addedValues = Input.parseEntityList(input, entClass, unique);
+			ArrayList<T> addedValues = Input.parseEntityList(thisEnt.getJaamSimModel(), subKw, entClass, unique);
 			for( T val : addedValues ) {
 				if( unique && newValue.contains( val ) )
 					throw new InputErrorException(INP_ERR_NOTUNIQUE, val.getName());
 				newValue.add( val );
 			}
 			value = newValue;
+			return;
 		}
-		// If removing from the list
-		else if( kw.getArg( 0 ).equals( "--" ) ) {
-			ArrayList<String> input = new ArrayList<>(kw.numArgs()-1);
-			for (int i = 1; i < kw.numArgs(); i++)
-				input.add(kw.getArg(i));
 
-			Input.assertCountRange(input, 0, value.size() - minCount );
+		// If removing from the list
+		if( kw.getArg( 0 ).equals( "--" ) ) {
+			KeywordIndex subKw = new KeywordIndex(kw, 1);
+
+			Input.assertCountRange(subKw, 0, value.size() - minCount );
 			if( even ) {
 				if ((kw.numArgs() % 2) == 0)
 					throw new InputErrorException(INP_ERR_EVENCOUNT, kw.argString());
 			}
 
 			ArrayList<T> newValue = new ArrayList<>( value );
-			ArrayList<T> removedValues = Input.parseEntityList(input, entClass, unique);
+			ArrayList<T> removedValues = Input.parseEntityList(thisEnt.getJaamSimModel(), subKw, entClass, unique);
 			for( T val : removedValues ) {
 				if( ! newValue.contains( val ) )
-					InputAgent.logWarning( "Could not remove " + val + " from " + this.getKeyword() );
+					InputAgent.logWarning(thisEnt.getJaamSimModel(),
+							"Could not remove " + val + " from " + this.getKeyword() );
 				newValue.remove( val );
 			}
 			value = newValue;
+			return;
 		}
-		// Otherwise, just set the list normally
-		else {
-			Input.assertCountRange(kw, minCount, maxCount);
-			if( even )
-				Input.assertCountEven(kw);
 
-			value = Input.parseEntityList(kw, entClass, unique);
-		}
+		// Otherwise, just set the list normally
+		Input.assertCountRange(kw, minCount, maxCount);
+		if( even )
+			Input.assertCountEven(kw);
+
+		value = Input.parseEntityList(thisEnt.getJaamSimModel(), kw, entClass, unique);
+	}
+
+	@Override
+	public String getValidInputDesc() {
+		return Input.VALID_ENTITY_LIST;
 	}
 
 	@Override
@@ -122,15 +129,11 @@ public class EntityListInput<T extends Entity> extends ListInput<ArrayList<T>> {
 		this.includeSelf = bool;
 	}
 
-	public void setValidClasses(ArrayList<Class<? extends Entity>> classes ) {
-		validClasses = classes;
-	}
-
 	@Override
-	public ArrayList<String> getValidOptions() {
+	public ArrayList<String> getValidOptions(Entity ent) {
 		ArrayList<String> list = new ArrayList<>();
-		for(T each: Entity.getClonesOfIterator(entClass) ) {
-			if(each.testFlag(Entity.FLAG_GENERATED))
+		for(T each: ent.getJaamSimModel().getClonesOfIterator(entClass) ) {
+			if(!each.isRegistered())
 				continue;
 
 			if( ! isValidClass( each ))
@@ -148,7 +151,18 @@ public class EntityListInput<T extends Entity> extends ListInput<ArrayList<T>> {
 
 			list.add(each.getName());
 		}
-		Collections.sort(list);
+
+		// Include the default values
+		if (getDefaultValue() != null) {
+			for (Entity def : getDefaultValue()) {
+				String name = def.getName();
+				if (list.contains(name))
+					continue;
+				list.add(name);
+			}
+		}
+
+		Collections.sort(list, Input.uiSortOrder);
 		return list;
 	}
 
@@ -160,29 +174,53 @@ public class EntityListInput<T extends Entity> extends ListInput<ArrayList<T>> {
 			toks.add(value.get(i).getName());
 	}
 
-	private String getInputString(ArrayList<T> val) {
+	@Override
+	public void setTokens(KeywordIndex kw) {
+		isDef = false;
 
-		if (val.size() == 0)
+		String[] args = kw.getArgArray();
+		if (args.length > 0) {
+
+			// Consider the following input case:
+			// Object1 Keyword1 { ++ Entity1 ...
+			if (args[0].equals( "++" )) {
+				this.addTokens(args);
+				return;
+			}
+
+			// Consider the following input case:
+			// Object1 Keyword1 { -- Entity1 ...
+			if (args[0].equals( "--" )) {
+				if (this.removeTokens(args))
+					return;
+			}
+		}
+
+		valueTokens = args;
+	}
+
+	@Override
+	public String getDefaultString() {
+		if (defValue == null || defValue.isEmpty())
 			return "";
 
 		StringBuilder tmp = new StringBuilder();
-		tmp.append(val.get(0).getName());
-		for (int i = 1; i < val.size(); i++) {
+		tmp.append(defValue.get(0).getName());
+		for (int i = 1; i < defValue.size(); i++) {
 			tmp.append(SEPARATOR);
-			tmp.append(val.get(i).getName());
+			tmp.append(defValue.get(i).getName());
 		}
 		return tmp.toString();
 	}
 
-
-	@Override
-	public String getDefaultString() {
-		if (defValue == null || defValue.size() == 0)
-			return "";
-		return this.getInputString(defValue);
-	}
-
 	public boolean isValidClass( Entity ent ) {
+
+		for (Class<? extends Entity> c : invalidClasses) {
+			if (c.isAssignableFrom( ent.getClass() )) {
+				return false;
+			}
+		}
+
 		if( validClasses.size() == 0 )
 			return true;
 
@@ -194,4 +232,28 @@ public class EntityListInput<T extends Entity> extends ListInput<ArrayList<T>> {
 
 		return false;
 	}
+
+	public void addValidClass(Class<? extends Entity> aClass ) {
+		invalidClasses.remove(aClass);
+		validClasses.add(aClass);
+	}
+
+	public void addInvalidClass(Class<? extends Entity> aClass ) {
+		validClasses.remove(aClass);
+		invalidClasses.add(aClass);
+	}
+
+	public void clearValidClasses() {
+		validClasses.clear();
+		invalidClasses.clear();
+	}
+
+	@Override
+	public boolean removeReferences(Entity ent) {
+		if (value == null)
+			return false;
+		boolean ret = value.removeAll(Collections.singleton(ent));
+		return ret;
+	}
+
 }

@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2010-2011 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2020 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,53 +19,64 @@ package com.jaamsim.input;
 
 import java.util.ArrayList;
 
+import com.jaamsim.basicsim.Entity;
+
 
 public class BooleanInput extends Input<Boolean> {
 
-    private static final ArrayList<String> validOptions;
+	private static final ArrayList<String> validOptions;
 
-    static {
-        validOptions = new ArrayList<>();
-        validOptions.add("TRUE");
-        validOptions.add("FALSE");
-    }
+	public static final String TRUE = "TRUE";
+	public static final String FALSE = "FALSE";
 
-    /**
-     * Creates a new Boolean Input with the given keyword, category, units, and
-     * default value.
-     */
-    public BooleanInput(String key, String cat, boolean def) {
-        super(key, cat, Boolean.valueOf(def));
-    }
+	static {
+		validOptions = new ArrayList<>();
+		validOptions.add(TRUE);
+		validOptions.add(FALSE);
+	}
 
-    /**
-     *
-     * @param kw
-     * @throws InputErrorException
-     */
-    @Override
-    public void parse(KeywordIndex kw) throws InputErrorException {
-        Input.assertCount(kw, 1);
-        value = Boolean.valueOf(Input.parseBoolean(kw.getArg(0)));
-    }
+	/**
+	 * Creates a new Boolean Input with the given keyword, category, units, and
+	 * default value.
+	 */
+	public BooleanInput(String key, String cat, boolean def) {
+		super(key, cat, Boolean.valueOf(def));
+	}
 
-    /**
-     * 返回合法的选项
-     * @return
-     */
-    @Override
-    public ArrayList<String> getValidOptions() {
-        return validOptions;
-    }
+	@Override
+	public String applyConditioning(String str) {
+		if (str.startsWith("t") || str.startsWith("T") || str.startsWith("1"))
+			return TRUE;
+		if (str.startsWith("f") || str.startsWith("F") || str.startsWith("0"))
+			return FALSE;
+		return str;
+	}
 
-    @Override
-    public String getDefaultString() {
-        if (defValue == null)
-            return "";
+	@Override
+	public void parse(Entity thisEnt, KeywordIndex kw)
+	throws InputErrorException {
+		Input.assertCount(kw, 1);
+		value = Boolean.valueOf(Input.parseBoolean(kw.getArg(0)));
+	}
 
-        if (defValue)
-            return "TRUE";
+	@Override
+	public String getValidInputDesc() {
+		return Input.VALID_BOOLEAN;
+	}
 
-        return "FALSE";
-    }
+	@Override
+	public ArrayList<String> getValidOptions(Entity ent) {
+		return validOptions;
+	}
+
+	@Override
+	public String getDefaultString() {
+		if (defValue == null)
+			return "";
+
+		if (defValue)
+			return TRUE;
+
+		return FALSE;
+	}
 }

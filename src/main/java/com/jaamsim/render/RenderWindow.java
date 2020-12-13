@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2012 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2018 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,14 +19,15 @@ package com.jaamsim.render;
 
 import java.awt.Frame;
 import java.awt.Image;
+import java.awt.event.FocusEvent;
+import java.awt.event.FocusListener;
 import java.util.ArrayList;
-
-import com.jogamp.opengl.GLCapabilitiesImmutable;
-import com.jogamp.opengl.GLContext;
-import com.jogamp.opengl.GLEventListener;
 
 import com.jogamp.newt.awt.NewtCanvasAWT;
 import com.jogamp.newt.opengl.GLWindow;
+import com.jogamp.opengl.GLCapabilitiesImmutable;
+import com.jogamp.opengl.GLContext;
+import com.jogamp.opengl.GLEventListener;
 
 public class RenderWindow {
 
@@ -58,6 +60,15 @@ public class RenderWindow {
 		NewtCanvasAWT canvas = new NewtCanvasAWT(_window);
 		_awtFrame.add(canvas);
 		_awtFrame.setBounds(x, y, width, height);
+
+		_awtFrame.addFocusListener(new FocusListener() {
+			@Override
+			public void focusGained(FocusEvent e) {
+				_window.requestFocus();
+			}
+			@Override
+			public void focusLost(FocusEvent e) {}
+		});
 
 		if (icon != null) {
 			_awtFrame.setIconImage(icon);

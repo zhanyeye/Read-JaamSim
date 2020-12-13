@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2015 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2017-2019 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,15 +30,13 @@ public class UnitTypeListInput extends ListInput<ArrayList<ObjectType>> {
 
 	public UnitTypeListInput(String key, String cat, ArrayList<Class<? extends Unit>> utList) {
 		super(key, cat, null);
-		if (utList == null)
-			return;
-		defaultUnitTypeList = new ArrayList<>(utList);
-		ArrayList<ObjectType> otList = new ArrayList<>(utList.size());
-		for (Class<? extends Unit> ut : utList) {
-			otList.add(ObjectType.getObjectTypeForClass(ut));
-		}
-		setDefaultValue(otList);
-		setUnitTypeList(value);
+		setDefaultValue(utList);
+	}
+
+	public void setDefaultValue(ArrayList<Class<? extends Unit>> utList) {
+		super.setDefaultValue(null);  // getValue is never used
+		unitTypeList = utList;
+		defaultUnitTypeList = utList;
 	}
 
 	private void setUnitTypeList(ArrayList<ObjectType> otList) {
@@ -66,22 +65,27 @@ public class UnitTypeListInput extends ListInput<ArrayList<ObjectType>> {
 	}
 
 	@Override
-	public void copyFrom(Input<?> in) {
-		super.copyFrom(in);
+	public void copyFrom(Entity thisEnt, Input<?> in) {
+		super.copyFrom(thisEnt, in);
 		setUnitTypeList(value);
 	}
 
 	@Override
-	public void parse(KeywordIndex kw) throws InputErrorException {
+	public void parse(Entity thisEnt, KeywordIndex kw) throws InputErrorException {
 		Input.assertCountRange(kw, minCount, maxCount);
-		value = Input.parseEntityList(kw, ObjectType.class, false);
+		value = Input.parseEntityList(thisEnt.getJaamSimModel(), kw, ObjectType.class, false);
 		setUnitTypeList(value);
 	}
 
 	@Override
-	public ArrayList<String> getValidOptions() {
+	public String getValidInputDesc() {
+		return Input.VALID_UNIT_TYPE_LIST;
+	}
+
+	@Override
+	public ArrayList<String> getValidOptions(Entity ent) {
 		ArrayList<String> list = new ArrayList<>();
-		for (ObjectType each: Entity.getClonesOfIterator(ObjectType.class)) {
+		for (ObjectType each: ent.getJaamSimModel().getClonesOfIterator(ObjectType.class)) {
 			Class<? extends Entity> klass = each.getJavaClass();
 			if (klass == null)
 				continue;
@@ -89,8 +93,22 @@ public class UnitTypeListInput extends ListInput<ArrayList<ObjectType>> {
 			if (Unit.class.isAssignableFrom(klass))
 				list.add(each.getName());
 		}
-		Collections.sort(list);
+		Collections.sort(list, Input.uiSortOrder);
 		return list;
+	}
+
+	@Override
+	public String getDefaultString() {
+		if (defValue == null || defValue.isEmpty())
+			return "";
+
+		StringBuilder tmp = new StringBuilder();
+		tmp.append(defValue.get(0).getName());
+		for (int i = 1; i < defValue.size(); i++) {
+			tmp.append(SEPARATOR);
+			tmp.append(defValue.get(i).getName());
+		}
+		return tmp.toString();
 	}
 
 }

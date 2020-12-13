@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2013 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2019 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +18,6 @@
 package com.jaamsim.input;
 
 import java.util.ArrayList;
-import java.util.Collections;
 
 import com.jaamsim.basicsim.Entity;
 import com.jaamsim.basicsim.ObjectType;
@@ -28,13 +28,12 @@ public class UnitTypeInput extends Input<ObjectType> {
 	private Class<? extends Unit> defaultUnitType;
 
 	public UnitTypeInput(String key, String cat, Class<? extends Unit> ut) {
-		super(key, cat, ObjectType.getObjectTypeForClass(ut));
-		unitType = ut;
-		defaultUnitType = ut;
+		super(key, cat, null);
+		setDefaultValue(ut);
 	}
 
 	public void setDefaultValue(Class<? extends Unit> ut) {
-		this.setDefaultValue(ObjectType.getObjectTypeForClass(ut));
+		super.setDefaultValue(null);  // getValue is never used
 		unitType = ut;
 		defaultUnitType = ut;
 	}
@@ -46,17 +45,17 @@ public class UnitTypeInput extends Input<ObjectType> {
 	}
 
 	@Override
-	public void copyFrom(Input<?> in) {
-		super.copyFrom(in);
+	public void copyFrom(Entity thisEnt, Input<?> in) {
+		super.copyFrom(thisEnt, in);
 		UnitTypeInput inp = (UnitTypeInput) in;
 		unitType = inp.unitType;
 	}
 
 	@Override
-	public void parse(KeywordIndex kw)
+	public void parse(Entity thisEnt, KeywordIndex kw)
 	throws InputErrorException {
 		Input.assertCount(kw, 1);
-		ObjectType t = Input.parseEntity(kw.getArg(0), ObjectType.class);
+		ObjectType t = Input.parseEntity(thisEnt.getJaamSimModel(), kw.getArg(0), ObjectType.class);
 		Class<? extends Unit> type = Input.checkCast(t.getJavaClass(), Unit.class);
 
 		value = t;
@@ -64,21 +63,12 @@ public class UnitTypeInput extends Input<ObjectType> {
 	}
 
 	@Override
-	public ArrayList<String> getValidOptions() {
-		ArrayList<String> list = new ArrayList<>();
-		for (ObjectType each: Entity.getClonesOfIterator(ObjectType.class)) {
-			Class<? extends Entity> klass = each.getJavaClass();
-			if (klass == null)
-				continue;
-
-			if (Unit.class.isAssignableFrom(klass))
-				list.add(each.getName());
-		}
-		Collections.sort(list);
-		return list;
+	public ArrayList<String> getValidOptions(Entity ent) {
+		return Unit.getUnitTypeList(ent.getJaamSimModel());
 	}
 
 	public Class<? extends Unit> getUnitType() {
 		return unitType;
 	}
+
 }

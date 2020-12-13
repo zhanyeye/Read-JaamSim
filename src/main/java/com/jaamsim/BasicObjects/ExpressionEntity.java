@@ -17,13 +17,12 @@
 package com.jaamsim.BasicObjects;
 
 import com.jaamsim.Graphics.DisplayEntity;
-import com.jaamsim.Samples.SampleExpInput;
+import com.jaamsim.Samples.SampleInput;
 import com.jaamsim.Samples.SampleProvider;
 import com.jaamsim.input.Input;
 import com.jaamsim.input.Keyword;
 import com.jaamsim.input.Output;
 import com.jaamsim.input.UnitTypeInput;
-import com.jaamsim.ui.FrameBox;
 import com.jaamsim.units.Unit;
 import com.jaamsim.units.UserSpecifiedUnit;
 
@@ -35,16 +34,15 @@ public class ExpressionEntity extends DisplayEntity implements SampleProvider {
 
 	@Keyword(description = "The expression to be evaluated.",
 	         exampleList = {"'[Queue1].QueueLength + [Queue2].QueueLength'"})
-	private final SampleExpInput sampleValue;
+	private final SampleInput sampleValue;
 
 	{
-		unitType = new UnitTypeInput("UnitType", "Key Inputs", UserSpecifiedUnit.class);
+		unitType = new UnitTypeInput("UnitType", KEY_INPUTS, UserSpecifiedUnit.class);
 		unitType.setRequired(true);
 		this.addInput(unitType);
 
-		sampleValue = new SampleExpInput("Expression", "Key Inputs", null);
+		sampleValue = new SampleInput("Expression", KEY_INPUTS, null);
 		sampleValue.setUnitType(UserSpecifiedUnit.class);
-		sampleValue.setEntity(this);
 		sampleValue.setRequired(true);
 		this.addInput(sampleValue);
 	}
@@ -57,7 +55,6 @@ public class ExpressionEntity extends DisplayEntity implements SampleProvider {
 
 		if (in == unitType) {
 			sampleValue.setUnitType(getUnitType());
-			FrameBox.reSelectEntity();  // Update the units in the Output Viewer
 			return;
 		}
 	}
@@ -89,7 +86,7 @@ public class ExpressionEntity extends DisplayEntity implements SampleProvider {
 
 	@Override
 	@Output(name = "Value",
-	 description = "The evaluated value of the expression.",
+	 description = "The present value for the expression.",
 	    unitType = UserSpecifiedUnit.class,
 	  reportable = true)
 	public double getNextSample(double simTime) {

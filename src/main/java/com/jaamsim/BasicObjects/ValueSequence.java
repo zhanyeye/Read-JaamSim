@@ -24,7 +24,6 @@ import com.jaamsim.input.Keyword;
 import com.jaamsim.input.Output;
 import com.jaamsim.input.UnitTypeInput;
 import com.jaamsim.input.ValueListInput;
-import com.jaamsim.ui.FrameBox;
 import com.jaamsim.units.DimensionlessUnit;
 import com.jaamsim.units.Unit;
 import com.jaamsim.units.UserSpecifiedUnit;
@@ -43,11 +42,11 @@ public class ValueSequence extends DisplayEntity implements SampleProvider {
 	private int index = -1;
 
 	{
-		unitType = new UnitTypeInput("UnitType", "Key Inputs", UserSpecifiedUnit.class);
+		unitType = new UnitTypeInput("UnitType", KEY_INPUTS, UserSpecifiedUnit.class);
 		unitType.setRequired(true);
 		this.addInput(unitType);
 
-		valueList = new ValueListInput("ValueList", "Key Inputs", null);
+		valueList = new ValueListInput("ValueList", KEY_INPUTS, null);
 		valueList.setUnitType(UserSpecifiedUnit.class);
 		valueList.setRequired(true);
 		this.addInput(valueList);
@@ -67,7 +66,6 @@ public class ValueSequence extends DisplayEntity implements SampleProvider {
 
 		if (in == unitType) {
 			valueList.setUnitType(getUnitType());
-			FrameBox.reSelectEntity();  // Update the units in the Output Viewer
 			return;
 		}
 	}

@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2011 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2018-2019 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,11 +28,14 @@ import java.util.Arrays;
 
 import javax.swing.filechooser.FileNameExtensionFilter;
 
+import com.jaamsim.basicsim.Entity;
+
 
 public class FileInput extends Input<URI> {
 	private String fileType;  // the type of file, e.g. "Image" or "3D"
 	private String[] validFileExtensions;  // supported file extensions
 	private String[] validFileDescriptions;  // description of each supported file extension
+	private Entity ent;
 
 	public FileInput(String key, String cat, URI def) {
 		super(key, cat, def);
@@ -41,7 +45,12 @@ public class FileInput extends Input<URI> {
 	}
 
 	@Override
-	public void parse(KeywordIndex kw)
+	public String applyConditioning(String str) {
+		return Parser.addQuotesIfNeeded(str);
+	}
+
+	@Override
+	public void parse(Entity thisEnt, KeywordIndex kw)
 	throws InputErrorException {
 		URI temp = Input.parseURI(kw);
 
@@ -54,14 +63,20 @@ public class FileInput extends Input<URI> {
 			throw new InputErrorException("Invalid file extension: %s.\nValid extensions are: %s",
 					temp.getPath(), Arrays.toString(validFileExtensions));
 
+		ent = thisEnt;
 		value = temp;
 	}
 
 	@Override
-	public void getValueTokens(ArrayList<String> toks) {
-		if (value == null) return;
+	public String getValidInputDesc() {
+		return Input.VALID_FILE;
+	}
 
-		toks.add(InputAgent.getRelativeFilePath(value));
+	@Override
+	public void getValueTokens(ArrayList<String> toks) {
+		if (value == null || ent == null) return;
+
+		toks.add(InputAgent.getRelativeFilePath(ent.getJaamSimModel(), value));
 	}
 
 	public static ArrayList<ArrayList<String>> getTokensFromURI(URI uri){
@@ -132,7 +147,7 @@ public class FileInput extends Input<URI> {
 
 	private String getFileExtention(URI u) {
 		String name = u.toString();
-		int idx = name.lastIndexOf(".");
+		int idx = name.lastIndexOf('.');
 		if (idx < 0)
 			return "";
 

@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2012 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2016-2020 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +20,6 @@ package com.jaamsim.controllers;
 import java.awt.Dimension;
 import java.awt.EventQueue;
 import java.awt.Frame;
-import java.awt.Image;
 import java.awt.dnd.DragSourceDragEvent;
 import java.awt.dnd.DragSourceDropEvent;
 import java.awt.dnd.DragSourceEvent;
@@ -42,21 +42,34 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import javax.swing.JMenuItem;
 import javax.swing.JPopupMenu;
 
+import com.jaamsim.Commands.Command;
+import com.jaamsim.Commands.DefineCommand;
+import com.jaamsim.Commands.KeywordCommand;
+import com.jaamsim.Commands.ListCommand;
 import com.jaamsim.DisplayModels.DisplayModel;
+import com.jaamsim.GameObjects.GameEntity;
+import com.jaamsim.Graphics.DirectedEntity;
 import com.jaamsim.Graphics.DisplayEntity;
+import com.jaamsim.Graphics.Editable;
+import com.jaamsim.Graphics.EntityLabel;
+import com.jaamsim.Graphics.OverlayEntity;
+import com.jaamsim.Graphics.Region;
+import com.jaamsim.Graphics.View;
 import com.jaamsim.basicsim.Entity;
+import com.jaamsim.basicsim.JaamSimModel;
 import com.jaamsim.basicsim.ObjectType;
 import com.jaamsim.basicsim.Simulation;
 import com.jaamsim.datatypes.IntegerVector;
-import com.jaamsim.events.EventManager;
+import com.jaamsim.input.ColourInput;
+import com.jaamsim.input.Input;
 import com.jaamsim.input.InputAgent;
 import com.jaamsim.input.InputErrorException;
 import com.jaamsim.input.KeywordIndex;
 import com.jaamsim.math.AABB;
+import com.jaamsim.math.Color4d;
 import com.jaamsim.math.Mat4d;
 import com.jaamsim.math.MathUtils;
 import com.jaamsim.math.Plane;
-import com.jaamsim.math.Quaternion;
 import com.jaamsim.math.Ray;
 import com.jaamsim.math.Transform;
 import com.jaamsim.math.Vec2d;
@@ -66,6 +79,7 @@ import com.jaamsim.render.Action;
 import com.jaamsim.render.CameraInfo;
 import com.jaamsim.render.DisplayModelBinding;
 import com.jaamsim.render.Future;
+import com.jaamsim.render.LineProxy;
 import com.jaamsim.render.MeshDataCache;
 import com.jaamsim.render.MeshProtoKey;
 import com.jaamsim.render.OffscreenTarget;
@@ -77,11 +91,13 @@ import com.jaamsim.render.TessFontKey;
 import com.jaamsim.render.TexCache;
 import com.jaamsim.render.WindowInteractionListener;
 import com.jaamsim.render.util.ExceptionLogger;
+import com.jaamsim.ui.ContextMenu;
 import com.jaamsim.ui.FrameBox;
 import com.jaamsim.ui.GUIFrame;
 import com.jaamsim.ui.LogBox;
-import com.jaamsim.ui.ObjectSelector;
-import com.jaamsim.ui.View;
+import com.jaamsim.units.AngleUnit;
+import com.jaamsim.units.DistanceUnit;
+import com.jogamp.newt.event.KeyEvent;
 
 /**
  * Top level owner of the JaamSim renderer. This class both owns and drives the Renderer object, but is also
@@ -90,9 +106,13 @@ import com.jaamsim.ui.View;
  *
  */
 public class RenderManager implements DragSourceListener {
-
 	private final static int EXCEPTION_STACK_THRESHOLD = 10; // The number of recoverable exceptions until a stack trace is output
 	private final static int EXCEPTION_PRINT_RATE = 30; // The number of total exceptions until the overall log is printed
+
+	/**
+	 * Default plane used for Mouse click intersections.
+	 */
+	static final Plane XY_PLANE = new Plane();
 
 	private int numberOfExceptions = 0;
 
@@ -110,9 +130,14 @@ public class RenderManager implements DragSourceListener {
 	private final Renderer renderer;
 	private final AtomicBoolean finished = new AtomicBoolean(false);
 	private final AtomicBoolean fatalError = new AtomicBoolean(false);
-	private final AtomicBoolean redraw = new AtomicBoolean(false);
+	private final RedrawCallback redraw = new RedrawCallback();
 
 	private final AtomicBoolean screenshot = new AtomicBoolean(false);
+
+	private final AtomicBoolean showLinks = new AtomicBoolean(false);
+	private final AtomicBoolean createLinks = new AtomicBoolean(false);
+	private final AtomicBoolean linkDirection = new AtomicBoolean(true);
+	private final double linkArrowSize = 0.2;
 
 	private final ExceptionLogger exceptionLogger;
 
@@ -121,6 +146,7 @@ public class RenderManager implements DragSourceListener {
 	private int activeWindowID = -1;
 
 	private final Object popupLock;
+	private final Object sceneDragLock;
 	private JPopupMenu lastPopup;
 
 	/**
@@ -128,7 +154,9 @@ public class RenderManager implements DragSourceListener {
 	 */
 	private ArrayList<RenderProxy> cachedScene;
 
-	private DisplayEntity selectedEntity = null;
+	private final ArrayList<DisplayEntity> selectedEntityList = new ArrayList<>();
+	private Vec3d mousePosition = new Vec3d();
+	private int mouseWindowID = -1;  // window containing the present mouse position
 
 	private long simTick = 0;
 
@@ -136,14 +164,20 @@ public class RenderManager implements DragSourceListener {
 	private Vec3d dragCollisionPoint;
 	private Vec3d dragEntityPosition;
 	private ArrayList<Vec3d> dragEntityPoints;
+	private Vec3d dragEntityOrientation;
+	private Vec3d dragEntitySize;
+	private Mat4d dragEntityTransMat;
+	private Mat4d dragEntityInvTransMat;
+	private IntegerVector dragEntityScreenPosition;
 
 	// The object type for drag-and-drop operation, if this is null, the user is not dragging
 	private ObjectType dndObjectType;
-	private long dndDropTime = 0;
 
 	// The video recorder to sample
 	private VideoRecorder recorder;
 
+	// FIXME: the preview cache will cause a GUIFrame to be created, needs fixing for fully headless
+	// operation
 	private final PreviewCache previewCache = new PreviewCache();
 
 	// Below are special PickingIDs for resizing and dragging handles
@@ -180,20 +214,40 @@ public class RenderManager implements DragSourceListener {
 		}, "RenderManagerThread");
 		managerThread.start();
 
-		GUIFrame.getRateLimiter().registerCallback(new Runnable() {
-			@Override
-			public void run() {
-				synchronized(redraw) {
-					if (windowControls.size() == 0 && !screenshot.get()) {
-						return; // Do not queue a redraw if there are no open windows
-					}
-					redraw.set(true);
-					redraw.notifyAll();
-				}
-			}
-		});
+		GUIFrame.registerCallback(redraw);
 
 		popupLock = new Object();
+		sceneDragLock = new Object();
+	}
+
+	private class RedrawCallback implements Runnable {
+		final AtomicBoolean redraw = new AtomicBoolean(false);
+
+		@Override
+		public void run() {
+			synchronized(this) {
+				if (windowControls.size() == 0 && !screenshot.get()) {
+					return; // Do not queue a redraw if there are no open windows
+				}
+				redraw.set(true);
+				this.notifyAll();
+			}
+		}
+
+		final void beginDrawing() {
+			redraw.set(false);
+		}
+
+		final void waitForRedraw() {
+			// Wait for a redraw request
+			synchronized(this) {
+				while (!redraw.get()) {
+					try {
+						this.wait();
+					} catch (InterruptedException e) {}
+				}
+			}
+		}
 	}
 
 	public static final void updateTime(long simTick) {
@@ -201,17 +255,12 @@ public class RenderManager implements DragSourceListener {
 			return;
 
 		RenderManager.inst().simTick = simTick;
-		RenderManager.inst().queueRedraw();
 	}
 
 	public static final void redraw() {
 		if (!isGood()) return;
 
-		inst().queueRedraw();
-	}
-
-	private void queueRedraw() {
-		GUIFrame.getRateLimiter().queueUpdate();
+		GUIFrame.updateUI();
 	}
 
 	public void createWindow(View view) {
@@ -225,24 +274,25 @@ public class RenderManager implements DragSourceListener {
 			}
 		}
 
-		IntegerVector windSize = view.getWindowSize();
-		IntegerVector windPos = view.getWindowPos();
-
-		Image icon = GUIFrame.getWindowIcon();
-
+		IntegerVector windSize = GUIFrame.getInstance().getWindowSize(view);
+		IntegerVector windPos = GUIFrame.getInstance().getWindowPos(view);
 		CameraControl control = new CameraControl(renderer, view);
 
 		int windowID = renderer.createWindow(windPos.get(0), windPos.get(1),
 		                                      windSize.get(0), windSize.get(1),
 		                                      view.getID(),
 		                                      view.getTitle(), view.getName(),
-		                                      icon, control);
+		                                      null, control);
 
 		control.setWindowID(windowID);
 		windowControls.put(windowID, control);
 		windowToViewMap.put(windowID, view);
 
-		queueRedraw();
+		GUIFrame.updateUI();
+	}
+
+	public void closeWindow(View view) {
+		renderer.closeViewWindow(view.getID());
 	}
 
 	public static final void clear() {
@@ -262,10 +312,11 @@ public class RenderManager implements DragSourceListener {
 
 		// Update the state of the window in the input file
 		View v = windowToViewMap.get(windowID);
-		if (!v.getKeepWindowOpen())
-			InputAgent.applyArgs(v, "ShowWindow", "FALSE");
-
-		v.setKeepWindowOpen(false);
+		if (v.showWindow() && !GUIFrame.getInstance().isIconified() && !v.isDead()
+				&& GUIFrame.getJaamSimModel() == v.getJaamSimModel()) {
+			KeywordIndex kw = InputAgent.formatBoolean("ShowWindow", false);
+			InputAgent.storeAndExecute(new KeywordCommand(v, kw));
+		}
 
 		windowControls.remove(windowID);
 		windowToViewMap.remove(windowID);
@@ -281,7 +332,6 @@ public class RenderManager implements DragSourceListener {
 
 	/**
 	 * Ideally, this states that it is safe to call initialize() (assuming isGood() returned false)
-	 * @return
 	 */
 	public static boolean canInitialize() {
 		return s_instance == null;
@@ -319,11 +369,13 @@ public class RenderManager implements DragSourceListener {
 					continue;
 				}
 
-				double renderTime = EventManager.ticksToSecs(simTick);
-				redraw.set(false);
+				JaamSimModel simModel = GUIFrame.getJaamSimModel();
+				double renderTime = simModel.getEventManager().ticksToSeconds(simTick);
+				redraw.beginDrawing();
 
-				for (int i = 0; i < View.getAll().size(); i++) {
-					View v = View.getAll().get(i);
+				ArrayList<View> views = GUIFrame.getInstance().getViews();
+				for (int i = 0; i < views.size(); i++) {
+					View v = views.get(i);
 					v.update(renderTime);
 				}
 
@@ -331,81 +383,91 @@ public class RenderManager implements DragSourceListener {
 					cc.checkForUpdate();
 				}
 
-				cachedScene = new ArrayList<>();
-				DisplayModelBinding.clearCacheCounters();
-				DisplayModelBinding.clearCacheMissData();
-
 				boolean screenShotThisFrame = screenshot.get();
 
-				long startNanos = System.nanoTime();
-
-				ArrayList<DisplayModelBinding> selectedBindings = new ArrayList<>();
-
-				// Update all graphical entities in the simulation
-				final ArrayList<? extends Entity> allEnts = Entity.getAll();
-				for (int i = 0; i < allEnts.size(); i++) {
-					DisplayEntity de;
-					try {
-						Entity e = allEnts.get(i);
-						if (e instanceof DisplayEntity)
-							de = (DisplayEntity)e;
-						else
-							continue;
-					}
-					catch (IndexOutOfBoundsException e) {
-						break;
-					}
-
-					try {
-						de.updateGraphics(renderTime);
-					}
-					// Catch everything so we don't screw up the behavior handling
-					catch (Throwable e) {
-						logException(e);
-					}
-				}
-
-				long updateNanos = System.nanoTime();
-
 				int totalBindings = 0;
-				for (int i = 0; i < allEnts.size(); i++) {
-					DisplayEntity de;
-					try {
-						Entity e = allEnts.get(i);
-						if (e instanceof DisplayEntity)
-							de = (DisplayEntity)e;
-						else
-							continue;
-					}
-					catch (IndexOutOfBoundsException e) {
-						break;
+				long startNanos = System.nanoTime();
+				long updateNanos = 0;
+				long endNanos = 0;
+
+				int maxRenderableEntities = simModel.getSimulation().getMaxEntitiesToDisplay();
+
+				synchronized (sceneDragLock) {
+
+					cachedScene = new ArrayList<>();
+					DisplayModelBinding.clearCacheCounters();
+					DisplayModelBinding.clearCacheMissData();
+
+					ArrayList<DisplayModelBinding> selectedBindings = new ArrayList<>();
+
+					// Update all graphical entities in the simulation
+					// All entities are updated regardless of the number or whether 'Show' is set
+					// (required for Queue, etc.)
+					for (DisplayEntity de : simModel.getClonesOfIterator(DisplayEntity.class)) {
+						try {
+							de.updateGraphics(renderTime);
+						}
+						// Catch everything so we don't screw up the behavior handling
+						catch (Throwable e) {
+							logException(e);
+						}
 					}
 
-					for (DisplayModelBinding binding : de.getDisplayBindings()) {
-						try {
-							totalBindings++;
-							binding.collectProxies(renderTime, cachedScene);
-							if (binding.isBoundTo(selectedEntity)) {
-								selectedBindings.add(binding);
+					updateNanos = System.nanoTime();
+
+					int numEnts = 0;
+					// Collect the render proxies for each entity
+					for (DisplayEntity de : simModel.getClonesOfIterator(DisplayEntity.class)) {
+						if (!de.getShow())
+							continue;
+
+						numEnts++;
+						// There is an upper limit on number of entities
+						if (numEnts > maxRenderableEntities) {
+							break;
+						}
+						for (DisplayModelBinding binding : de.getDisplayBindings()) {
+							try {
+								totalBindings++;
+								binding.collectProxies(renderTime, cachedScene);
+								for (DisplayEntity ent : getSelectedEntityList()) {
+									if (binding.isBoundTo(ent)) {
+										selectedBindings.add(binding);
+										break;
+									}
+								}
+							} catch (Throwable t) {
+								// Log the exception in the exception list
+								logException(t);
 							}
+						}
+					}
+
+					// Collect the proxies for the green box that is shown around the selected entity
+					// (collected second so they always appear on top)
+					for (DisplayModelBinding binding : selectedBindings) {
+						try {
+							binding.collectSelectionProxies(renderTime, cachedScene);
 						} catch (Throwable t) {
 							// Log the exception in the exception list
 							logException(t);
 						}
 					}
-				}
 
-				// Collect selection proxies second so they always appear on top
-				for (DisplayModelBinding binding : selectedBindings) {
-					try {
-						binding.collectSelectionProxies(renderTime, cachedScene);
-					} catch (Throwable t) {
-						// Log the exception in the exception list
-						logException(t);
+					// Finally include the displayable links for linked entities
+					if (showLinks.get()) {
+						addLinkDisplays(linkDirection.get(), cachedScene);
 					}
-				}
 
-				long endNanos = System.nanoTime();
+					// Show a rubber band arrow from the selected entity to the mouse position
+					if (createLinks.get() && isSingleEntitySelected() && mouseWindowID > 0) {
+						DisplayEntity selectedEntity = getSelectedEntity();
+						Vec3d source = selectedEntity.getSourcePoint(linkDirection.get());
+						addLink(source, mousePosition, 0.0d, 0.0d, linkDirection.get(), cachedScene);
+					}
+
+					endNanos = System.nanoTime();
+				} // sceneDragLock
 
 				renderer.setScene(cachedScene);
 
@@ -436,7 +498,7 @@ public class RenderManager implements DragSourceListener {
 					dbgMsg.append(" entities at (").append(mouseInfo.x);
 					dbgMsg.append(", ").append(mouseInfo.y).append("): ");
 					for (PickData pd : picks) {
-						Entity ent = Entity.idToEntity(pd.id);
+						Entity ent = simModel.idToEntity(pd.id);
 						if (ent != null)
 							dbgMsg.append(ent.getName());
 
@@ -463,15 +525,7 @@ public class RenderManager implements DragSourceListener {
 				logException(t);
 			}
 
-			// Wait for a redraw request
-			synchronized(redraw) {
-				while (!redraw.get()) {
-					try {
-						redraw.wait();
-					} catch (InterruptedException e) {}
-				}
-			}
-
+			redraw.waitForRedraw();
 		}
 
 		exceptionLogger.printExceptionLog();
@@ -498,7 +552,6 @@ public class RenderManager implements DragSourceListener {
 	// Note: this is intentionally package private to be called by an inner class
 	void popupMenuImp(int windowID) {
 		synchronized (popupLock) {
-
 			Renderer.WindowMouseInfo mouseInfo = renderer.getMouseInfo(windowID);
 			if (mouseInfo == null) {
 				// Somehow this window was closed along the way, just ignore this click
@@ -516,14 +569,12 @@ public class RenderManager implements DragSourceListener {
 
 			for (PickData pd : picks) {
 				if (!pd.isEntity) { continue; }
-				Entity ent = Entity.idToEntity(pd.id);
-				if (ent == null) { continue; }
-				if (!(ent instanceof DisplayEntity)) { continue; }
-
-				DisplayEntity de = (DisplayEntity)ent;
-				if (!de.isMovable()) { continue; }  // only a movable DisplayEntity responds to a right-click
-
-				ents.add(de);
+				Entity ent = GUIFrame.getJaamSimModel().idToEntity(pd.id);
+				if (ent instanceof DisplayEntity) {
+					DisplayEntity de = (DisplayEntity)ent;
+					if (de.isMovable()) // only a movable DisplayEntity responds to a right-click
+						ents.add(de);
+				}
 			}
 
 			if (!mouseInfo.mouseInWindow) {
@@ -537,22 +588,30 @@ public class RenderManager implements DragSourceListener {
 			menu.setLightWeightPopupEnabled(false);
 			final int menuX = mouseInfo.x + awtFrame.getInsets().left;
 			final int menuY = mouseInfo.y + awtFrame.getInsets().top;
+			final int nodeIndex = getNodeIndex(windowID, mouseInfo.x, mouseInfo.y);
 
-			if (ents.size() == 0) { return; } // Nothing to show
-
-			if (ents.size() == 1) {
-				ObjectSelector.populateMenu(menu, ents.get(0), menuX, menuY);
+			if (ents.size() == 0) {
+				FrameBox.setSelectedEntity(null, false);
+				ContextMenu.populateMenu(menu, null, nodeIndex, awtFrame, menuX, menuY);
 			}
+
+			else if (ents.size() == 1) {
+				FrameBox.setSelectedEntity(ents.get(0), false);
+				ContextMenu.populateMenu(menu, ents.get(0), nodeIndex, awtFrame, menuX, menuY);
+			}
+
 			else {
 				// Several entities, let the user pick the interesting entity first
+				Collections.sort(ents, Input.uiSortOrder);
 				for (final DisplayEntity de : ents) {
 					JMenuItem thisItem = new JMenuItem(de.getName());
 					thisItem.addActionListener( new ActionListener() {
 
 						@Override
 						public void actionPerformed( ActionEvent event ) {
+							FrameBox.setSelectedEntity(de, false);
 							menu.removeAll();
-							ObjectSelector.populateMenu(menu, de, menuX, menuY);
+							ContextMenu.populateMenu(menu, de, nodeIndex, awtFrame, menuX, menuY);
 							menu.show(awtFrame, menuX, menuY);
 						}
 					} );
@@ -566,31 +625,56 @@ public class RenderManager implements DragSourceListener {
 		} // synchronized (_popupLock)
 	}
 
-	public void handleMouseClicked(int windowID, int x, int y, short count) {
+	public void handleMouseClicked(int windowID, int x, int y, int modifiers, short count) {
 
+		boolean shiftDown = (modifiers & WindowInteractionListener.MOD_SHIFT) != 0;
+		boolean controlDown = (modifiers & WindowInteractionListener.MOD_CTRL) != 0;
+		boolean altDown = (modifiers & WindowInteractionListener.MOD_ALT) != 0;
+		if (shiftDown || altDown)
+			return;
+
+		// Find the entity at this location
 		List<PickData> picks = pickForMouse(windowID, false);
-
 		Collections.sort(picks, new SelectionSorter());
-
+		DisplayEntity ent = null;
 		for (PickData pd : picks) {
-			// Select the first entity after sorting
-			if (pd.isEntity) {
-				DisplayEntity ent = (DisplayEntity)Entity.idToEntity(pd.id);
-				if (!ent.isMovable()) {
-					continue;
-				}
-				FrameBox.setSelectedEntity(ent);
-
-				Vec3d globalCoord = getGlobalPositionForMouseData(windowID, x, y, ent);
-				ent.handleMouseClicked(count, globalCoord);
-				queueRedraw();
-				return;
+			if (!pd.isEntity)
+				continue;
+			DisplayEntity e = (DisplayEntity) GUIFrame.getJaamSimModel().idToEntity(pd.id);
+			if (e.isMovable()) {
+				ent = e;
+				break;
 			}
 		}
 
-		// If no entity is found, set the selected entity to the view window
-		FrameBox.setSelectedEntity(windowToViewMap.get(windowID));
-		queueRedraw();
+		// If no entity is found, set the selected entity to null
+		if (ent == null) {
+			FrameBox.setSelectedEntity(null, false);
+			GUIFrame.updateUI();
+			return;
+		}
+
+		// Select the entity
+		if (controlDown && isEntitySelected()) {
+			addSelectedEntity(ent);
+			GUIFrame.updateUI();
+			return;
+		}
+		FrameBox.setSelectedEntity(ent, true);
+
+		// Handle the mouse click for an Overlay entity
+		if (ent instanceof OverlayEntity) {
+			OverlayEntity olEnt = (OverlayEntity) ent;
+			Vec2d size = renderer.getViewableSize(windowID);
+			olEnt.handleMouseClicked(count, x, y, (int)size.x, (int)size.y);
+			GUIFrame.updateUI();
+			return;
+		}
+
+		// Handle the mouse click for a normal entity
+		Vec3d globalCoord = getGlobalPositionForMouseData(windowID, x, y, ent);
+		ent.handleMouseClicked(count, globalCoord);
+		GUIFrame.updateUI();
 	}
 
 	/**
@@ -609,11 +693,27 @@ public class RenderManager implements DragSourceListener {
 			return new ArrayList<>(); // empty set
 		}
 
-		Ray pickRay = RenderUtils.getPickRay(mouseInfo);
+		// Look for overlay entities
+		int x = mouseInfo.x;
+		int y = mouseInfo.y;
+		List<PickData> ret = pickForRasterCoord(x, y, view.getID());
 
-		return pickForRay(pickRay, view.getID(), precise);
+		// Look for normal entities
+		Ray pickRay = RenderUtils.getPickRay(mouseInfo);
+		ret.addAll(pickForRay(pickRay, view.getID(), precise));
+
+		return ret;
 	}
 
+	private List<PickData> pickForRasterCoord(int x, int y, int viewID) {
+		List<PickData> ret = new ArrayList<>();
+		Vec2d vec = new Vec2d(x, y);
+		List<Long> overlayList = renderer.overlayPick(vec, viewID);
+		for (Long id : overlayList) {
+			ret.add(new PickData(id));
+		}
+		return ret;
+	}
 
 	/**
 	 * PickData represents enough information to sort a list of picks based on a picking preference
@@ -648,6 +748,17 @@ public class RenderManager implements DragSourceListener {
 
 			isEntity = true;
 		}
+
+		/**
+		 * This pick was an overlay entity.
+		 * @param id
+		 */
+		public PickData(long id) {
+			this.id = id;
+			size = 0;
+			dist = 0;
+			isEntity = true;
+		}
 	}
 
 	/**
@@ -663,10 +774,8 @@ public class RenderManager implements DragSourceListener {
 			if (!p0.isEntity && p1.isEntity) {
 				return 1;
 			}
-			if (p0.size == p1.size) {
-				return 0;
-			}
-			return (p0.size < p1.size) ? -1 : 1;
+
+			return Double.compare(p0.size, p1.size);
 		}
 
 	}
@@ -764,7 +873,7 @@ public class RenderManager implements DragSourceListener {
 			}
 			knownIDs.add(pick.pickingID);
 
-			DisplayEntity ent = (DisplayEntity)Entity.idToEntity(pick.pickingID);
+			DisplayEntity ent = (DisplayEntity)GUIFrame.getJaamSimModel().idToEntity(pick.pickingID);
 			if (ent == null) {
 				// This object is not an entity, but may be a picking handle
 				uniquePicks.add(new PickData(pick.pickingID, pick.dist));
@@ -790,6 +899,19 @@ public class RenderManager implements DragSourceListener {
 		}
 
 		return RenderUtils.getPickRayForPosition(mouseInfo.cameraInfo, x, y, mouseInfo.width, mouseInfo.height);
+	}
+
+	public static CameraInfo getCameraInfoForView(View view) {
+		if (!isGood()) return null;
+
+		RenderManager rman = RenderManager.inst();
+		int winID = rman.getWindowID(view);
+		Renderer.WindowMouseInfo mouseInfo = rman.renderer.getMouseInfo(winID);
+
+		if (mouseInfo == null)
+			return null;
+
+		return mouseInfo.cameraInfo;
 	}
 
 	/**
@@ -837,7 +959,7 @@ public class RenderManager implements DragSourceListener {
 	 */
 	public double getOffsetForStringPosition(TessFontKey fontKey, double textHeight, String string, int i) {
 		StringBuilder sb = new StringBuilder(string);
-		return getRenderedStringLength(fontKey, textHeight, sb.substring(0, i).toString());
+		return getRenderedStringLength(fontKey, textHeight, sb.substring(0, i));
 	}
 
 	private void logException(Throwable t) {
@@ -853,24 +975,91 @@ public class RenderManager implements DragSourceListener {
 		}
 	}
 
-	public static void setSelection(Entity ent) {
+	public static void setSelection(Entity ent, boolean canMakeLink) {
 		if (!RenderManager.isGood())
 			return;
 
-		RenderManager.inst().setSelectEntity(ent);
+		RenderManager.inst().setSelectEntity(ent, canMakeLink);
 	}
 
-	private void setSelectEntity(Entity ent) {
-		if (ent instanceof DisplayEntity)
-			selectedEntity = (DisplayEntity)ent;
-		else
-			selectedEntity = null;
+	private void setSelectEntity(Entity ent, boolean canMakeLink) {
+		if (ent instanceof DisplayEntity) {
+			DisplayEntity selectedEntity = (DisplayEntity) ent;
+			DisplayEntity oldEnt = getSelectedEntity();
+			selectedEntityList.clear();
+			selectedEntityList.add(selectedEntity);
 
-		queueRedraw();
+			if (createLinks.get() && canMakeLink) {
+				if (selectedEntity != null && oldEnt != null && oldEnt != selectedEntity) {
+					try {
+						oldEnt.linkTo(selectedEntity, linkDirection.get());
+					}
+					catch (InputErrorException e) {}
+				}
+			}
+
+		}
+		else if (ent instanceof View) {
+			selectedEntityList.clear();
+			View view = (View) ent;
+			int windowID = getWindowID(view);
+			focusWindow(windowID);
+		}
+		else {
+			selectedEntityList.clear();
+		}
+
+		GUIFrame.updateUI();
+	}
+
+	private void addSelectedEntity(DisplayEntity ent) {
+		if (!isSelectionValid(ent))
+			return;
+		selectedEntityList.add(ent);
+	}
+
+	private ArrayList<DisplayEntity> getSelectedEntityList() {
+		return selectedEntityList;
+	}
+
+	private DisplayEntity getSelectedEntity() {
+		if (selectedEntityList.isEmpty())
+			return null;
+		return selectedEntityList.get(0);
 	}
 
 	public boolean isEntitySelected() {
-		return (selectedEntity != null);
+		return !selectedEntityList.isEmpty();
+	}
+
+	private boolean isSingleEntitySelected() {
+		return selectedEntityList.size() == 1;
+	}
+
+	private boolean isSelectionValid(DisplayEntity ent) {
+		if (!isEntitySelected())
+			return true;
+		DisplayEntity selectedEntity = getSelectedEntity();
+
+		if (ent instanceof OverlayEntity && !(selectedEntity instanceof OverlayEntity))
+			return false;
+
+		if (!(ent instanceof OverlayEntity) && selectedEntity instanceof OverlayEntity)
+			return false;
+
+		if (ent.getCurrentRegion() != selectedEntity.getCurrentRegion())
+			return false;
+
+		if (ent.getParent() != selectedEntity.getParent())
+			return false;
+
+		DisplayEntity e = ent;
+		while (e != null) {
+			if (selectedEntityList.contains(e))
+				return false;
+			e = e.getRelativeEntity();
+		}
+		return true;
 	}
 
 	/**
@@ -881,17 +1070,31 @@ public class RenderManager implements DragSourceListener {
 	 */
 	public boolean handleDrag(WindowInteractionListener.DragInfo dragInfo) {
 
-		// If there is no object to move and the control is pressed then do nothing (return true)
-		// If control is not pressed then move the camera (return false)
+		synchronized(sceneDragLock) {
+
+		// If control key is pressed and there is no object to move then do nothing (return true)
+		// If control key is not pressed, then move the camera (return false)
+		DisplayEntity selectedEntity = getSelectedEntity();
 		if (selectedEntity == null || !selectedEntity.isMovable())
 			return dragInfo.controlDown();
+
+		// Overlay object
+		if (selectedEntity instanceof OverlayEntity) {
+			Vec2d size = renderer.getViewableSize(dragInfo.windowID);
+			if (!dragInfo.controlDown()) {
+				if (!isSingleEntitySelected())
+					return false;
+				OverlayEntity olEnt = (OverlayEntity) selectedEntity;
+				return olEnt.handleDrag(dragInfo.x, dragInfo.y, dragInfo.startX, dragInfo.startY,
+					(int)size.x, (int)size.y);
+			}
+			return handleOverlayMove(dragInfo.x, dragInfo.y, dragInfo.startX, dragInfo.startY,
+					(int)size.x, (int)size.y);
+		}
 
 		// Find the start and current world space positions
 		Ray firstRay = getRayForMouse(dragInfo.windowID, dragInfo.startX, dragInfo.startY);
 		Ray currentRay = getRayForMouse(dragInfo.windowID, dragInfo.x, dragInfo.y);
-		Ray lastRay = getRayForMouse(dragInfo.windowID,
-		                             dragInfo.x - dragInfo.dx,
-		                             dragInfo.y - dragInfo.dy);
 
 		Transform trans = selectedEntity.getGlobalTrans();
 
@@ -900,10 +1103,11 @@ public class RenderManager implements DragSourceListener {
 
 		double firstDist = entityPlane.collisionDist(firstRay);
 		double currentDist = entityPlane.collisionDist(currentRay);
-		double lastDist = entityPlane.collisionDist(lastRay);
 
 		// If the Control key is not pressed, then the selected entity handles the drag action
 		if (!dragInfo.controlDown()) {
+			if (!isSingleEntitySelected())
+				return false;
 			Vec3d firstPt = firstRay.getPointAtDist(firstDist);
 			Vec3d currentPt = currentRay.getPointAtDist(currentDist);
 			boolean ret = selectedEntity.handleDrag(currentPt, firstPt);
@@ -917,190 +1121,271 @@ public class RenderManager implements DragSourceListener {
 			return true;
 
 		// MOVE
-		if (dragHandleID == MOVE_PICK_ID)
+		if (dragHandleID == MOVE_PICK_ID) {
+			if (!selectedEntity.isPositionNominal())
+				return true;
 			return handleMove(currentRay, firstRay, currentDist, firstDist, dragInfo.shiftDown());
+		}
 
 		// RESIZE
-		if (dragHandleID <= RESIZE_POSX_PICK_ID &&
-		    dragHandleID >= RESIZE_NXNY_PICK_ID)
-			return handleResize(currentRay, lastRay, currentDist, lastDist);
+		if (dragHandleID <= RESIZE_POSX_PICK_ID && dragHandleID >= RESIZE_NXNY_PICK_ID) {
+			if (!selectedEntity.isSizeNominal())
+				return true;
+			return handleResize(currentRay, firstRay, currentDist, firstDist);
+		}
 
 		// ROTATE
-		if (dragHandleID == ROTATE_PICK_ID)
-			return handleRotate(currentRay, lastRay, currentDist, lastDist);
+		if (dragHandleID == ROTATE_PICK_ID) {
+			if (!selectedEntity.isOrientationNominal())
+				return true;
+			return handleRotate(currentRay, firstRay, currentDist, firstDist);
+		}
 
 		// LINE MOVE
-		if (dragHandleID == LINEDRAG_PICK_ID)
-			return handleLineMove(currentRay, lastRay, currentDist, lastDist, dragInfo.shiftDown());
+		if (dragHandleID == LINEDRAG_PICK_ID) {
+			if (!selectedEntity.isPointsNominal())
+				return true;
+			return handleLineMove(currentRay, firstRay, currentDist, firstDist, dragInfo.shiftDown());
+		}
 
 		// LINE NODE MOVE
-		if (dragHandleID <= LINENODE_PICK_ID)
+		if (dragHandleID <= LINENODE_PICK_ID) {
+			if (!selectedEntity.isPointsNominal())
+				return true;
 			return handleLineNodeMove(currentRay, firstRay, currentDist, firstDist, dragInfo.shiftDown());
+		}
 
 		return false;
+
+		} // sceneDragLock
+	}
+
+	// Moves an overlay entity to a new position in the windows
+	private boolean handleOverlayMove(int x, int y, int startX, int startY, int windowWidth, int windowHeight) {
+		DisplayEntity selectedEntity = getSelectedEntity();
+		OverlayEntity olEnt = (OverlayEntity) selectedEntity;
+		IntegerVector lastPos = olEnt.getScreenPosition();
+
+		if (dragEntityScreenPosition == null)
+			return false;
+		int dx = x - startX;
+		int dy = y - startY;
+		int posX = dragEntityScreenPosition.get(0) + dx * (olEnt.getAlignRight() ? -1 : 1);
+		int posY = dragEntityScreenPosition.get(1) + dy * (olEnt.getAlignBottom() ? -1 : 1);
+		posX = Math.min(Math.max(0, posX), windowWidth);
+		posY = Math.min(Math.max(0, posY), windowHeight);
+		KeywordIndex kw = InputAgent.formatIntegers("ScreenPosition", posX, posY);
+		ArrayList<Command> cmdList = new ArrayList<>();
+		cmdList.add(new KeywordCommand(olEnt, kw));
+
+		// Move any additional entities that were selected
+		int xOffset = (posX - lastPos.get(0)) * (olEnt.getAlignRight() ? -1 : 1);
+		int yOffset = posY - lastPos.get(1) * (olEnt.getAlignBottom() ? -1 : 1);
+		for (DisplayEntity ent : getSelectedEntityList()) {
+			if (ent == selectedEntity)
+				continue;
+			olEnt = (OverlayEntity) ent;
+			IntegerVector pos = olEnt.getScreenPosition();
+			posX = pos.get(0) + xOffset * (olEnt.getAlignRight() ? -1 : 1);
+			posY = pos.get(1) + yOffset * (olEnt.getAlignBottom() ? -1 : 1);
+			posX = Math.min(Math.max(0, posX), windowWidth);
+			posY = Math.min(Math.max(0, posY), windowHeight);
+			kw = InputAgent.formatIntegers("ScreenPosition", posX, posY);
+			cmdList.add(new KeywordCommand(olEnt, kw));
+		}
+
+		InputAgent.storeAndExecute(new ListCommand(cmdList));
+		return true;
 	}
 
 	//Moves the selected entity to a new position in space
 	private boolean handleMove(Ray currentRay, Ray firstRay, double currentDist, double firstDist, boolean shift) {
+		DisplayEntity selectedEntity = getSelectedEntity();
+		JaamSimModel simModel = selectedEntity.getJaamSimModel();
+		Simulation simulation = simModel.getSimulation();
 
 		// Trap degenerate cases
 		if (currentDist < 0 || currentDist == Double.POSITIVE_INFINITY ||
 		      firstDist < 0 ||   firstDist == Double.POSITIVE_INFINITY)
 			return true;
 
+		// Global position of the entity prior to the drag
+		Vec3d pos = new Vec3d(dragEntityPosition);
+
 		// Vertical move
 		if (shift) {
-			Vec3d entPos = new Vec3d(dragEntityPosition);
 			double zDiff = RenderUtils.getZDiff(dragCollisionPoint, currentRay, firstRay);
-			entPos.z += zDiff;
-			if (Simulation.isSnapToGrid())
-				entPos = Simulation.getSnapGridPosition(entPos, selectedEntity.getGlobalPosition());
-			selectedEntity.setInputForGlobalPosition(entPos);
-			return true;
+			pos.z += zDiff;
 		}
 
 		// Horizontal move
-		Plane dragPlane = new Plane(new Vec3d(0, 0, 1), dragCollisionPoint.z); // XY plane at collision point
-		double cDist = dragPlane.collisionDist(currentRay);
-		double lDist = dragPlane.collisionDist(firstRay);
+		else {
+			Plane dragPlane = new Plane(new Vec3d(0, 0, 1), dragCollisionPoint.z); // XY plane at collision point
+			double cDist = dragPlane.collisionDist(currentRay);
+			double lDist = dragPlane.collisionDist(firstRay);
 
-		if (cDist < 0 || cDist == Double.POSITIVE_INFINITY ||
-		    lDist < 0 || lDist == Double.POSITIVE_INFINITY)
-			return true;
+			if (cDist < 0 || cDist == Double.POSITIVE_INFINITY ||
+			    lDist < 0 || lDist == Double.POSITIVE_INFINITY)
+				return true;
 
-		Vec3d cPoint = currentRay.getPointAtDist(cDist);
-		Vec3d lPoint = firstRay.getPointAtDist(lDist);
+			Vec3d cPoint = currentRay.getPointAtDist(cDist);
+			Vec3d lPoint = firstRay.getPointAtDist(lDist);
 
-		Vec3d del = new Vec3d();
-		del.sub3(cPoint, lPoint);
+			Vec3d del = new Vec3d();
+			del.sub3(cPoint, lPoint);
+			pos.add3(del);
+		}
 
-		Vec3d pos = new Vec3d(dragEntityPosition);
-		pos.add3(del);
-		if (Simulation.isSnapToGrid())
-			pos = Simulation.getSnapGridPosition(pos, selectedEntity.getGlobalPosition());
-		selectedEntity.setInputForGlobalPosition(pos);
+		Vec3d localPos = selectedEntity.getLocalPosition(pos);
+		if (simulation.isSnapToGrid())
+			localPos = simulation.getSnapGridPosition(localPos, selectedEntity.getPosition(), shift);
+		KeywordIndex kw = simModel.formatVec3dInput("Position", localPos, DistanceUnit.class);
+
+		// Move the selected entity
+		ArrayList<Command> cmdList = new ArrayList<>();
+		if (!selectedEntity.usePointsInput()) {
+			cmdList.add(new KeywordCommand(selectedEntity, kw));
+		}
+		else {
+			ArrayList<Vec3d> points = selectedEntity.getPoints();
+			Vec3d offset = new Vec3d(localPos);
+			offset.sub3(selectedEntity.getPosition());
+			KeywordIndex ptsKw = simModel.formatPointsInputs("Points", points, offset);
+			cmdList.add(new KeywordCommand(selectedEntity, kw, ptsKw));
+		}
+
+		// Move any additional entities that were selected
+		Vec3d globalOffset = selectedEntity.getGlobalPosition(localPos);
+		globalOffset.sub3(selectedEntity.getGlobalPosition());
+		for (DisplayEntity ent : getSelectedEntityList()) {
+			if (ent == selectedEntity)
+				continue;
+			pos = ent.getGlobalPosition();
+			pos.add3(globalOffset);
+			localPos = ent.getLocalPosition(pos);
+			kw = simModel.formatVec3dInput("Position", localPos, DistanceUnit.class);
+			if (!ent.usePointsInput()) {
+				cmdList.add(new KeywordCommand(ent, kw));
+			}
+			else {
+				ArrayList<Vec3d> points = ent.getPoints();
+				Vec3d offset = new Vec3d(localPos);
+				offset.sub3(ent.getPosition());
+				KeywordIndex ptsKw = simModel.formatPointsInputs("Points", points, offset);
+				cmdList.add(new KeywordCommand(ent, kw, ptsKw));
+			}
+		}
+
+		InputAgent.storeAndExecute(new ListCommand(cmdList));
 		return true;
 	}
 
-	private boolean handleResize(Ray currentRay, Ray lastRay, double currentDist, double lastDist) {
+	private boolean handleResize(Ray currentRay, Ray firstRay, double currentDist, double firstDist) {
+		if (!isSingleEntitySelected())
+			return false;
+		DisplayEntity selectedEntity = getSelectedEntity();
+		JaamSimModel simModel = selectedEntity.getJaamSimModel();
+		Simulation simulation = simModel.getSimulation();
 
 		Vec3d currentPoint = currentRay.getPointAtDist(currentDist);
-		Vec3d lastPoint = lastRay.getPointAtDist(lastDist);
-
-		Vec3d size = selectedEntity.getSize();
-		Mat4d transMat = selectedEntity.getTransMatrix();
-		Mat4d invTransMat = selectedEntity.getInvTransMatrix();
+		Vec3d firstPoint = firstRay.getPointAtDist(firstDist);
 
 		Vec3d entSpaceCurrent = new Vec3d(); // entSpacePoint is the current point in model space
-		entSpaceCurrent.multAndTrans3(invTransMat, currentPoint);
+		entSpaceCurrent.multAndTrans3(dragEntityInvTransMat, currentPoint);
 
-		Vec3d entSpaceLast = new Vec3d(); // entSpaceLast is the last point in model space
-		entSpaceLast.multAndTrans3(invTransMat, lastPoint);
+		Vec3d entSpaceFirst = new Vec3d(); // entSpaceLast is the last point in model space
+		entSpaceFirst.multAndTrans3(dragEntityInvTransMat, firstPoint);
 
 		Vec3d entSpaceDelta = new Vec3d();
-		entSpaceDelta.sub3(entSpaceCurrent, entSpaceLast);
+		entSpaceDelta.sub3(entSpaceCurrent, entSpaceFirst);
 
-		Vec3d pos = selectedEntity.getGlobalPosition();
-		Vec3d scale = selectedEntity.getSize();
+		Vec3d scale = new Vec3d(dragEntitySize);
 		Vec4d fixedPoint = new Vec4d(0.0d, 0.0d, 0.0d, 1.0d);
 
 		if (dragHandleID == RESIZE_POSX_PICK_ID) {
-			//scale.x = 2*entSpaceCurrent.x() * size.x();
-			scale.x += entSpaceDelta.x * size.x;
+			scale.x += entSpaceDelta.x * dragEntitySize.x;
 			fixedPoint = new Vec4d(-0.5,  0.0, 0.0, 1.0d);
 		}
 		if (dragHandleID == RESIZE_POSY_PICK_ID) {
-			scale.y += entSpaceDelta.y * size.y;
+			scale.y += entSpaceDelta.y * dragEntitySize.y;
 			fixedPoint = new Vec4d( 0.0, -0.5, 0.0, 1.0d);
 		}
 		if (dragHandleID == RESIZE_NEGX_PICK_ID) {
-			scale.x -= entSpaceDelta.x * size.x;
+			scale.x -= entSpaceDelta.x * dragEntitySize.x;
 			fixedPoint = new Vec4d( 0.5,  0.0, 0.0, 1.0d);
 		}
 		if (dragHandleID == RESIZE_NEGY_PICK_ID) {
-			scale.y -= entSpaceDelta.y * size.y;
+			scale.y -= entSpaceDelta.y * dragEntitySize.y;
 			fixedPoint = new Vec4d( 0.0,  0.5, 0.0, 1.0d);
 		}
 
 		if (dragHandleID == RESIZE_PXPY_PICK_ID) {
-			scale.x += entSpaceDelta.x * size.x;
-			scale.y += entSpaceDelta.y * size.y;
+			scale.x += entSpaceDelta.x * dragEntitySize.x;
+			scale.y += entSpaceDelta.y * dragEntitySize.y;
 			fixedPoint = new Vec4d(-0.5, -0.5, 0.0, 1.0d);
 		}
 		if (dragHandleID == RESIZE_PXNY_PICK_ID) {
-			scale.x += entSpaceDelta.x * size.x;
-			scale.y -= entSpaceDelta.y * size.y;
+			scale.x += entSpaceDelta.x * dragEntitySize.x;
+			scale.y -= entSpaceDelta.y * dragEntitySize.y;
 			fixedPoint = new Vec4d(-0.5,  0.5, 0.0, 1.0d);
 		}
 		if (dragHandleID == RESIZE_NXPY_PICK_ID) {
-			scale.x -= entSpaceDelta.x * size.x;
-			scale.y += entSpaceDelta.y * size.y;
+			scale.x -= entSpaceDelta.x * dragEntitySize.x;
+			scale.y += entSpaceDelta.y * dragEntitySize.y;
 			fixedPoint = new Vec4d( 0.5, -0.5, 0.0, 1.0d);
 		}
 		if (dragHandleID == RESIZE_NXNY_PICK_ID) {
-			scale.x -= entSpaceDelta.x * size.x;
-			scale.y -= entSpaceDelta.y * size.y;
+			scale.x -= entSpaceDelta.x * dragEntitySize.x;
+			scale.y -= entSpaceDelta.y * dragEntitySize.y;
 			fixedPoint = new Vec4d( 0.5,  0.5, 0.0, 1.0d);
 		}
 
-		// Handle the case where the scale is pulled through itself. Fix the scale,
-		// and swap the currently selected handle
-		if (scale.x <= 0.00005) {
-			scale.x = 0.0001;
-			if (dragHandleID == RESIZE_POSX_PICK_ID) { dragHandleID = RESIZE_NEGX_PICK_ID; }
-			else if (dragHandleID == RESIZE_NEGX_PICK_ID) { dragHandleID = RESIZE_POSX_PICK_ID; }
+		scale.x = Math.max(0.0d, scale.x);
+		scale.y = Math.max(0.0d, scale.y);
 
-			else if (dragHandleID == RESIZE_PXPY_PICK_ID) { dragHandleID = RESIZE_NXPY_PICK_ID; }
-			else if (dragHandleID == RESIZE_PXNY_PICK_ID) { dragHandleID = RESIZE_NXNY_PICK_ID; }
-			else if (dragHandleID == RESIZE_NXPY_PICK_ID) { dragHandleID = RESIZE_PXPY_PICK_ID; }
-			else if (dragHandleID == RESIZE_NXNY_PICK_ID) { dragHandleID = RESIZE_PXNY_PICK_ID; }
-		}
+		if (simulation.isSnapToGrid())
+			scale = simulation.getSnapGridPosition(scale, dragEntitySize, false);
 
-		if (scale.y <= 0.00005) {
-			scale.y = 0.0001;
-			if (dragHandleID == RESIZE_POSY_PICK_ID) { dragHandleID = RESIZE_NEGY_PICK_ID; }
-			else if (dragHandleID == RESIZE_NEGY_PICK_ID) { dragHandleID = RESIZE_POSY_PICK_ID; }
-
-			else if (dragHandleID == RESIZE_PXPY_PICK_ID) { dragHandleID = RESIZE_PXNY_PICK_ID; }
-			else if (dragHandleID == RESIZE_PXNY_PICK_ID) { dragHandleID = RESIZE_PXPY_PICK_ID; }
-			else if (dragHandleID == RESIZE_NXPY_PICK_ID) { dragHandleID = RESIZE_NXNY_PICK_ID; }
-			else if (dragHandleID == RESIZE_NXNY_PICK_ID) { dragHandleID = RESIZE_NXPY_PICK_ID; }
-		}
-
+		// Determine the new position for the entity
 		Vec4d oldFixed = new Vec4d(0.0d, 0.0d, 0.0d, 1.0d);
-		oldFixed.mult4(transMat, fixedPoint);
-		selectedEntity.setSize(scale);
-		transMat = selectedEntity.getTransMatrix(); // Get the new matrix
+		oldFixed.mult4(dragEntityTransMat, fixedPoint);
 
 		Vec4d newFixed = new Vec4d(0.0d, 0.0d, 0.0d, 1.0d);
+		Mat4d transMat = selectedEntity.getTransMatrix(scale); // Get the new matrix once size is changed
 		newFixed.mult4(transMat, fixedPoint);
 
 		Vec4d posAdjust = new Vec4d(0.0d, 0.0d, 0.0d, 1.0d);
 		posAdjust.sub3(oldFixed, newFixed);
-
+		Vec3d pos = selectedEntity.getGlobalPosition();
 		pos.add3(posAdjust);
-		selectedEntity.setInputForGlobalPosition(pos);
+		Vec3d localPos = selectedEntity.getLocalPosition(pos);
 
-		KeywordIndex kw = InputAgent.formatPointInputs("Size", selectedEntity.getSize(), "m");
-		InputAgent.apply(selectedEntity, kw);
+		KeywordIndex sizeKw = simModel.formatVec3dInput("Size", scale, DistanceUnit.class);
+		KeywordIndex posKw = simModel.formatVec3dInput("Position", localPos, DistanceUnit.class);
+		InputAgent.storeAndExecute(new KeywordCommand(selectedEntity, sizeKw, posKw));
 		return true;
 	}
 
-	private boolean handleRotate(Ray currentRay, Ray lastRay, double currentDist, double lastDist) {
+	public static final double ANGLE_SPACING = Math.toRadians(1.0d);
 
-		Mat4d transMat = selectedEntity.getTransMatrix();
+	private boolean handleRotate(Ray currentRay, Ray firstRay, double currentDist, double firstDist) {
+		if (!isSingleEntitySelected())
+			return false;
+		DisplayEntity selectedEntity = getSelectedEntity();
+		JaamSimModel simModel = selectedEntity.getJaamSimModel();
+		Simulation simulation = simModel.getSimulation();
 
 		// The points where the previous pick ended and current position. Collision is with the entity's XY plane
 		Vec3d currentPoint = currentRay.getPointAtDist(currentDist);
-		Vec3d lastPoint = lastRay.getPointAtDist(lastDist);
+		Vec3d firstPoint = firstRay.getPointAtDist(firstDist);
 
 		Vec3d align = selectedEntity.getAlignment();
 
 		Vec4d rotateCenter = new Vec4d(align.x, align.y, align.z, 1.0d);
-		rotateCenter.mult4(transMat, rotateCenter);
+		rotateCenter.mult4(dragEntityTransMat, rotateCenter);
 
 		Vec4d a = new Vec4d(0.0d, 0.0d, 0.0d, 1.0d);
-		a.sub3(lastPoint, rotateCenter);
+		a.sub3(firstPoint, rotateCenter);
 		Vec4d b = new Vec4d(0.0d, 0.0d, 0.0d, 1.0d);
 		b.sub3(currentPoint, rotateCenter);
 
@@ -1108,48 +1393,102 @@ public class RenderManager implements DragSourceListener {
 		aCrossB.cross3(a, b);
 
 		double sinTheta = aCrossB.z / a.mag3() / b.mag3();
-		double theta = Math.asin(sinTheta);
+		double cosTheta = a.dot3(b) / a.mag3() / b.mag3();
+		double theta = Math.atan2(sinTheta, cosTheta);
 
-		Vec3d orient = selectedEntity.getOrientation();
+		Vec3d orient = new Vec3d(dragEntityOrientation);
 		orient.z += theta;
-		KeywordIndex kw = InputAgent.formatPointInputs("Orientation", orient, "rad");
-		InputAgent.apply(selectedEntity, kw);
+		if (simulation.isSnapToGrid())
+			orient = Simulation.getSnapGridPosition(orient, dragEntityOrientation, true, ANGLE_SPACING);
+
+		KeywordIndex kw = simModel.formatVec3dInput("Orientation", orient, AngleUnit.class);
+		InputAgent.storeAndExecute(new KeywordCommand(selectedEntity, kw));
 		return true;
 	}
 
-	private boolean handleLineMove(Ray currentRay, Ray lastRay, double currentDist, double lastDist, boolean shift) {
+	private boolean handleLineMove(Ray currentRay, Ray firstRay, double currentDist, double firstDist, boolean shift) {
+		DisplayEntity selectedEntity = getSelectedEntity();
+		JaamSimModel simModel = selectedEntity.getJaamSimModel();
+		Simulation simulation = simModel.getSimulation();
 
 		// The points where the previous pick ended and current position. Collision is with the entity's XY plane
 		Vec3d currentPoint = currentRay.getPointAtDist(currentDist);
-		Vec3d lastPoint = lastRay.getPointAtDist(lastDist);
+		Vec3d firstPoint = firstRay.getPointAtDist(firstDist);
 
-		ArrayList<Vec3d> screenPoints = selectedEntity.getPoints();
-		if (screenPoints == null || screenPoints.isEmpty())
+		if (dragEntityPoints == null || dragEntityPoints.isEmpty())
 			return true;
+
+		// Global node positions at the start of the move
+		ArrayList<Vec3d> globalPts = selectedEntity.getGlobalPosition(dragEntityPoints);
 
 		Vec3d delta = new Vec3d();
 
 		if (shift) {
-			Vec4d medPoint = RenderUtils.getGeometricMedian(screenPoints);
-			delta.z = RenderUtils.getZDiff(medPoint, currentRay, lastRay);
+			Vec4d medPoint = RenderUtils.getGeometricMedian(globalPts);
+			delta.z = RenderUtils.getZDiff(medPoint, currentRay, firstRay);
 		}
 		else {
-			delta.sub3(currentPoint, lastPoint);
-			if (selectedEntity.getCurrentRegion() != null) {
-				Transform invTrans = selectedEntity.getCurrentRegion().getInverseRegionTransForVectors();
-				invTrans.multAndTrans(delta, delta);
-			}
+			delta.sub3(currentPoint, firstPoint);
+		}
+
+		// Align the first node to snap grid
+		if (simulation.isSnapToGrid()) {
+			Vec3d point = new Vec3d();
+			point.add3(globalPts.get(0), delta);
+			Vec3d localPos = selectedEntity.getLocalPosition(point);
+			localPos = simulation.getSnapGridPosition(localPos, dragEntityPoints.get(0), shift);
+			point = selectedEntity.getGlobalPosition(localPos);
+			delta.sub3(point, globalPts.get(0));
 		}
 
 		// Set the new position for the line
-		InputAgent.apply(selectedEntity, InputAgent.formatPointsInputs("Points", screenPoints, delta));
+		for (Vec3d pt : globalPts) {
+			pt.add3(delta);
+		}
+		ArrayList<Vec3d> localPts = selectedEntity.getLocalPosition(globalPts);
 
-		// Set the position of the entity to the coordinates of the first node
-		InputAgent.apply(selectedEntity, InputAgent.formatPointInputs("Position", screenPoints.get(0), "m"));
+		// Set the new position coordinate
+		Vec3d pos = new Vec3d(dragEntityPosition);
+		pos.add3(delta);
+		Vec3d localPos = selectedEntity.getLocalPosition(pos);
+
+		KeywordIndex ptsKw = simModel.formatPointsInputs("Points", localPts, new Vec3d());
+		KeywordIndex posKw = simModel.formatVec3dInput("Position", localPos, DistanceUnit.class);
+		ArrayList<Command> cmdList = new ArrayList<>();
+		cmdList.add(new KeywordCommand(selectedEntity, -1, posKw, ptsKw));
+
+		// Move any additional entities that were selected
+		Vec3d globalOffset = selectedEntity.getGlobalPosition(localPos);
+		globalOffset.sub3(selectedEntity.getGlobalPosition(selectedEntity.getPoints().get(0)));
+		for (DisplayEntity ent : getSelectedEntityList()) {
+			if (ent == selectedEntity)
+				continue;
+			pos = ent.getGlobalPosition();
+			pos.add3(globalOffset);
+			localPos = ent.getLocalPosition(pos);
+			posKw = simModel.formatVec3dInput("Position", localPos, DistanceUnit.class);
+			if (!ent.usePointsInput()) {
+				cmdList.add(new KeywordCommand(ent, posKw));
+			}
+			else {
+				ArrayList<Vec3d> points = ent.getPoints();
+				Vec3d offset = new Vec3d(localPos);
+				offset.sub3(ent.getPosition());
+				ptsKw = simModel.formatPointsInputs("Points", points, globalOffset);
+				cmdList.add(new KeywordCommand(ent, posKw, ptsKw));
+			}
+		}
+
+		InputAgent.storeAndExecute(new ListCommand(cmdList));
 		return true;
 	}
 
 	private boolean handleLineNodeMove(Ray currentRay, Ray firstRay, double currentDist, double firstDist, boolean shift) {
+		if (!isSingleEntitySelected())
+			return false;
+		DisplayEntity selectedEntity = getSelectedEntity();
+		JaamSimModel simModel = selectedEntity.getJaamSimModel();
+		Simulation simulation = simModel.getSimulation();
 
 		int nodeIndex = (int)(-1*(dragHandleID - LINENODE_PICK_ID));
 
@@ -1170,22 +1509,31 @@ public class RenderManager implements DragSourceListener {
 			diff.z = 0.0d;
 		}
 		point.add3(diff);
+		Vec3d localPos = selectedEntity.getLocalPosition(point);
 
 		// Align the node to snap grid
-		if (Simulation.isSnapToGrid())
-			point = Simulation.getSnapGridPosition(point, selectedEntity.getGlobalPosition(screenPoints.get(nodeIndex)));
+		if (simulation.isSnapToGrid()) {
+			Vec3d oldPos = screenPoints.get(nodeIndex);
+			localPos = simulation.getSnapGridPosition(localPos, oldPos, shift);
+		}
+
+		ArrayList<Vec3d> newPoints = new ArrayList<>();
+		for (Vec3d v : screenPoints) {
+			newPoints.add(v);
+		}
 
 		// Set the new position for the node
-		screenPoints.get(nodeIndex).set3(selectedEntity.getLocalPosition(point));
-		InputAgent.apply(selectedEntity, InputAgent.formatPointsInputs("Points", screenPoints, new Vec3d()));
+		newPoints.set(nodeIndex, localPos);
 
-		// Set the position of the entity to the coordinates of the first node
-		if (nodeIndex == 0)
-			InputAgent.apply(selectedEntity, InputAgent.formatPointInputs("Position", screenPoints.get(0), "m"));
+		KeywordIndex ptsKw = simModel.formatPointsInputs("Points", newPoints, new Vec3d());
+		InputAgent.storeAndExecute(new KeywordCommand(selectedEntity, nodeIndex, ptsKw));
 		return true;
 	}
 
 	private void splitLineEntity(int windowID, int x, int y) {
+		DisplayEntity selectedEntity = getSelectedEntity();
+		JaamSimModel simModel = selectedEntity.getJaamSimModel();
+
 		Ray currentRay = getRayForMouse(windowID, x, y);
 
 		Mat4d rayMatrix = MathUtils.RaySpace(currentRay);
@@ -1194,13 +1542,7 @@ public class RenderManager implements DragSourceListener {
 		if (points == null || points.isEmpty())
 			return;
 
-		Transform trans = null;
-		if (selectedEntity.getCurrentRegion() != null || selectedEntity.getRelativeEntity() != null)
-			trans = selectedEntity.getGlobalPositionTransform();
-
-		ArrayList<Vec3d> globalPoints = new ArrayList<>(points);
-		if (trans != null)
-			globalPoints = (ArrayList<Vec3d>) RenderUtils.transformPointsWithTrans(trans.getMat4dRef(), globalPoints);
+		ArrayList<Vec3d> globalPoints = selectedEntity.getGlobalPosition(points);
 
 		int splitInd = 0;
 		Vec4d nearPoint = null;
@@ -1223,66 +1565,53 @@ public class RenderManager implements DragSourceListener {
 			return;
 		}
 
-		if (trans != null) {
-			Transform invTrans = new Transform();
-			trans.inverse(invTrans);
-			invTrans.multAndTrans(nearPoint, nearPoint);
-		}
+		// Insert the new node
+		points.add(splitInd + 1, selectedEntity.getLocalPosition(nearPoint));
 
-		// If we are here, we have a segment to split, at index i
-		ArrayList<Vec3d> splitPoints = new ArrayList<>();
-		for(int i = 0; i <= splitInd; ++i) {
-			splitPoints.add(points.get(i));
-		}
-		splitPoints.add(nearPoint);
-		for (int i = splitInd+1; i < points.size(); ++i) {
-			splitPoints.add(points.get(i));
-		}
-		KeywordIndex kw = InputAgent.formatPointsInputs("Points", splitPoints, new Vec3d());
-		InputAgent.apply(selectedEntity, kw);
+		KeywordIndex ptsKw = simModel.formatPointsInputs("Points", points, new Vec3d());
+		InputAgent.storeAndExecute(new KeywordCommand(selectedEntity, splitInd + 1, ptsKw));
 	}
 
 	private void removeLineNode(int windowID, int x, int y) {
-		Ray currentRay = getRayForMouse(windowID, x, y);
-
-		Mat4d rayMatrix = MathUtils.RaySpace(currentRay);
+		DisplayEntity selectedEntity = getSelectedEntity();
+		JaamSimModel simModel = selectedEntity.getJaamSimModel();
 
 		ArrayList<Vec3d> points = selectedEntity.getPoints();
 		if (points == null || points.size() <= 2)
 			return;
 
-		ArrayList<Vec3d> globalPoints = new ArrayList<>(points);
+		int removeInd = getNodeIndex(windowID, x, y);
+		if (removeInd == -1)
+			return;
 
-		Transform trans = null;
-		if (selectedEntity.getCurrentRegion() != null || selectedEntity.getRelativeEntity() != null) {
-			trans = selectedEntity.getGlobalPositionTransform();
-			globalPoints = (ArrayList<Vec3d>) RenderUtils.transformPointsWithTrans(trans.getMat4dRef(), globalPoints);
-		}
+		// Remove the selected node
+		points.remove(removeInd);
 
-		int removeInd = 0;
-		// Find a line segment we are near
-		for ( ;removeInd < points.size(); ++removeInd) {
-			Vec4d p = new Vec4d(globalPoints.get(removeInd).x, globalPoints.get(removeInd).y, globalPoints.get(removeInd).z, 1.0d);
+		KeywordIndex ptsKw = simModel.formatPointsInputs("Points", points, new Vec3d());
+		InputAgent.storeAndExecute(new KeywordCommand(selectedEntity, removeInd, ptsKw));
+	}
 
+	public int getNodeIndex(int windowID, int x, int y) {
+		if (!isSingleEntitySelected())
+			return -1;
+
+		DisplayEntity selectedEntity = getSelectedEntity();
+		ArrayList<Vec3d> points = selectedEntity.getPoints();
+		if (points == null)
+			return -1;
+
+		Ray currentRay = getRayForMouse(windowID, x, y);
+		Mat4d rayMatrix = MathUtils.RaySpace(currentRay);
+
+		ArrayList<Vec3d> globalPoints = selectedEntity.getGlobalPosition(points);
+		for (int i = 0; i < points.size(); i++) {
+			Vec4d p = new Vec4d(globalPoints.get(i).x, globalPoints.get(i).y, globalPoints.get(i).z, 1.0d);
 			double rayAngle = RenderUtils.angleToRay(rayMatrix, p);
-
 			if (rayAngle > 0 && rayAngle < 0.01309) { // 0.75 degrees in radians
-				break;
-			}
-
-			if (removeInd == points.size()) {
-				// No appropriate point was found
-				return;
+				return i;
 			}
 		}
-
-		ArrayList<Vec3d> splitPoints = new ArrayList<>();
-		for(int i = 0; i < points.size(); ++i) {
-			if (i == removeInd) continue;
-			splitPoints.add(points.get(i));
-		}
-		KeywordIndex kw = InputAgent.formatPointsInputs("Points", splitPoints, new Vec3d());
-		InputAgent.apply(selectedEntity, kw);
+		return -1;
 	}
 
 	private boolean isMouseHandleID(long id) {
@@ -1290,6 +1619,7 @@ public class RenderManager implements DragSourceListener {
 	}
 
 	public boolean handleMouseButton(int windowID, int x, int y, int button, boolean isDown, int modifiers) {
+		DisplayEntity selectedEntity = getSelectedEntity();
 
 		if (button != 1) { return false; }
 		if (!isDown) {
@@ -1315,6 +1645,19 @@ public class RenderManager implements DragSourceListener {
 
 		if (!controlDown) {
 			return false;
+		}
+
+		// Record the data for the selected entity before it is dragged
+		if (selectedEntity != null) {
+			dragEntityPosition = selectedEntity.getGlobalPosition();
+			dragEntityPoints = selectedEntity.getPoints();
+			dragEntityOrientation = selectedEntity.getOrientation();
+			dragEntitySize = selectedEntity.getSize();
+			dragEntityTransMat = selectedEntity.getTransMatrix(dragEntitySize);
+			dragEntityInvTransMat = selectedEntity.getInvTransMatrix();
+			if (selectedEntity instanceof OverlayEntity) {
+				dragEntityScreenPosition = ((OverlayEntity) selectedEntity).getScreenPosition();
+			}
 		}
 
 		Ray pickRay = getRayForMouse(windowID, x, y);
@@ -1346,6 +1689,7 @@ public class RenderManager implements DragSourceListener {
 				entityDist = pd.dist;
 			}
 		}
+
 		// The following logical condition effectively checks if we hit the entity first, and did not select
 		// any mouse handle other than the move handle
 		if (entityDist != Double.POSITIVE_INFINITY &&
@@ -1353,16 +1697,12 @@ public class RenderManager implements DragSourceListener {
 		    (dragHandleID == 0 || dragHandleID == MOVE_PICK_ID)) {
 
 			// Use the entity collision point for dragging instead of the handle collision point
-			dragEntityPosition = selectedEntity.getGlobalPosition();
-			dragEntityPoints = selectedEntity.getPoints();
 			dragCollisionPoint = pickRay.getPointAtDist(entityDist);
 			dragHandleID = MOVE_PICK_ID;
 			return true;
 		}
 		if (mouseHandleDist != Double.POSITIVE_INFINITY) {
 			// We hit a mouse handle
-			dragEntityPosition = selectedEntity.getGlobalPosition();
-			dragEntityPoints = selectedEntity.getPoints();
 			dragCollisionPoint = pickRay.getPointAtDist(mouseHandleDist);
 			return true;
 		}
@@ -1371,7 +1711,7 @@ public class RenderManager implements DragSourceListener {
 	}
 
 	public void clearSelection() {
-		selectedEntity = null;
+		selectedEntityList.clear();
 	}
 
 	public void hideExistingPopups() {
@@ -1385,69 +1725,140 @@ public class RenderManager implements DragSourceListener {
 		}
 	}
 
-	public boolean isDragAndDropping() {
-		// This is such a brutal hack to work around newt's lack of drag and drop support
-		// Claim we are still dragging for up to 10ms after the last drop failed...
-		long currTime = System.nanoTime();
-		return dndObjectType != null &&
-		       ((currTime - dndDropTime) < 100000000); // Did the last 'drop' happen less than 100 ms ago?
-	}
-
 	public void startDragAndDrop(ObjectType ot) {
 		dndObjectType = ot;
 	}
 
 	public void mouseMoved(int windowID, int x, int y) {
 		Ray currentRay = getRayForMouse(windowID, x, y);
-		double dist = Plane.XY_PLANE.collisionDist(currentRay);
+		double dist = RenderManager.XY_PLANE.collisionDist(currentRay);
 
 		if (dist == Double.POSITIVE_INFINITY) {
 			// I dunno...
 			return;
 		}
 
-		Vec3d xyPlanePoint = currentRay.getPointAtDist(dist);
-		GUIFrame.instance().showLocatorPosition(xyPlanePoint);
-		queueRedraw();
+		mousePosition = currentRay.getPointAtDist(dist);
+		GUIFrame.showLocatorPosition(mousePosition);
 	}
 
+	public void mouseEntry(int windowID, int x, int y, boolean isInWindow) {
+		mouseWindowID = isInWindow ? windowID : -1;
+	}
+
+	public Region getRegion(int windowID, int x, int y) {
+		Ray currentRay = getRayForMouse(windowID, x, y);
+		int viewID = getActiveView().getID();
+		List<PickData> picks = pickForRay(currentRay, viewID, false);
+		Collections.sort(picks, new SelectionSorter());
+		for (PickData pd : picks) {
+			if (!pd.isEntity)
+				continue;
+			Entity ent = GUIFrame.getJaamSimModel().idToEntity(pd.id);
+			if (ent instanceof Region) {
+				return (Region) ent;
+			}
+		}
+		return null;
+	}
 
 	public void createDNDObject(int windowID, int x, int y) {
+		JaamSimModel simModel = dndObjectType.getJaamSimModel();
 		Ray currentRay = getRayForMouse(windowID, x, y);
-		double dist = Plane.XY_PLANE.collisionDist(currentRay);
+		double dist = RenderManager.XY_PLANE.collisionDist(currentRay);
 
 		if (dist == Double.POSITIVE_INFINITY) {
 			// Unfortunate...
 			return;
 		}
 
-		Vec3d creationPoint = currentRay.getPointAtDist(dist);
+		// Set the sub-model for this location
+		Entity parent = null;
+		Region region = getRegion(windowID, x, y);
+		if (region != null && region.getParent() != simModel.getSimulation()) {
+			parent = region.getParent();
+		}
 
 		// Create a new instance
 		Class<? extends Entity> proto  = dndObjectType.getJavaClass();
 		String name = proto.getSimpleName();
-		Entity ent = InputAgent.defineEntityWithUniqueName(proto, name, "", true);
+		if (parent != null && !(OverlayEntity.class.isAssignableFrom(proto))) {
+			name = parent.getName() + "." + name;
+		}
+		name = InputAgent.getUniqueName(simModel, name, "");
+		InputAgent.storeAndExecute(new DefineCommand(simModel, proto, name));
+		Entity ent = simModel.getNamedEntity(name);
 
 		// Set input values for a dragged and dropped entity
 		ent.setInputsForDragAndDrop();
 
+		// Set the link from the selected entity
+		if (createLinks.get() && isSingleEntitySelected() && ent instanceof DisplayEntity)
+			getSelectedEntity().linkTo((DisplayEntity) ent, linkDirection.get());
+
 		// We are no longer drag-and-dropping
 		dndObjectType = null;
-		FrameBox.setSelectedEntity(ent);
+		FrameBox.setSelectedEntity(ent, false);
 
+		// Set the position for the entity
 		if (ent instanceof DisplayEntity) {
+			DisplayEntity dispEnt = (DisplayEntity) ent;
+
+			// Set the region
+			if (region != null && !(ent instanceof OverlayEntity))
+				InputAgent.applyArgs(ent, "Region", region.getName());
+
+			// Set the location
+			Vec3d creationPoint = currentRay.getPointAtDist(dist);
+			creationPoint = dispEnt.getLocalPosition(creationPoint);
+			Simulation simulation = simModel.getSimulation();
+			if (simulation.isSnapToGrid()) {
+				creationPoint = simulation.getSnapGridPosition(creationPoint);
+			}
+
 			try {
-				((DisplayEntity)ent).dragged(creationPoint);
+				dispEnt.dragged(x, y, creationPoint);
 			}
 			catch (InputErrorException e) {}
-			this.focusWindow(windowID);
+
+			// Add the label
+			if (simulation.isShowLabels() && EntityLabel.canLabel(dispEnt))
+				EntityLabel.showTemporaryLabel(dispEnt, true);
+
+			// Set the focus on the window that received the entity
+			Frame awtRef = renderer.getAWTFrame(windowID);
+			if (awtRef != null)
+				awtRef.requestFocus();
 		}
 	}
 
 	@Override
-	public void dragDropEnd(DragSourceDropEvent arg0) {
-		// Clear the dragging flag
-		dndDropTime = System.nanoTime();
+	public void dragDropEnd(DragSourceDropEvent evt) {
+
+		// Find the view windows that contain this screen point
+		ArrayList<Integer> list = new ArrayList<>();
+		for (int id : windowToViewMap.keySet()) {
+			if (renderer.getAWTFrame(id).getBounds().contains(evt.getX(), evt.getY())) {
+				list.add(id);
+			}
+		}
+		if (list.isEmpty())
+			return;
+
+		// If multiple windows are found, try to select the one on top
+		int windowID = list.get(0);
+		if (list.contains(activeWindowID)) {
+			windowID = activeWindowID;
+		}
+
+		// Convert the global screen points to ones for the window
+		Renderer.WindowMouseInfo mouseInfo = renderer.getMouseInfo(windowID);
+		if (mouseInfo == null)
+			return;
+		int x = evt.getX() - mouseInfo.viewableX;
+		int y = evt.getY() - mouseInfo.viewableY;
+
+		createDNDObject(windowID, x, y);
 	}
 
 	@Override
@@ -1468,7 +1879,7 @@ public class RenderManager implements DragSourceListener {
 		}
 
 		// The mesh is not loaded and we are non-blocking, so trigger a mesh load and return
-		MeshDataCache.loadMesh(key, new AtomicBoolean());
+		MeshDataCache.loadMesh(key);
 		return null;
 	}
 
@@ -1478,7 +1889,7 @@ public class RenderManager implements DragSourceListener {
 		}
 
 		// The mesh is not loaded and we are non-blocking, so trigger a mesh load and return
-		MeshDataCache.loadMesh(key, new AtomicBoolean());
+		MeshDataCache.loadMesh(key);
 		return null;
 	}
 
@@ -1527,18 +1938,63 @@ public class RenderManager implements DragSourceListener {
 	}
 
 	public void focusWindow(int windowID) {
+		setActiveWindow(windowID);
 		renderer.focusWindow(windowID);
+	}
+
+	private int getWindowID(View view) {
+		for (Map.Entry<Integer, View> entry : windowToViewMap.entrySet()) {
+			if (entry.getValue() == view) {
+				return entry.getKey();
+			}
+		}
+		return -1;
+	}
+
+	public boolean isVisible(View view) {
+		return windowToViewMap.containsValue(view);
 	}
 
 	public static Frame getOpenWindowForView(View view) {
 		if (!isGood()) return null;
 
 		RenderManager rman = RenderManager.inst();
-		for (Map.Entry<Integer, View> entry : rman.windowToViewMap.entrySet()) {
-			if (entry.getValue() == view)
-				return rman.renderer.getAWTFrame(entry.getKey());
-		}
-		return null;
+		int winID = rman.getWindowID(view);
+		return rman.renderer.getAWTFrame(winID);
+	}
+
+	public void setPOI(View view, Vec3d pt) {
+		int winID = getWindowID(view);
+		CameraControl control = windowControls.get(winID);
+		if (control == null)
+			return;
+		control.setPOI(pt);
+	}
+
+	public Vec3d getPOI(View view) {
+		int winID = getWindowID(view);
+		CameraControl control = windowControls.get(winID);
+		if (control == null)
+			return null;
+		return control.getPOI();
+	}
+
+	public Vec3d getPOI() {
+		CameraControl control = windowControls.get(activeWindowID);
+		if (control == null)
+			return null;
+		return control.getPOI();
+	}
+
+	/**
+	 * Can this hardware perform off screen rendering. Note: this method returning true is necessary, but not sufficient to
+	 * support off screen rendering.
+	 */
+	public static boolean canRenderOffscreen() {
+		if (!isGood()) return false;
+
+		RenderManager rman = RenderManager.inst();
+		return rman.renderer.isGL3Supported();
 	}
 
 	/**
@@ -1547,7 +2003,6 @@ public class RenderManager implements DragSourceListener {
 	 * @param camInfo
 	 * @param width
 	 * @param height
-	 * @return
 	 */
 	public Future<BufferedImage> renderOffscreen(ArrayList<RenderProxy> scene, CameraInfo camInfo, int viewID,
 	                                   int width, int height, Runnable runWhenDone) {
@@ -1556,41 +2011,17 @@ public class RenderManager implements DragSourceListener {
 
 	/**
 	 * Return a FutureImage of the equivalent screen renderer from the given position looking at the given center
-	 * @param cameraPos
-	 * @param viewCenter
+	 * @param view
 	 * @param width - width of returned image
 	 * @param height - height of returned image
 	 * @param target - optional target to prevent re-allocating GPU resources
-	 * @return
 	 */
 	public Future<BufferedImage> renderScreenShot(View view, int width, int height, OffscreenTarget target) {
-
 		Vec3d cameraPos = view.getGlobalPosition();
 		Vec3d cameraCenter = view.getGlobalCenter();
+		PolarInfo pi = new PolarInfo(cameraCenter, cameraPos);
 
-		Vec3d viewDiff = new Vec3d();
-		viewDiff.sub3(cameraPos, cameraCenter);
-
-		double rotZ = Math.atan2(viewDiff.x, -viewDiff.y);
-
-		double xyDist = Math.hypot(viewDiff.x, viewDiff.y);
-
-		double rotX = Math.atan2(xyDist, viewDiff.z);
-
-		if (Math.abs(rotX) < 0.005) {
-			rotZ = 0; // Don't rotate if we are looking straight up or down
-		}
-
-		Quaternion rot = new Quaternion();
-		rot.setRotZAxis(rotZ);
-
-		Quaternion tmp = new Quaternion();
-		tmp.setRotXAxis(rotX);
-
-		rot.mult(rot, tmp);
-
-		Transform trans = new Transform(cameraPos, rot, 1);
-
+		Transform trans = new Transform(cameraPos, pi.getRotation(), 1);
 		CameraInfo camInfo = new CameraInfo(Math.PI/3, trans, view.getSkyboxTexture());
 
 		return renderer.renderOffscreen(null, view.getID(), camInfo, width, height, null, target);
@@ -1626,7 +2057,7 @@ public class RenderManager implements DragSourceListener {
 		synchronized (screenshot) {
 			screenshot.set(true);
 			this.recorder = recorder;
-			queueRedraw();
+			GUIFrame.updateUI();
 			while (screenshot.get()) {
 				try {
 					screenshot.wait();
@@ -1642,12 +2073,239 @@ public class RenderManager implements DragSourceListener {
 		}
 	}
 
-	public void handleKeyPressed(int keyCode, char keyChar, boolean shift, boolean control, boolean alt) {
-		selectedEntity.handleKeyPressed(keyCode, keyChar, shift, control, alt);
+	public boolean handleKeyPressed(int keyCode, char keyChar, boolean shift, boolean control, boolean alt) {
+		DisplayEntity selectedEntity = getSelectedEntity();
+
+		// Selected entity in edit mode
+		if (selectedEntity instanceof Editable && ((Editable) selectedEntity).isEditMode()) {
+			if (!isSingleEntitySelected())
+				return false;
+			selectedEntity.handleKeyPressed(keyCode, keyChar, shift, control, alt);
+			return true;
+		}
+
+		// Key combinations for Control panel buttons
+		if (control && keyCode == KeyEvent.VK_Z) {
+			GUIFrame.getInstance().invokeUndo();
+			return true;
+		}
+		if (control && keyCode == KeyEvent.VK_Y) {
+			GUIFrame.getInstance().invokeRedo();
+			return true;
+		}
+		if (control && keyCode == KeyEvent.VK_N) {
+			GUIFrame.getInstance().invokeNew();
+			return true;
+		}
+		if (control && keyCode == KeyEvent.VK_O) {
+			GUIFrame.getInstance().invokeOpen();
+			return true;
+		}
+		if (control && keyCode == KeyEvent.VK_S) {
+			GUIFrame.getInstance().invokeSave();
+			return true;
+		}
+		if (control && alt && keyCode == KeyEvent.VK_S) {
+			GUIFrame.getInstance().invokeSaveAs();
+			return true;
+		}
+		if (alt && keyCode == KeyEvent.VK_F4) {
+			GUIFrame.getInstance().invokeExit();
+			return true;
+		}
+		if (control && keyCode == KeyEvent.VK_F) {
+			GUIFrame.getInstance().invokeFind();
+			return true;
+		}
+		if (keyCode == KeyEvent.VK_F1) {
+			GUIFrame.getInstance().invokeHelp();
+			return true;
+		}
+		if (keyCode == KeyEvent.VK_SPACE) {
+			GUIFrame.getInstance().invokeRunPause();
+			return true;
+		}
+		if (keyCode == KeyEvent.VK_PERIOD) {   // same as the '>' key
+			GUIFrame.getInstance().invokeSimSpeedUp();
+			return true;
+		}
+		if (keyCode == KeyEvent.VK_COMMA) {    // same as the '<' key
+			GUIFrame.getInstance().invokeSimSpeedDown();
+			return true;
+		}
+		if (control && keyCode == KeyEvent.VK_C) {
+			if (selectedEntity != null) {
+				GUIFrame.getInstance().invokeCopy(selectedEntity);
+				return true;
+			}
+		}
+		if (control && keyCode == KeyEvent.VK_V) {
+			GUIFrame.getInstance().invokePaste();
+			return true;
+		}
+
+		// Selected entity not in edit mode
+		if (selectedEntity != null) {
+			boolean bool = false;
+			for (DisplayEntity ent : getSelectedEntityList()) {
+				boolean b = ent.handleKeyPressed(keyCode, keyChar, shift, control, alt);
+				bool = bool || b;
+			}
+			return bool;
+		}
+
+		// Game entities
+		boolean bool = false;
+		if (keyCode != KeyEvent.VK_LEFT && keyCode != KeyEvent.VK_RIGHT
+				&& keyCode != KeyEvent.VK_UP && keyCode != KeyEvent.VK_DOWN) {
+			for (GameEntity gEnt : GUIFrame.getJaamSimModel().getClonesOfIterator(GameEntity.class)) {
+				bool = bool || gEnt.handleKeyPressed(keyCode, keyChar, shift, control, alt);
+			}
+		}
+		return bool;
 	}
 
 	public void handleKeyReleased(int keyCode, char keyChar, boolean shift, boolean control, boolean alt) {
-		selectedEntity.handleKeyReleased(keyCode, keyChar, shift, control, alt);
+		ArrayList<DisplayEntity> list = new ArrayList<>(getSelectedEntityList());
+		for (DisplayEntity ent : list) {
+			ent.handleKeyReleased(keyCode, keyChar, shift, control, alt);
+		}
+	}
+
+	/**
+	 * Returns the global coordinates corresponding to the specified raster position projected
+	 * onto the x-y plane.
+	 */
+	public Vec3d getMousePosition(int windowID, int x, int y) {
+		Ray currentRay = getRayForMouse(windowID, x, y);
+		double dist = RenderManager.XY_PLANE.collisionDist(currentRay);
+		if (dist == Double.POSITIVE_INFINITY)
+			return null;
+		return currentRay.getPointAtDist(dist);
+	}
+
+	/**
+	 * Moves the entity to the last place at which the mouse was clicked.
+	 * @param ent - entity to be positioned
+	 */
+	public void dragEntityToMousePosition(DisplayEntity ent) {
+		CameraControl cam = windowControls.get(activeWindowID);
+		if (cam == null)
+			return;
+		Vec3d pos = cam.getPOI();
+		pos = ent.getLocalPosition(pos);
+		Simulation simulation = ent.getSimulation();
+		if (simulation.isSnapToGrid()) {
+			pos = simulation.getSnapGridPosition(pos);
+		}
+		Renderer.WindowMouseInfo mouseInfo = renderer.getMouseInfo(activeWindowID);
+		try {
+			ent.dragged(mouseInfo.x, mouseInfo.y, pos);
+		}
+		catch (InputErrorException e) {}
+	}
+
+	public void setShowLinks(boolean bShow) {
+		showLinks.set(bShow);
+	}
+	public void setCreateLinks(boolean bCreate) {
+		createLinks.set(bCreate);
+	}
+	public void setLinkDirection(boolean bool) {
+		linkDirection.set(bool);
+	}
+
+	private void addLink(DirectedEntity sourceDE, DirectedEntity destDE, boolean dir, ArrayList<RenderProxy> scene) {
+		Vec3d source = sourceDE.getSourcePoint();
+		Vec3d sink = destDE.getSinkPoint();
+		double sourceRadius = sourceDE.entity.getRadius();
+		double sinkRadius = destDE.entity.getRadius();
+
+		// If the objects are too close, use the minimum radius values
+		Vec3d arrowDir = new Vec3d();
+		arrowDir.sub3(sink, source);
+		double linkSize = arrowDir.mag3();
+		if (linkSize - sourceRadius - sinkRadius < linkArrowSize) {
+			sourceRadius = sourceDE.entity.getMinRadius();
+			sinkRadius = destDE.entity.getMinRadius();
+		}
+
+		addLink(source, sink, sourceRadius, sinkRadius, dir, scene);
+	}
+
+	private void addLink(Vec3d source, Vec3d sink, double sourceRadius, double sinkRadius, boolean dir, ArrayList<RenderProxy> scene) {
+
+		// Calculate the length of the arrow and a unit vector in its direction
+		Vec3d arrowDir = new Vec3d();
+		arrowDir.sub3(sink, source);
+		double linkSize = arrowDir.mag3();
+		arrowDir.normalize3();
+
+		// Reduce the arrow length to allow for the radius values
+		linkSize = linkSize - sourceRadius - sinkRadius;
+		if (linkSize <= 0.0d)
+			return;
+		Vec3d temp = new Vec3d();
+		temp.scale3(sourceRadius, arrowDir);
+		source.add3(temp);
+		temp.scale3(sinkRadius, arrowDir);
+		sink.sub3(temp);
+
+		// Reduce the arrow head size for a short arrow
+		double arrowHeadSize = Math.min(linkSize*0.3, linkArrowSize);
+
+		temp.scale3(arrowHeadSize, arrowDir);
+		Vec3d arrowMidPoint = new Vec3d();
+		arrowMidPoint.sub3(sink, temp);
+		Vec3d arrowHeadDir = new Vec3d();
+		arrowHeadDir.cross3(arrowDir, new Vec3d(0,0,1));
+		if (arrowHeadDir.mag3() == 0.0) {
+			arrowHeadDir.set3(1, 0, 0);
+		} else {
+			arrowHeadDir.normalize3();
+		}
+		arrowHeadDir.scale3(arrowHeadSize*0.5);
+
+		Vec3d arrowPoint0 = new Vec3d();
+		Vec3d arrowPoint1 = new Vec3d();
+		arrowPoint0.sub3(arrowMidPoint, arrowHeadDir);
+		arrowPoint1.add3(arrowMidPoint, arrowHeadDir);
+
+		double delta = GUIFrame.getJaamSimModel().getSimulation().getSnapGridSpacing()/100.0d;
+
+		Vec4d source4 = new Vec4d(source.x, source.y, source.z + delta, 1);
+		Vec4d sink4 = new Vec4d(sink.x, sink.y, sink.z + delta, 1);
+		Vec4d ap0 = new Vec4d(arrowPoint0.x, arrowPoint0.y, arrowPoint0.z + delta, 1);
+		Vec4d ap1 = new Vec4d(arrowPoint1.x, arrowPoint1.y, arrowPoint1.z + delta, 1);
+
+		ArrayList<Vec4d> segments = new ArrayList<>(6);
+		segments.add(source4);
+		segments.add(sink4);
+
+		// Now add the 'head' of the arrow
+		segments.add(sink4);
+		segments.add(ap0);
+
+		segments.add(sink4);
+		segments.add(ap1);
+
+		Color4d linkColour = ColourInput.BLUE;
+		if (!dir)
+			linkColour = ColourInput.RED;
+
+		scene.add(new LineProxy(segments, linkColour, 1, DisplayModel.ALWAYS, 0));
+	}
+
+	private void addLinkDisplays(boolean dir, ArrayList<RenderProxy> scene) {
+		for (DisplayEntity ent : GUIFrame.getJaamSimModel().getClonesOfIterator(DisplayEntity.class)) {
+			DirectedEntity de = new DirectedEntity(ent, dir);
+			for (DirectedEntity dest : ent.getDestinationDirEnts(dir)) {
+				addLink(de, dest, dir, scene);
+			}
+			for (DirectedEntity source : ent.getSourceDirEnts(dir)) {
+				addLink(source, de, dir, scene);
+			}
+		}
 	}
 
 	public static void setDebugInfo(boolean showDebug) {
@@ -1655,7 +2313,7 @@ public class RenderManager implements DragSourceListener {
 			return;
 		}
 		s_instance.renderer.setDebugInfo(showDebug);
-		s_instance.queueRedraw();
+		GUIFrame.updateUI();
 	}
 
 }

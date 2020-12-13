@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2013 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2020 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +17,11 @@
  */
 package com.jaamsim.Samples;
 
+import java.util.ArrayList;
+
+import com.jaamsim.basicsim.JaamSimModel;
+import com.jaamsim.input.Input;
+import com.jaamsim.units.DimensionlessUnit;
 import com.jaamsim.units.Unit;
 
 public class SampleConstant implements SampleProvider {
@@ -28,7 +34,7 @@ public class SampleConstant implements SampleProvider {
 	}
 
 	public SampleConstant(double val) {
-		this.unitType = Unit.class;
+		this.unitType = DimensionlessUnit.class;
 		this.val = val;
 	}
 
@@ -61,10 +67,28 @@ public class SampleConstant implements SampleProvider {
 		return val;
 	}
 
+	public String getValueString(JaamSimModel simModel) {
+		StringBuilder tmp = new StringBuilder();
+		tmp.append(Double.toString(val/simModel.getDisplayedUnitFactor(unitType)));
+		if (unitType != DimensionlessUnit.class)
+			tmp.append(Input.SEPARATOR).append(simModel.getDisplayedUnit(unitType));
+		return tmp.toString();
+	}
+
 	@Override
 	public String toString() {
 		StringBuilder tmp = new StringBuilder();
-		tmp.append(val/Unit.getDisplayedUnitFactor(unitType));
+		tmp.append(Double.toString(val));
+		if (unitType != DimensionlessUnit.class)
+			tmp.append(Input.SEPARATOR).append(Unit.getSIUnit(unitType));
 		return tmp.toString();
+	}
+
+	public ArrayList<String> getTokens() {
+		ArrayList<String> list = new ArrayList<>();
+		list.add(Double.toString(val));
+		if (unitType != DimensionlessUnit.class)
+			list.add(Unit.getSIUnit(unitType));
+		return list;
 	}
 }

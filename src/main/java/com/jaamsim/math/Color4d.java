@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2012 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2018-2020 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +17,8 @@
  */
 package com.jaamsim.math;
 
+import com.jaamsim.input.ColourInput;
+
 /**
  * A data structure to hold RGBA color information.
  */
@@ -27,11 +30,11 @@ public double b;
 public double a;
 
 public Color4d() {
-	r = 0.0d; g = 0.0d; b = 0.0d; a = 1.0d;
+	this(0.0d, 0.0d, 0.0d, 1.0d);
 }
 
 public Color4d(double r, double g, double b) {
-	this.r = r; this.g = g; this.b = b; this.a = 1.0d;
+	this(r, g, b, 1.0d);
 }
 
 public Color4d(double r, double g, double b, double a) {
@@ -39,7 +42,15 @@ public Color4d(double r, double g, double b, double a) {
 }
 
 public Color4d(Color4d col) {
-	this.r = col.r; this.g = col.g; this.b = col.b; this.a = col.a;
+	this(col.r, col.g, col.b, col.a);
+}
+
+public Color4d(int r, int g, int b) {
+	this(r, g, b, 255);
+}
+
+public Color4d(int r, int g, int b, int a) {
+	this(r/255.0d, g/255.0d, b/255.0d, a/255.0d);
 }
 
 public float[] toFloats() {
@@ -62,8 +73,7 @@ public boolean equals4(Color4d c) {
 
 /**
  * Checks if all vector components are within EPSILON of each other
- * @param other - the other vector
- * @return
+ * @param o - the other vector
  */
 @Override
 public boolean equals(Object o)
@@ -82,6 +92,11 @@ public int hashCode() {
 	       Double.valueOf(g).hashCode() * 7 +
 	       Double.valueOf(b).hashCode() * 79 +
 	       Double.valueOf(a).hashCode() * 1239;
+}
+
+@Override
+public String toString() {
+	return ColourInput.toString(this);
 }
 
 }

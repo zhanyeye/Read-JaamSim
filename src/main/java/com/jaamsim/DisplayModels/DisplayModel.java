@@ -16,6 +16,7 @@
  */
 package com.jaamsim.DisplayModels;
 
+import com.jaamsim.Graphics.View;
 import com.jaamsim.basicsim.Entity;
 import com.jaamsim.datatypes.DoubleVector;
 import com.jaamsim.input.EntityListInput;
@@ -26,7 +27,6 @@ import com.jaamsim.input.Vec3dInput;
 import com.jaamsim.math.Vec3d;
 import com.jaamsim.render.DisplayModelBinding;
 import com.jaamsim.render.VisibilityInfo;
-import com.jaamsim.ui.View;
 import com.jaamsim.units.DistanceUnit;
 
 public abstract class DisplayModel extends Entity {
@@ -35,17 +35,19 @@ public abstract class DisplayModel extends Entity {
 
 	private VisibilityInfo visInfo = ALWAYS;
 
-	@Keyword(description = "The view objects this model will be visible on. If this is empty the entity is visible on all views.",
-	         example = "ShipModel VisibleViews { TitleView DefaultView }")
+	@Keyword(description = "The view windows on which this model will be visible. "
+	                     + "If this is empty the entity is visible on all views.",
+	         exampleList = {"TitleView DefaultView"})
 	private final EntityListInput<View> visibleViews;
 
 	@Keyword(description = "The distances from the camera that this display model will be visible",
-	         example = "ShipModel DrawRange { 0 100 m }")
+	         exampleList = {"0 100 m"})
 	private final ValueListInput drawRange;
 
-	@Keyword(description = "ModelScale scales the resulting visualization by this vector. Warning!! Resizing an entity with this set " +
-	         "to a value that is not 1 is very unintuitive.",
-	         example = "ShipModel ModelScale { 5 5 5 }")
+	@Keyword(description = "ModelScale scales the resulting visualization by this vector. "
+	                     + "Warning!! Resizing an entity with this set to a value that is not 1 "
+	                     + "is very unintuitive.",
+	         exampleList = {"5 5 5"})
 	private final Vec3dInput modelScale;
 
 	private static final DoubleVector defRange = new DoubleVector(2);
@@ -56,17 +58,20 @@ public abstract class DisplayModel extends Entity {
 	}
 
 	{
-		visibleViews = new EntityListInput<>(View.class, "VisibleViews", "Graphics", null);
+		attributeDefinitionList.setHidden(true);
+		namedExpressionInput.setHidden(true);
+
+		visibleViews = new EntityListInput<>(View.class, "VisibleViews", GRAPHICS, null);
 		visibleViews.setDefaultText("All Views");
 		this.addInput(visibleViews);
 
-		drawRange = new ValueListInput("DrawRange", "Graphics", defRange);
+		drawRange = new ValueListInput("DrawRange", GRAPHICS, defRange);
 		drawRange.setUnitType(DistanceUnit.class);
 		drawRange.setValidCount(2);
 		drawRange.setValidRange(0, Double.POSITIVE_INFINITY);
 		this.addInput(drawRange);
 
-		modelScale = new Vec3dInput( "ModelScale", "Graphics", new Vec3d(1, 1, 1));
+		modelScale = new Vec3dInput( "ModelScale", GRAPHICS, new Vec3d(1, 1, 1));
 		modelScale.setValidRange( 0.0001, 10000);
 		this.addInput( modelScale);
 

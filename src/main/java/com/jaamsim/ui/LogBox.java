@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2014 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2019-2020 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +23,8 @@ import java.io.StringWriter;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 import javax.swing.SwingUtilities;
+
+import com.jaamsim.basicsim.JaamSimModel;
 
 public class LogBox extends FrameBox {
 
@@ -46,8 +49,7 @@ public class LogBox extends FrameBox {
 
 		getContentPane().add( scrollPane );
 
-		setLocation(GUIFrame.COL3_START, GUIFrame.LOWER_START);
-		setSize(GUIFrame.COL3_WIDTH, GUIFrame.LOWER_HEIGHT);
+		addComponentListener(FrameBox.getSizePosAdapter(this, "LogViewerSize", "LogViewerPos"));
 	}
 
 	/**
@@ -84,8 +86,6 @@ public class LogBox extends FrameBox {
 			logBuilder.append(logLine + "\n");
 		}
 
-		System.out.println(logLine);
-
 		// Append to the existing log area if it exists
 		if (myInstance != null) {
 			SwingUtilities.invokeLater(new Runnable() {
@@ -118,9 +118,17 @@ public class LogBox extends FrameBox {
 
 		String stackTrace = sw.toString();
 		logLine(stackTrace);
+
+		System.err.println(stackTrace);
 	}
 
 	public static void renderLogException(Throwable ex) {
+
+		// Suppress renderer error messages when in batch mode
+		JaamSimModel simModel = GUIFrame.getJaamSimModel();
+		if (simModel == null || simModel.isBatchRun())
+			return;
+
 		logException(ex);
 	}
 

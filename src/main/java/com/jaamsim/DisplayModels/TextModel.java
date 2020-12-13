@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2013 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2018-2019 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,25 +23,32 @@ import java.util.ArrayList;
 import java.util.Arrays;
 
 import com.jaamsim.Graphics.BillboardText;
+import com.jaamsim.Graphics.EntityLabel;
 import com.jaamsim.Graphics.OverlayText;
 import com.jaamsim.Graphics.TextBasics;
+import com.jaamsim.Graphics.TextEntity;
 import com.jaamsim.basicsim.Entity;
 import com.jaamsim.controllers.RenderManager;
 import com.jaamsim.datatypes.IntegerVector;
 import com.jaamsim.input.BooleanInput;
 import com.jaamsim.input.ColourInput;
 import com.jaamsim.input.Input;
+import com.jaamsim.input.IntegerInput;
 import com.jaamsim.input.Keyword;
 import com.jaamsim.input.StringChoiceInput;
 import com.jaamsim.input.StringListInput;
+import com.jaamsim.input.ValueInput;
 import com.jaamsim.input.Vec3dInput;
 import com.jaamsim.math.Color4d;
 import com.jaamsim.math.Transform;
+import com.jaamsim.math.Vec2d;
 import com.jaamsim.math.Vec3d;
 import com.jaamsim.math.Vec4d;
 import com.jaamsim.render.BillboardStringProxy;
 import com.jaamsim.render.DisplayModelBinding;
 import com.jaamsim.render.LineProxy;
+import com.jaamsim.render.OverlayLineProxy;
+import com.jaamsim.render.OverlayPolygonProxy;
 import com.jaamsim.render.OverlayStringProxy;
 import com.jaamsim.render.PolygonProxy;
 import com.jaamsim.render.RenderProxy;
@@ -48,39 +56,49 @@ import com.jaamsim.render.RenderUtils;
 import com.jaamsim.render.StringProxy;
 import com.jaamsim.render.TessFontKey;
 import com.jaamsim.render.VisibilityInfo;
+import com.jaamsim.units.DistanceUnit;
 
-public class TextModel extends DisplayModel {
+public class TextModel extends DisplayModel implements TextEntity {
 
-	@Keyword(description = "The name of the font to be used for the label. The " +
-	                "font name must be enclosed in single quotes.",
-	         example = "TitleModel FontName { 'Arial' }")
+	@Keyword(description = "The font to be used for the text.",
+	         exampleList = { "Arial" })
 	private final StringChoiceInput fontName;
 
-	@Keyword(description = "A list of font styles to be applied to the label, e.g. Bold, Italic. ",
-	         example = "TitleModel FontStyle { Bold }  ")
+	@Keyword(description = "The height of the text as displayed in the view window.",
+	         exampleList = {"15 m"})
+	protected final ValueInput textHeight;
+
+	@Keyword(description = "The height of the text in pixels, used by billboard text and "
+	                     + "overlay text.",
+	         exampleList = {"15"})
+	protected final IntegerInput textHeightInPixels;
+
+	@Keyword(description = "The font styles to be applied to the text, e.g. Bold, Italic. ",
+	         exampleList = { "Bold" })
 	private final StringListInput fontStyle;
 
-	@Keyword(description = "The colour of the font, defined using a colour keyword or RGB values.",
-	         example = "TitleModel FontColor { Red }")
+	@Keyword(description = "The colour of the text.",
+	         exampleList = { "red", "skyblue", "135 206 235" })
 	private final ColourInput fontColor;
 
-	@Keyword(description = "A Boolean value.  If TRUE, then a drop shadow appears for the text label.",
-	         example = "TitleModel  DropShadow { TRUE }")
+	@Keyword(description = "If TRUE, then a drop shadow appears for the text.",
+	         exampleList = { "TRUE" })
 	private final BooleanInput dropShadow;
 
-	@Keyword(description = "The colour for the drop shadow, defined using a colour keyword or RGB values.",
-	         example = "TitleModel  DropShadowColour { red }")
+	@Keyword(description = "The colour for the drop shadow",
+	         exampleList = { "red", "skyblue", "135 206 235" })
 	private final ColourInput dropShadowColor;
 
-	@Keyword(description = "A set of { x, y, z } numbers that define the offset in each direction of the drop shadow from the Text.",
-	         example = "TitleModel  DropShadowOffset { 0.1 0.1 0.0 }")
+	@Keyword(description = "The { x, y, z } coordinates of the drop shadow's offset, expressed "
+	                     + "as a decimal fraction of the text height.",
+	         exampleList = { "0.1 -0.1 0.001" })
 	private final Vec3dInput dropShadowOffset;
 
 	private int style; // Font Style
 
 	private static final int defFont;
-	private static final ArrayList<String> validFontNames;
-	private static final ArrayList<String> validStyles;
+	public static final ArrayList<String> validFontNames;
+	public static final ArrayList<String> validStyles;
 
 	static {
 		GraphicsEnvironment ge = GraphicsEnvironment.getLocalGraphicsEnvironment();
@@ -99,47 +117,79 @@ public class TextModel extends DisplayModel {
 	}
 
 	{
-		fontName = new StringChoiceInput("FontName", "Key Inputs", defFont);
+		fontName = new StringChoiceInput("FontName", KEY_INPUTS, defFont);
 		fontName.setChoices(validFontNames);
 		this.addInput(fontName);
 
-		fontColor = new ColourInput("FontColour", "Key Inputs", ColourInput.BLACK);
+		textHeight = new ValueInput("TextHeight", KEY_INPUTS, 0.3d);
+		textHeight.setValidRange(0.0d, Double.POSITIVE_INFINITY);
+		textHeight.setUnitType(DistanceUnit.class);
+		this.addInput(textHeight);
+
+		textHeightInPixels = new IntegerInput("TextHeightInPixels", KEY_INPUTS, 10);
+		textHeightInPixels.setValidRange(0, Integer.MAX_VALUE);
+		this.addInput(textHeightInPixels);
+
+		fontColor = new ColourInput("FontColour", KEY_INPUTS, ColourInput.BLACK);
 		this.addInput(fontColor);
 		this.addSynonym(fontColor, "FontColor");
 
-		fontStyle = new StringListInput("FontStyle", "Key Inputs", new ArrayList<String>(0));
+		fontStyle = new StringListInput("FontStyle", KEY_INPUTS, new ArrayList<String>(0));
 		fontStyle.setValidOptions(validStyles);
 		fontStyle.setCaseSensitive(false);
 		this.addInput(fontStyle);
 
-		dropShadow = new BooleanInput( "DropShadow", "Key Inputs", false );
-		this.addInput( dropShadow );
+		dropShadow = new BooleanInput("DropShadow", KEY_INPUTS, false);
+		this.addInput(dropShadow);
 
-		dropShadowColor = new ColourInput("DropShadowColour", "Key Inputs", ColourInput.BLACK);
+		dropShadowColor = new ColourInput("DropShadowColour", KEY_INPUTS, ColourInput.BLACK);
 		this.addInput(dropShadowColor);
 		this.addSynonym(dropShadowColor, "DropShadowColor");
 
-		dropShadowOffset = new Vec3dInput("DropShadowOffset", "Key Inputs", new Vec3d(-0.1d, -0.1d, -0.001d));
+		dropShadowOffset = new Vec3dInput("DropShadowOffset", KEY_INPUTS, new Vec3d(-0.1d, -0.1d, -0.001d));
 		this.addInput(dropShadowOffset);
 
 		style = Font.PLAIN;
 	}
 
 	@Override
-	public void updateForInput( Input<?> in ) {
-		super.updateForInput( in );
+	public void updateForInput(Input<?> in) {
+		super.updateForInput(in);
 
-		if(in == fontStyle) {
-			style = Font.PLAIN;
-			for(String each: fontStyle.getValue() ) {
-				if(each.equalsIgnoreCase("Bold") ) {
-					style += Font.BOLD;
-				}
-				else if (each.equalsIgnoreCase("Italic")) {
-					style += Font.ITALIC;
+		if (in == fontStyle) {
+			style = getStyle(fontStyle.getValue());
+			return;
+		}
+
+		if (in == textHeight) {
+			for (TextBasics text : getJaamSimModel().getClonesOfIterator(EntityLabel.class)) {
+				if (text.getDisplayModelList().get(0) == this) {
+					text.resizeForText();
 				}
 			}
+			return;
 		}
+	}
+
+	public static int getStyle(ArrayList<String> strArray) {
+		int ret = Font.PLAIN;
+		for(String each: strArray ) {
+			if(each.equalsIgnoreCase("Bold") ) {
+				ret += Font.BOLD;
+			}
+			else if (each.equalsIgnoreCase("Italic")) {
+				ret += Font.ITALIC;
+			}
+		}
+		return ret;
+	}
+
+	public static boolean isBold(int style) {
+		return (style & Font.BOLD) != 0;
+	}
+
+	public static boolean isItalic(int style) {
+		return (style & Font.ITALIC) != 0;
 	}
 
 	@Override
@@ -160,7 +210,80 @@ public class TextModel extends DisplayModel {
 		return (ent instanceof TextBasics) || (ent instanceof OverlayText);
 	}
 
-	private class Binding extends DisplayModelBinding {
+	public TessFontKey getTessFontKey() {
+		return new TessFontKey(fontName.getChoice(), style);
+	}
+
+	public static TessFontKey getDefaultTessFontKey() {
+		return new TessFontKey("Verdana", Font.PLAIN);
+	}
+
+	@Override
+	public Color4d getFontColor() {
+		return fontColor.getValue();
+	}
+
+	@Override
+	public double getTextHeight() {
+		return textHeight.getValue();
+	}
+
+	public int getTextHeightInPixels() {
+		return textHeightInPixels.getValue();
+	}
+
+	@Override
+	public String getTextHeightString() {
+		if (textHeight.isDefault())
+			return textHeight.getDefaultString();
+		return textHeight.getValueString();
+	}
+
+	public String getTextHeightInPixelsString() {
+		if (textHeightInPixels.isDefault())
+			return textHeightInPixels.getDefaultString();
+		return textHeightInPixels.getValueString();
+	}
+
+	@Override
+	public String getFontName() {
+		return fontName.getChoice();
+	}
+
+	@Override
+	public int getStyle() {
+		return getStyle(fontStyle.getValue());
+	}
+
+	@Override
+	public boolean isBold() {
+		return isBold(getStyle());
+	}
+
+	@Override
+	public boolean isItalic() {
+		return isItalic(getStyle());
+	}
+
+	@Override
+	public boolean getDropShadow() {
+		return dropShadow.getValue();
+	}
+
+	@Override
+	public Color4d getDropShadowColor() {
+		return dropShadowColor.getValue();
+	}
+
+	@Override
+	public Vec3d getDropShadowOffset() {
+		return dropShadowOffset.getValue();
+	}
+
+	// ********************************************************************************************
+	// Binding
+	// ********************************************************************************************
+	private static class Binding extends DisplayModelBinding {
 
 		private TextBasics labelObservee;
 
@@ -203,16 +326,13 @@ public class TextModel extends DisplayModel {
 
 			String text = labelObservee.getCachedText();
 			double height = labelObservee.getTextHeight();
-			Color4d color = getFontColorForText(text);
-			TessFontKey fk = new TessFontKey(fontName.getChoice(), style);
-
+			Color4d color = labelObservee.getFontColor();
+			TessFontKey fk = labelObservee.getTessFontKey();
 			Vec3d textSize = RenderManager.inst().getRenderedStringSize(fk, height, text);
 			Transform trans = labelObservee.getGlobalTransForSize(textSize);
-
-			boolean ds = dropShadow.getValue();
-			Color4d dsColor = dropShadowColor.getValue();
-			Vec3d dsOffset = dropShadowOffset.getValue();
-
+			boolean ds = labelObservee.getDropShadow();
+			Color4d dsColor = labelObservee.getDropShadowColor();
+			Vec3d dsOffset = labelObservee.getDropShadowOffset();
 			boolean editMode = labelObservee.isEditMode();
 			int insertPos = labelObservee.getInsertPosition();
 			int numSelected = labelObservee.getNumberSelected();
@@ -314,7 +434,10 @@ public class TextModel extends DisplayModel {
 		}
 	}
 
-	private class OverlayBinding extends DisplayModelBinding {
+	// ********************************************************************************************
+	// OverlayBinding
+	// ********************************************************************************************
+	private static class OverlayBinding extends DisplayModelBinding {
 
 		private OverlayText labelObservee;
 
@@ -332,6 +455,10 @@ public class TextModel extends DisplayModel {
 		private boolean dropShadowCache;
 		private Vec3d dsOffsetCache;
 		private Color4d dsColorCache;
+
+		private boolean editModeCache;
+		private int insertPosCache;
+		private int numSelectedCache;
 
 		private VisibilityInfo viCache;
 
@@ -355,22 +482,18 @@ public class TextModel extends DisplayModel {
 			}
 
 			String text = labelObservee.getCachedText();
-
-			Color4d color = getFontColorForText(text);
 			IntegerVector pos = labelObservee.getScreenPosition();
-			int height = labelObservee.getTextHeight();
-
+			int height = (int) labelObservee.getTextHeight();
 			boolean alignRight = labelObservee.getAlignRight();
 			boolean alignBottom = labelObservee.getAlignBottom();
-
-			TessFontKey fk = new TessFontKey(fontName.getChoice(), style);
-
-			boolean ds = dropShadow.getValue();
-
-			Color4d dsColor = dropShadowColor.getValue();
-
-			Vec3d dsOffset = new Vec3d(dropShadowOffset.getValue());
-			dsOffset.scale3(height);
+			Color4d color = labelObservee.getFontColor();
+			TessFontKey fk = labelObservee.getTessFontKey();
+			boolean ds = labelObservee.getDropShadow();
+			Color4d dsColor = labelObservee.getDropShadowColor();
+			Vec3d dsOffset = labelObservee.getDropShadowOffset();
+			boolean editMode = labelObservee.isEditMode();
+			int insertPos = labelObservee.getInsertPosition();
+			int numSelected = labelObservee.getNumberSelected();
 
 			VisibilityInfo vi = getVisibilityInfo();
 
@@ -386,6 +509,9 @@ public class TextModel extends DisplayModel {
 			dirty = dirty || dropShadowCache != ds;
 			dirty = dirty || dirty_col4d(dsColorCache, dsColor);
 			dirty = dirty || dirty_vec3d(dsOffsetCache, dsOffset);
+			dirty = dirty || editMode != editModeCache;
+			dirty = dirty || insertPos != insertPosCache;
+			dirty = dirty || numSelected != numSelectedCache;
 			dirty = dirty || !compare(viCache, vi);
 
 			textCache = text;
@@ -398,6 +524,9 @@ public class TextModel extends DisplayModel {
 			dropShadowCache = ds;
 			dsColorCache = dsColor;
 			dsOffsetCache = dsOffset;
+			editModeCache = editMode;
+			insertPosCache = insertPos;
+			numSelectedCache = numSelected;
 			viCache = vi;
 
 			if (cachedProxies != null && !dirty) {
@@ -412,27 +541,93 @@ public class TextModel extends DisplayModel {
 
 			cachedProxies = new ArrayList<>();
 
-			if (ds) {
+			// If the text is being edited, show the selection and the text insertion mark
+			if (editMode) {
+				double length = RenderManager.inst().getRenderedStringLength(fk, height, text);
+				double margin = 0.25d*height;
+				double textStart = alignRight ? pos.get(0) + length : pos.get(0);
+				double top = pos.get(1) - margin;
+				double bottom = pos.get(1) + height + margin;
 
+				// Highlight the selected text
+				if (numSelected != 0) {
+					int startPos = Math.min(insertPos, insertPos + numSelected);
+					int endPos = Math.max(insertPos, insertPos + numSelected);
+
+					// Calculate the position of the selected text in pixels relative to the start of the string
+					double startOffset = RenderManager.inst().getOffsetForStringPosition(fk, height, text, startPos);
+					double endOffset = RenderManager.inst().getOffsetForStringPosition(fk, height, text, endPos);
+					double start = textStart + startOffset * (alignRight ? -1.0d : 1.0d);
+					double end = textStart + endOffset * (alignRight ? -1.0d : 1.0d);
+
+					ArrayList<Vec2d> rect = new ArrayList<>(4);
+					rect.add(new Vec2d( start, bottom ));
+					rect.add(new Vec2d( start, top ));
+					rect.add(new Vec2d(   end, top ));
+					rect.add(new Vec2d(   end, bottom ));
+					cachedProxies.add(new OverlayPolygonProxy(rect, ColourInput.LIGHT_GREY,
+							!alignBottom, alignRight, vi, labelObservee.getEntityNumber()));
+				}
+
+				// Show the text insertion mark
+				double insertOffset = RenderManager.inst().getOffsetForStringPosition(fk, height, text, insertPos);
+				double insert = textStart + insertOffset * (alignRight ? -1.0d : 1.0d);
+				ArrayList<Vec2d> points = new ArrayList<>(2);
+				points.add(new Vec2d( insert, top ));
+				points.add(new Vec2d( insert, bottom ));
+				cachedProxies.add(new OverlayLineProxy(points, ColourInput.BLACK,
+						!alignBottom, alignRight, 1, vi, labelObservee.getEntityNumber()));
+			}
+
+			// Show the drop shadow
+			if (ds) {
+				dsOffset = new Vec3d(dsOffset);
+				dsOffset.scale3(height);
 				cachedProxies.add(new OverlayStringProxy(text, fk, dsColor, height,
 				                                      pos.get(0) + (dsOffset.x * (alignRight ? -1 : 1)),
 				                                      pos.get(1) - (dsOffset.y * (alignBottom ? -1 : 1)),
-				                                      alignRight, alignBottom, vi));
+				                                      alignRight, alignBottom, vi, labelObservee.getEntityNumber()));
 			}
 
+			// Show the text
 			cachedProxies.add(new OverlayStringProxy(text, fk, color, height, pos.get(0), pos.get(1),
-			                                     alignRight, alignBottom, vi));
+			                                     alignRight, alignBottom, vi, labelObservee.getEntityNumber()));
 
 			out.addAll(cachedProxies);
 		}
 
 		@Override
 		protected void collectSelectionBox(double simTime, ArrayList<RenderProxy> out) {
-			// No selection widgets for now
+
+			double length = RenderManager.inst().getRenderedStringLength(fkCache, heightCache, textCache);
+			double margin = 0.5d*heightCache;
+			double start = alignRightCache ? posCache.get(0) + length + margin
+					: posCache.get(0) - margin;
+			double end = alignRightCache ? posCache.get(0) - margin
+					: posCache.get(0) + length + margin;
+			double top = posCache.get(1) - margin;
+			double bottom = posCache.get(1) + heightCache + margin;
+
+			ArrayList<Vec2d> rect = new ArrayList<>(8);
+			rect.add(new Vec2d( start, bottom ));
+			rect.add(new Vec2d(   end, bottom ));
+			rect.add(new Vec2d(   end, bottom ));
+			rect.add(new Vec2d(   end, top    ));
+			rect.add(new Vec2d(   end, top    ));
+			rect.add(new Vec2d( start, top    ));
+			rect.add(new Vec2d( start, top    ));
+			rect.add(new Vec2d( start, bottom ));
+
+			OverlayLineProxy outline = new OverlayLineProxy(rect, ColourInput.GREEN,
+					!alignBottomCache, alignRightCache, 1, viCache, labelObservee.getEntityNumber());
+			out.add(outline);
 		}
 	}
 
-	private class BillboardBinding extends DisplayModelBinding {
+	// ********************************************************************************************
+	// BillboardBinding
+	// ********************************************************************************************
+	private static class BillboardBinding extends DisplayModelBinding {
 
 		private BillboardText labelObservee;
 
@@ -470,19 +665,12 @@ public class TextModel extends DisplayModel {
 			}
 
 			String text = labelObservee.getCachedText();
-
-			Color4d color = getFontColorForText(text);
 			int height = (int)labelObservee.getTextHeight();
-
-			TessFontKey fk = new TessFontKey(fontName.getChoice(), style);
-
-			boolean ds = dropShadow.getValue();
-
-			Color4d dsColor = dropShadowColor.getValue();
-
-			Vec3d dsOffset = new Vec3d(dropShadowOffset.getValue());
-			dsOffset.scale3(height);
-
+			Color4d color = labelObservee.getFontColor();
+			TessFontKey fk = labelObservee.getTessFontKey();
+			boolean ds = labelObservee.getDropShadow();
+			Color4d dsColor = labelObservee.getDropShadowColor();
+			Vec3d dsOffset = labelObservee.getDropShadowOffset();
 			Vec3d pos = labelObservee.getGlobalPosition();
 
 			VisibilityInfo vi = getVisibilityInfo();
@@ -522,33 +710,16 @@ public class TextModel extends DisplayModel {
 			cachedProxies = new ArrayList<>();
 
 			if (ds) {
-				cachedProxies.add(new BillboardStringProxy(text, fk, dsColor, height, pos, dsOffset.x, dsOffset.y, vi));
+				dsOffset = new Vec3d(dsOffset);
+				dsOffset.scale3(height);
+				cachedProxies.add(new BillboardStringProxy(text, fk, dsColor, height, pos, dsOffset.x, dsOffset.y,
+				                                           vi, labelObservee.getEntityNumber()));
 			}
 
-			cachedProxies.add(new BillboardStringProxy(text, fk, color, height, pos, 0, 0, vi));
+			cachedProxies.add(new BillboardStringProxy(text, fk, color, height, pos, 0, 0,
+			                                           vi, labelObservee.getEntityNumber()));
 			out.addAll(cachedProxies);
 		}
-
-		@Override
-		protected void collectSelectionBox(double simTime, ArrayList<RenderProxy> out) {
-			// No selection widgets for now
-		}
-	}
-
-	public TessFontKey getTessFontKey() {
-		return new TessFontKey(fontName.getChoice(), style);
-	}
-
-	public static TessFontKey getDefaultTessFontKey() {
-		return new TessFontKey("Verdana", Font.PLAIN);
-	}
-
-	public Color4d getFontColorForText(String text) {
-		return fontColor.getValue();
-	}
-
-	public Color4d getFontColor() {
-		return fontColor.getValue();
 	}
 
 }

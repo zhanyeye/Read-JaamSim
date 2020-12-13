@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2013 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2019-2020 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +20,6 @@ package com.jaamsim.ui;
 import java.awt.Point;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
@@ -27,7 +27,9 @@ import javax.swing.table.AbstractTableModel;
 import javax.swing.table.TableModel;
 
 import com.jaamsim.basicsim.Entity;
-import com.jaamsim.datatypes.DoubleVector;
+import com.jaamsim.basicsim.JaamSimModel;
+import com.jaamsim.input.Input;
+import com.jaamsim.input.InputAgent;
 import com.jaamsim.input.OutputHandle;
 import com.jaamsim.units.DimensionlessUnit;
 import com.jaamsim.units.Unit;
@@ -50,8 +52,7 @@ public class OutputBox extends FrameBox {
 
 		getContentPane().add( scrollPane );
 
-		setLocation(GUIFrame.COL3_START, GUIFrame.LOWER_START);
-		setSize(GUIFrame.COL3_WIDTH, GUIFrame.LOWER_HEIGHT);
+		addComponentListener(FrameBox.getSizePosAdapter(this, "OutputViewerSize", "OutputViewerPos"));
 	}
 
 	/**
@@ -107,167 +108,128 @@ public class OutputBox extends FrameBox {
 		super.dispose();
 	}
 
-private class OutputTable extends JTable {
-	public OutputTable(TableModel model) {
-		super(model);
+	private class OutputTable extends JTable {
+		public OutputTable(TableModel model) {
+			super(model);
 
-		setDefaultRenderer(Object.class, colRenderer);
+			setDefaultRenderer(Object.class, colRenderer);
 
-		getColumnModel().getColumn(0).setWidth(150);
-		getColumnModel().getColumn(1).setWidth(100);
+			getColumnModel().getColumn(0).setWidth(150);
+			getColumnModel().getColumn(1).setWidth(100);
 
-		this.getTableHeader().setFont(FrameBox.boldFont);
-		this.getTableHeader().setReorderingAllowed(false);
-	}
-
-	@Override
-	public String getToolTipText(MouseEvent event) {
-		Point p = event.getPoint();
-		int row = rowAtPoint(p);
-		if (currentEntity == null ||
-		    row >= entries.size() ||
-		    entries.get(row) instanceof Class) {
-			return null;
+			this.getTableHeader().setFont(FrameBox.boldFont);
+			this.getTableHeader().setReorderingAllowed(false);
 		}
 
-		OutputHandle output = (OutputHandle)entries.get(row);
-		return GUIFrame.formatOutputToolTip(output.getName(), output.getDescription());
-	}
+		@Override
+		public String getToolTipText(MouseEvent event) {
+			Point p = event.getPoint();
+			int row = rowAtPoint(p);
+			int col = columnAtPoint(p);
 
-	@Override
-	public void doLayout() {
-		FrameBox.fitTableToLastColumn(this);
-	}
-}
+			// Only the first column has tooltip
+			if (col != 0)
+				return null;
 
-private class OutputTableModel extends AbstractTableModel {
-	double simTime = 0.0d;
-	@Override
-	public int getColumnCount() {
-		return 2;
-	}
+			if (currentEntity == null ||
+			    row >= entries.size() ||
+			    entries.get(row) instanceof Class) {
+				return null;
+			}
 
-	@Override
-	public String getColumnName(int column) {
-		switch (column) {
-		case 0: return "Output";
-		case 1: return "Value";
+			OutputHandle output = (OutputHandle)entries.get(row);
+			return GUIFrame.formatOutputToolTip(output.getName(), output.getDescription());
 		}
 
-		return "Unknown";
+		@Override
+		public Point getToolTipLocation(MouseEvent e) {
+			int row = rowAtPoint(e.getPoint());
+			int y = getCellRect(row, 0, true).getLocation().y;
+			return new Point(getColumnModel().getColumn(0).getWidth(), y);
+		}
+
+		@Override
+		public void doLayout() {
+			FrameBox.fitTableToLastColumn(this);
+		}
 	}
 
-	@Override
-	public int getRowCount() {
-		return entries.size();
-	}
+	private class OutputTableModel extends AbstractTableModel {
+		double simTime = 0.0d;
+		@Override
+		public int getColumnCount() {
+			return 2;
+		}
 
-	@Override
-	public Object getValueAt(int row, int col) {
-		Object entry = entries.get(row);
-		switch (col) {
-		case 0:
-			if (entry instanceof Class)
-				return String.format("<HTML><B>%s</B></HTML>", ((Class<?>)entry).getSimpleName());
-			return String.format("    %s", ((OutputHandle)entry).getName());
-		case 1:
-			if (entry instanceof Class)
-				return "";
-			try {
-				StringBuilder sb = new StringBuilder();
-				String str;
+		@Override
+		public String getColumnName(int column) {
+			switch (column) {
+			case 0: return "Output";
+			case 1: return "Value";
+			}
 
-				// Determine the preferred unit
-				OutputHandle out = (OutputHandle)entry;
-				Class<? extends Unit> ut = out.getUnitType();
-				double factor = Unit.getDisplayedUnitFactor(ut);
-				String unitString = Unit.getDisplayedUnit(ut);
+			return "Unknown";
+		}
 
-				// Numeric outputs
-				if (out.isNumericValue()) {
-					double val = out.getValueAsDouble(simTime, Double.NaN);
-					if (out.getReturnType() == int.class || out.getReturnType() == long.class || out.getReturnType() == Integer.class) {
-						str = String.format("%.0f", val/factor);
-					}
-					else {
-						str = String.format("%g", val/factor);
-					}
-					sb.append(str);
-				}
+		@Override
+		public int getRowCount() {
+			return entries.size();
+		}
 
-				// DoubleVector output
-				else if (out.getReturnType() == DoubleVector.class) {
-					sb.append("{");
-					DoubleVector vec = out.getValue(simTime, DoubleVector.class);
-					for (int i=0; i<vec.size(); i++) {
-						str = String.format("%g, ", vec.get(i)/factor);
-						sb.append(str);
-					}
-					sb.replace(sb.length()-2, sb.length()-1, "}");
-				}
+		@Override
+		public Object getValueAt(int row, int col) {
+			Object entry = entries.get(row);
+			switch (col) {
+			case 0:
+				if (entry instanceof Class)
+					return String.format("<HTML><B>%s</B></HTML>", ((Class<?>)entry).getSimpleName());
+				return String.format("    %s", ((OutputHandle)entry).getName());
+			case 1:
+				if (entry instanceof Class)
+					return "";
+				try {
+					// Determine the preferred unit
+					JaamSimModel simModel = GUIFrame.getJaamSimModel();
+					OutputHandle out = (OutputHandle)entry;
+					Class<? extends Unit> ut = out.getUnitType();
+					double factor = simModel.getDisplayedUnitFactor(ut);
 
-				// ArrayList output
-				else if (out.getReturnType() == ArrayList.class) {
-					sb.append("{");
-					ArrayList<?> array = out.getValue(simTime, ArrayList.class);
-					for (int i=0; i<array.size(); i++) {
-						Object obj = array.get(i);
-						if (obj instanceof Double) {
-							double val = (Double)obj;
-							str = String.format("%g, ", val/factor);
+					// Select the appropriate format
+					String fmt = "%s";
+					if (out.isNumericValue()) {
+						if (out.isIntegerValue() && out.getUnitType() == DimensionlessUnit.class) {
+							fmt = "%.0f";
 						}
 						else {
-							str = String.format("%s, ", obj);
+							fmt = "%g";
 						}
-						sb.append(str);
 					}
-					sb.replace(sb.length()-2, sb.length()-1, "}");
-				}
 
-				// Keyed outputs
-				else if (out.getReturnType() == LinkedHashMap.class) {
-					sb.append("{");
-					LinkedHashMap<?, ?> map = out.getValue(simTime, LinkedHashMap.class);
-					for (Object key : map.keySet()) {
-						Object obj = map.get(key);
-						if (obj instanceof Double) {
-							double val = (Double)obj;
-							str = String.format("%s=%g, ", key, val/factor);
-						}
-						else {
-							str = String.format("%s=%s, ", key, obj);
-						}
-						sb.append(str);
+					// Evaluate the output
+					StringBuilder sb = new StringBuilder();
+					sb.append(InputAgent.getValueAsString(simModel, out, simTime, fmt, factor));
+
+					// Append the appropriate unit
+					if (ut != Unit.class && ut != DimensionlessUnit.class) {
+						String unitString = simModel.getDisplayedUnit(ut);
+						sb.append(Input.SEPARATOR).append(unitString);
 					}
-					sb.replace(sb.length()-2, sb.length()-1, "}");
+
+					return sb.toString();
 				}
-
-				// All other outputs
-				else {
-					str = out.getValue(simTime, out.getReturnType()).toString();
-					sb.append(str);
-					unitString = Unit.getSIUnit(ut);  // other outputs are not converted to preferred units
+				catch (Throwable e) {
+					return "Cannot evaluate";
 				}
-
-				// Append the appropriate unit
-				if (ut != Unit.class && ut != DimensionlessUnit.class)
-					sb.append("  ").append(unitString);
-
-				return sb.toString();
+			default:
+				assert false;
+				return null;
 			}
-			catch (Throwable e) {
-				return "";
-			}
-		default:
-			assert false;
-			return null;
+		}
+
+		@Override
+		public boolean isCellEditable(int rowIndex, int columnIndex) {
+			return false;
 		}
 	}
-
-	@Override
-	public boolean isCellEditable(int rowIndex, int columnIndex) {
-		return false;
-	}
-}
 
 }

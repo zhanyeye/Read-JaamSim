@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2002-2011 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2016-2020 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,9 +20,7 @@ package com.jaamsim.basicsim;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
-import java.util.concurrent.atomic.AtomicLong;
 
-import com.jaamsim.datatypes.DoubleVector;
 import com.jaamsim.events.Conditional;
 import com.jaamsim.events.EventHandle;
 import com.jaamsim.events.EventManager;
@@ -29,16 +28,24 @@ import com.jaamsim.events.ProcessTarget;
 import com.jaamsim.input.AttributeDefinitionListInput;
 import com.jaamsim.input.AttributeHandle;
 import com.jaamsim.input.BooleanInput;
+import com.jaamsim.input.ExpError;
+import com.jaamsim.input.ExpParser.Expression;
+import com.jaamsim.input.ExpResType;
+import com.jaamsim.input.ExpResult;
+import com.jaamsim.input.ExpValResult;
+import com.jaamsim.input.ExpressionHandle;
+import com.jaamsim.input.InOutHandle;
 import com.jaamsim.input.Input;
 import com.jaamsim.input.InputAgent;
 import com.jaamsim.input.InputErrorException;
 import com.jaamsim.input.Keyword;
 import com.jaamsim.input.KeywordIndex;
+import com.jaamsim.input.NamedExpression;
+import com.jaamsim.input.NamedExpressionListInput;
 import com.jaamsim.input.Output;
 import com.jaamsim.input.OutputHandle;
 import com.jaamsim.input.StringInput;
 import com.jaamsim.input.SynonymInput;
-import com.jaamsim.ui.FrameBox;
 import com.jaamsim.units.DimensionlessUnit;
 import com.jaamsim.units.TimeUnit;
 import com.jaamsim.units.Unit;
@@ -50,140 +57,126 @@ import com.jaamsim.units.UserSpecifiedUnit;
  * event execution.
  */
 public class Entity {
+	private final JaamSimModel simModel;
 
-	private static AtomicLong entityCount = new AtomicLong(0);
-
-	private static final ArrayList<Entity> allInstances;
-
-	private static final HashMap<String, Entity> namedEntities;
-
-	private String entityName;
-
+	String entityName;
 	private final long entityNumber;
 
-	//public static final int FLAG_TRACE = 0x01; // reserved in case we want to treat tracing like the other flags
+	// Package private so it can be accessed by JaamSimModel and EntityListNode
+	EntityListNode listNode;
+
+	private static final int FLAG_TRACE = 0x01;
 	//public static final int FLAG_TRACEREQUIRED = 0x02;
 	//public static final int FLAG_TRACESTATE = 0x04;
-	public static final int FLAG_LOCKED = 0x08;
+	//public static final int FLAG_LOCKED = 0x08;
 	//public static final int FLAG_TRACKEVENTS = 0x10;
-	public static final int FLAG_ADDED = 0x20;
-	public static final int FLAG_EDITED = 0x40;
-	public static final int FLAG_GENERATED = 0x80;
-	public static final int FLAG_DEAD = 0x0100;
-
+	static final int FLAG_ADDED = 0x20;  // entity was defined after the 'RecordEdits' flag
+	static final int FLAG_EDITED = 0x40;  // one or more inputs were modified after the 'RecordEdits' flag
+	static final int FLAG_GENERATED = 0x80;  // entity was created during the execution of the simulation
+	static final int FLAG_DEAD = 0x0100;  // entity has been deleted
+	static final int FLAG_REGISTERED = 0x0200;  // entity is included in the namedEntities HashMap
+	static final int FLAG_RETAINED = 0x0400;  // entity is retained when the model is reset between runs
 	private int flags;
 
-	protected boolean traceFlag = false;
+	Entity parent;
 
 	private final ArrayList<Input<?>> inpList = new ArrayList<>();
 
-	private final HashMap<String, AttributeHandle> attributeMap = new HashMap<>();
+	private final HashMap<String, AttributeHandle> attributeMap = new LinkedHashMap<>();
+	private final HashMap<String, ExpressionHandle> customOutputMap = new LinkedHashMap<>();
+	private final HashMap<String, InOutHandle> inputOutputMap = new LinkedHashMap<>();
 
-	private final BooleanInput trace;
+	public static final String KEY_INPUTS = "Key Inputs";
+	public static final String OPTIONS = "Options";
+	public static final String GRAPHICS = "Graphics";
+	public static final String THRESHOLDS = "Thresholds";
+	public static final String MAINTENANCE = "Maintenance";
+	public static final String FONT = "Font";
+	public static final String FORMAT = "Format";
+	public static final String GUI = "GUI";
+	public static final String MULTIPLE_RUNS = "Multiple Runs";
 
-	@Keyword(description = "A free form string describing the Entity",
+	@Keyword(description = "A free-form string describing the object.",
 	         exampleList = {"'A very useful entity'"})
 	protected final StringInput desc;
 
-	@Keyword(description = "The list of user defined attributes for this entity.\n" +
-			" The attribute name is followed by its initial value. The unit provided for" +
-			"this value will determine the attribute's unit type.",
-	         exampleList = {"{ A 20.0 s } { alpha 42 }"})
+	@Keyword(description = "Provides the programmer with a detailed trace of the logic executed "
+	                     + "by the entity. Trace information is sent to standard out.",
+	         exampleList = {"TRUE"})
+	protected final BooleanInput trace;
+
+	@Keyword(description = "If TRUE, the object is used in the simulation run.",
+	         exampleList = {"FALSE"})
+	protected final BooleanInput active;
+
+	@Keyword(description = "Defines one or more attributes for this entity. "
+	                     + "An attribute's value can be a number with or without units, "
+	                     + "an entity, a string, an array, a map, or a lambda function. "
+	                     + "The initial value set by the definition can only be changed by an "
+	                     + "Assign object.",
+	         exampleList = {"{ AAA 1 }  { bbb 2[s] }  { c '\"abc\"' }  { d [Queue1] }",
+	                        "{ e '{1,2,3}' }  { f '|x|(2*x)' }"})
 	public final AttributeDefinitionListInput attributeDefinitionList;
 
-	static {
-		allInstances = new ArrayList<>(100);
-		namedEntities = new HashMap<>(100);
-	}
+	@Keyword(description = "Defines one or more custom outputs for this entity. "
+	                     + "A custom output can return a number with or without units, "
+	                     + "an entity, a string, an array, a map, or a lambda function. "
+	                     + "The present value of a custom output is calculated on demand by the "
+	                     + "model.",
+	         exampleList = {"{ TwiceSimTime '2*this.SimTime' TimeUnit }  { SimTimeInDays 'this.SimTime/1[d]' }",
+	                        "{ FirstEnt 'size([Queue1].QueueList)>0 ? [Queue1].QueueList(1) : [SimEntity1]' }"})
+	public final NamedExpressionListInput namedExpressionInput;
 
 	{
-		trace = new BooleanInput("Trace", "Key Inputs", false);
+		desc = new StringInput("Description", KEY_INPUTS, "");
+		this.addInput(desc);
+
+		trace = new BooleanInput("Trace", OPTIONS, false);
 		trace.setHidden(true);
 		this.addInput(trace);
 
-		desc = new StringInput("Description", "Key Inputs", "");
-		desc.setHidden(true);
-		this.addInput(desc);
+		active = new BooleanInput("Active", OPTIONS, true);
+		active.setHidden(true);
+		this.addInput(active);
 
-		attributeDefinitionList = new AttributeDefinitionListInput(this, "AttributeDefinitionList",
-				"Key Inputs", new ArrayList<AttributeHandle>());
+		attributeDefinitionList = new AttributeDefinitionListInput("AttributeDefinitionList",
+				OPTIONS, new ArrayList<AttributeHandle>());
 		attributeDefinitionList.setHidden(false);
 		this.addInput(attributeDefinitionList);
+
+		namedExpressionInput = new NamedExpressionListInput("CustomOutputList",
+				OPTIONS, new ArrayList<NamedExpression>());
+		namedExpressionInput.setHidden(false);
+		this.addInput(namedExpressionInput);
 	}
 
 	/**
 	 * Constructor for entity initializing members.
 	 */
 	public Entity() {
-		entityNumber = getNextID();
-		synchronized(allInstances) {
-			allInstances.add(this);
-		}
-
+		simModel = JaamSimModel.getCreateModel();
+		entityNumber = simModel.getNextEntityID();
 		flags = 0;
 	}
 
-	private static long getNextID() {
-		return entityCount.incrementAndGet();
+	/**
+	 * Performs any initialization that must occur after the constructor has finished.
+	 */
+	public void postDefine() {}
+
+	public JaamSimModel getJaamSimModel() {
+		return simModel;
 	}
 
-	public static ArrayList<? extends Entity> getAll() {
-		synchronized(allInstances) {
-			return allInstances;
-		}
-	}
-
-	public static <T extends Entity> ArrayList<T> getInstancesOf(Class<T> proto) {
-		ArrayList<T> instanceList = new ArrayList<>();
-
-		for (Entity each : allInstances) {
-			if (proto == each.getClass()) {
-				instanceList.add(proto.cast(each));
-			}
-		}
-
-		return instanceList;
-	}
-
-	public static <T extends Entity> InstanceIterable<T> getInstanceIterator(Class<T> proto){
-		return new InstanceIterable<>(proto);
-	}
-
-	public static <T extends Entity> ClonesOfIterable<T> getClonesOfIterator(Class<T> proto){
-		return new ClonesOfIterable<>(proto);
+	public Simulation getSimulation() {
+		return simModel.getSimulation();
 	}
 
 	/**
-	 * Returns an iterator over the given proto class, but also filters only those
-	 * objects that implement the given interface class.
-	 * @return
+	 * Performs any additional actions that are required after a new configuration file has been
+	 * loaded. Performed prior to validation.
 	 */
-	public static <T extends Entity> ClonesOfIterableInterface<T> getClonesOfIterator(Class<T> proto, Class<?> iface){
-		return new ClonesOfIterableInterface<>(proto, iface);
-	}
-
-	public static <T extends Entity> ArrayList<T> getClonesOf(Class<T> proto) {
-		ArrayList<T> cloneList = new ArrayList<>();
-
-		for (Entity each : allInstances) {
-			if (proto.isAssignableFrom(each.getClass())) {
-				cloneList.add(proto.cast(each));
-			}
-		}
-
-		return cloneList;
-	}
-
-	public static Entity idToEntity(long id) {
-		synchronized (allInstances) {
-			for (Entity e : allInstances) {
-				if (e.getEntityNumber() == id) {
-					return e;
-				}
-			}
-			return null;
-		}
-	}
+	public void postLoad() {}
 
 	public void validate() throws InputErrorException {
 		for (Input<?> in : inpList) {
@@ -232,36 +225,61 @@ public class Entity {
 	public void setInputsForDragAndDrop() {}
 
 	public void kill() {
-		synchronized (allInstances) {
-			for (int i = 0; i < allInstances.size(); i++) {
-				if (allInstances.get(i) == this) {
-					allInstances.remove(i);
-					break;
-				}
-			}
+		for (Entity ent : getChildren()) {
+			ent.kill();
 		}
-		if (!testFlag(FLAG_GENERATED)) {
-			synchronized (namedEntities) {
-				if (namedEntities.get(entityName) == this)
-					namedEntities.remove(entityName);
+		if (this.isDead())
+			return;
+		simModel.removeInstance(this);
+	}
 
-				entityName = null;
-			}
-		}
+	/**
+	 * Reverses the actions taken by the kill method.
+	 * @param name - entity's absolute name before it was deleted
+	 */
+	public void restore(String name) {
+		simModel.restoreInstance(this);
+		this.setName(name);
+		this.clearFlag(Entity.FLAG_DEAD);
+		postDefine();
+	}
 
-		setFlag(FLAG_DEAD);
+	public final boolean isAdded() {
+		return this.testFlag(Entity.FLAG_ADDED);
+	}
+
+	public final boolean isGenerated() {
+		return this.testFlag(Entity.FLAG_GENERATED);
+	}
+
+	public final boolean isRegistered() {
+		return this.testFlag(Entity.FLAG_REGISTERED);
+	}
+
+	public final boolean isDead() {
+		return this.testFlag(Entity.FLAG_DEAD);
+	}
+
+	public final boolean isEdited() {
+		return this.testFlag(Entity.FLAG_EDITED);
+	}
+
+	public final void setEdited() {
+		this.setFlag(Entity.FLAG_EDITED);
+	}
+
+	/**
+	 * Returns whether the entity can participate in the simulation.
+	 * @return true if the entity can be used
+	 */
+	public boolean isActive() {
+		return active.getValue();
 	}
 
 	/**
 	 * Performs any actions that are required at the end of the simulation run, e.g. to create an output report.
 	 */
 	public void doEnd() {}
-
-	public static long getEntitySequence() {
-		long seq = (long)allInstances.size() << 32;
-		seq += entityCount.get();
-		return seq;
-	}
 
 	/**
 	 * Get the current Simulation ticks value.
@@ -283,6 +301,21 @@ public class Entity {
 		inpList.add(in);
 	}
 
+	protected void addInputAsOutput(Input<?> input) {
+		addInputAsOutput(input, input.getKeyword(), Integer.MAX_VALUE-1, DimensionlessUnit.class);
+	}
+
+	protected void addInputAsOutput(Input<?> input, String alias, int sequence, Class<? extends Unit> unitType) {
+
+		InOutHandle handle = new InOutHandle(this, input, alias, sequence, unitType);
+		inputOutputMap.put(alias, handle);
+
+	}
+
+	protected void removeInput(Input<?> in) {
+		inpList.remove(in);
+	}
+
 	protected void addSynonym(Input<?> in, String synonym) {
 		inpList.add(new SynonymInput(synonym, in));
 	}
@@ -302,36 +335,88 @@ public class Entity {
 	}
 
 	/**
-	 * Copy the inputs for each keyword to the caller.  Any inputs that have already
-	 * been set for the caller are overwritten by those for the entity being copied.
+	 * Copy the inputs for each keyword to the caller.
 	 * @param ent = entity whose inputs are to be copied
 	 */
 	public void copyInputs(Entity ent) {
-		ArrayList<String> tmp = new ArrayList<>();
-		for (Input<?> sourceInput : ent.inpList) {
-			if (sourceInput.isDefault() || sourceInput.isSynonym()) {
-				continue;
-			}
-			tmp.clear();
-			sourceInput.getValueTokens(tmp);
-			KeywordIndex kw = new KeywordIndex(sourceInput.getKeyword(), tmp, null);
-			InputAgent.apply(this, kw);
+		for (int seq = 0; seq < 2; seq++) {
+			copyInputs(ent, seq, false);
 		}
 	}
 
 	/**
-	 * Creates an exact copy of the specified entity.
-	 * <p>
-	 * All the entity's inputs are copied to the new entity, but its internal
-	 * properties are left uninitialised.
-	 * @param ent - entity to be copied.
-	 * @param name - name of the copied entity.
-	 * @return - copied entity.
+	 * Copy the inputs for the keywords with the specified sequence number to the caller.
+	 * @param ent = entity whose inputs are to be copied
+	 * @param seq = sequence number for the keyword (0 = early keyword, 1 = normal keyword)
+	 * @param bool = true if each copied input is locked after its value is set
 	 */
-	public static <T extends Entity> T fastCopy(T ent, String name) {
-		// Create the new entity
-		@SuppressWarnings("unchecked")
-		T ret = (T)InputAgent.generateEntityWithName(ent.getClass(), name);
+	public void copyInputs(Entity ent, int seq, boolean bool) {
+
+		String oldParent = ent.getParent().getName();
+		String oldParent1 = String.format("[%s]", oldParent);
+		String oldParent2 = String.format("%s.", oldParent);
+
+		String newParent = this.getParent().getName();
+		String newParent1 = String.format("[%s]", newParent);
+		String newParent2 = String.format("%s.", newParent);
+
+		// Provide stub definitions for the custom outputs
+		if (seq == 0) {
+			NamedExpressionListInput in = (NamedExpressionListInput) ent.getInput("CustomOutputList");
+			if (in != null && !in.isDefault()) {
+				KeywordIndex kw = InputAgent.formatInput(in.getKeyword(), in.getStubDefinition());
+				InputAgent.apply(this, kw);
+			}
+		}
+
+		// Apply the inputs based on the source entity
+		ArrayList<String> tmp = new ArrayList<>();
+		for (Input<?> sourceInput : ent.getEditableInputs()) {
+			if (sourceInput.isDefault() || sourceInput.isSynonym()
+					|| sourceInput.getSequenceNumber() != seq)
+				continue;
+			String key = sourceInput.getKeyword();
+			Input<?> targetInput = this.getInput(key);
+			if (targetInput == null)
+				continue;
+
+			tmp.clear();
+			sourceInput.getValueTokens(tmp);
+
+			// Replace references to the parent entity
+			if (this.getParent() != ent.getParent()) {
+				for (int i = 0; i < tmp.size(); i++) {
+					String str = tmp.get(i);
+					if (str.equals(oldParent))
+						str = newParent;
+					str = str.replace(oldParent1, newParent1);
+					str = str.replace(oldParent2, newParent2);
+					tmp.set(i, str);
+				}
+			}
+
+			try {
+				KeywordIndex kw = new KeywordIndex(key, tmp, null);
+				InputAgent.apply(this, targetInput, kw);
+				targetInput.setLocked(bool);
+			}
+			catch (Exception e) {
+				GUIListener gui = getJaamSimModel().getGUIListener();
+				if (gui != null) {
+					String msg = String.format("%s, keyword: %s, value: %s%n%s", this, key, tmp, e.getMessage());
+					gui.invokeErrorDialogBox("Runtime Error", msg);
+				}
+			}
+		}
+	}
+
+	/**
+	 * Copies the input values from one entity to another. This method is significantly faster
+	 * than copying and re-parsing the input data.
+	 * @param ent - entity whose inputs are to be copied.
+	 * @param target - entity whose inputs are to be assigned.
+	 */
+	public static void fastCopyInputs(Entity ent, Entity target) {
 		// Loop through the original entity's inputs
 		ArrayList<Input<?>> orig = ent.getEditableInputs();
 		for (int i = 0; i < orig.size(); i++) {
@@ -341,45 +426,90 @@ public class Entity {
 			if (sourceInput.isDefault() || sourceInput.isSynonym())
 				continue;
 
+			// Get the matching input for the new entity
+			Input<?> targetInput = target.getEditableInputs().get(i);
+
 			// Assign the value to the copied entity's input
-			Input<?> targetInput = ret.getEditableInputs().get(i);
-			targetInput.copyFrom(sourceInput);
-			ret.updateForInput(targetInput);
+			targetInput.copyFrom(target, sourceInput);
+
+			// Further processing related to this input
+			target.updateForInput(targetInput);
 		}
-		return ret;
 	}
 
-	public void setFlag(int flag) {
+	final void setFlag(int flag) {
 		flags |= flag;
 	}
 
-	public void clearFlag(int flag) {
+	final void clearFlag(int flag) {
 		flags &= ~flag;
 	}
 
-	public boolean testFlag(int flag) {
+	final boolean testFlag(int flag) {
 		return (flags & flag) != 0;
 	}
 
-	public void setTraceFlag() {
-		traceFlag = true;
+	public final void setTraceFlag() {
+		this.setFlag(FLAG_TRACE);
 	}
 
-	public void clearTraceFlag() {
-		traceFlag = false;
+	public final void clearTraceFlag() {
+		this.clearFlag(FLAG_TRACE);
+	}
+
+	public final boolean isTraceFlag() {
+		return this.testFlag(FLAG_TRACE);
 	}
 
 	/**
 	 * Method to return the name of the entity.
-	 * Note that the name of the entity may not be the unique identifier used in the namedEntityHashMap; see Entity.toString()
+	 * This returns the "absolute" name for entities that are the child of other entities.
+	 * Use getLocalName() for the name relative to this entity's parent
 	 */
 	public final String getName() {
+		if (!this.isRegistered() || parent == null) {
+			return entityName;
+		}
+
+		// Build up the name based on the chain of parents
+		ArrayList<String> revNames = new ArrayList<>();
+		revNames.add(entityName);
+		Entity curEnt = this.getParent();
+		JaamSimModel model = getJaamSimModel();
+		while(curEnt != model.getSimulation()) {
+			revNames.add(curEnt.entityName);
+			curEnt = curEnt.getParent();
+		}
+
+		// Build up the name back to front
+		StringBuilder sb = new StringBuilder();
+		for (int i = revNames.size() - 1; i >= 0; i--) {
+			sb.append(revNames.get(i));
+			if (i > 0) {
+				sb.append('.');
+			}
+		}
+		return sb.toString();
+	}
+
+	public final String getLocalName() {
 		return entityName;
 	}
 
 	/**
+	 * Add a child to this entity, should only be called from JaamSimModel
+	 * @param child
+	 */
+	public void addChild(Entity child) {
+		error("Entity [%s] may not have children", getName());
+	}
+
+	public void removeChild(Entity child) {
+		error("Entity [%s] may not have children", getName());
+	}
+
+	/**
 	 * Get the unique number for this entity
-	 * @return
 	 */
 	public long getEntityNumber() {
 		return entityNumber;
@@ -394,26 +524,62 @@ public class Entity {
 		return getName();
 	}
 
-	public static Entity getNamedEntity(String name) {
-		synchronized (namedEntities) {
-			return namedEntities.get(name);
+	/**
+	 * Sets the absolute name of the entity.
+	 * @param newName - new absolute name
+	 */
+	public void setName(String newName) {
+		String localName = newName;
+		if (newName.contains(".")) {
+			String[] names = newName.split("\\.");
+			localName = names[names.length - 1];
 		}
+		setLocalName(localName);
 	}
 
 	/**
-	 * Method to set the input name of the entity.
+	 * Sets the local name of the entity.
+	 * @param newName - new local name
 	 */
-	public void setName(String newName) {
-		if (testFlag(FLAG_GENERATED)) {
-			entityName = newName;
-			return;
-		}
+	public void setLocalName(String newName) {
+		simModel.renameEntity(this, newName);
+	}
 
-		synchronized (namedEntities) {
-			namedEntities.remove(entityName);
-			entityName = newName;
-			namedEntities.put(entityName, this);
+	/**
+	 * Returns the parent entity for this entity
+	 */
+	public Entity getParent() {
+		if (parent != null)
+			return parent;
+		return simModel.getSimulation();
+	}
+
+	/**
+	 * Gets a named child from this entity.
+	 * Default behaviour always returns null, only specific entities may have children
+	 * @param name - the local name of the child, implementers must split the name on '.' characters and recursively call getChild()
+	 * @return the descendant named or null if no such entity exists
+	 */
+	public Entity getChild(String name) {
+		return null;
+	}
+
+	/**
+	 * Returns the named child entities for this entity.
+	 * @return array of child entities
+	 */
+	public ArrayList<Entity> getChildren() {
+		return new ArrayList<>();
+	}
+
+	public int getSubModelLevel() {
+		int ret = 0;
+		Entity ent = parent;
+		while (ent != null) {
+			ret++;
+			ent = ent.parent;
 		}
+		return ret;
 	}
 
 	/**
@@ -435,16 +601,20 @@ public class Entity {
 			for (AttributeHandle h : attributeDefinitionList.getValue()) {
 				this.addAttribute(h.getName(), h);
 			}
-
-			// Update the OutputBox
-			FrameBox.reSelectEntity();
 			return;
 		}
+		if (in == namedExpressionInput) {
+			customOutputMap.clear();
+			for (NamedExpression ne : namedExpressionInput.getValue()) {
+				addCustomOutput(ne.getName(), ne.getExpression(), ne.getUnitType());
+			}
+			return;
+		}
+
 	}
 
 	public final void startProcess(String methodName, Object... args) {
-		ProcessTarget t = new ReflectionTarget(this, methodName, args);
-		startProcess(t);
+		EventManager.startProcess(new ReflectionTarget(this, methodName, args));
 	}
 
 	public final void startProcess(ProcessTarget t) {
@@ -453,6 +623,10 @@ public class Entity {
 
 	public final void scheduleProcess(double secs, int priority, ProcessTarget t) {
 		EventManager.scheduleSeconds(secs, priority, false, t, null);
+	}
+
+	public final void scheduleProcess(double secs, int priority, String methodName, Object... args) {
+		EventManager.scheduleSeconds(secs, priority, false, new ReflectionTarget(this, methodName, args), null);
 	}
 
 	public final void scheduleProcess(double secs, int priority, ProcessTarget t, EventHandle handle) {
@@ -469,6 +643,10 @@ public class Entity {
 
 	public final void scheduleProcessTicks(long ticks, int priority, ProcessTarget t) {
 		EventManager.scheduleTicks(ticks, priority, false, t, null);
+	}
+
+	public final void scheduleProcessTicks(long ticks, int priority, String methodName, Object... args) {
+		EventManager.scheduleTicks(ticks, priority, false, new ReflectionTarget(this, methodName, args), null);
 	}
 
 	public final void waitUntil(Conditional cond, EventHandle handle) {
@@ -506,7 +684,7 @@ public class Entity {
 
 	/**
 	 * Wait a number of discrete simulation ticks and a given priority.
-	 * @param secs
+	 * @param ticks
 	 * @param priority
 	 */
 	public final void simWaitTicks(long ticks, int priority) {
@@ -515,7 +693,7 @@ public class Entity {
 
 	/**
 	 * Wait a number of discrete simulation ticks and a given priority.
-	 * @param secs
+	 * @param ticks
 	 * @param priority
 	 * @param fifo
 	 * @param handle
@@ -539,80 +717,44 @@ public class Entity {
 	// ******************************************************************************************************
 
 	/**
-	 * Track the given subroutine.
+	 * Prints a trace statement for the given subroutine.
+	 * The entity name is included in the output.
+	 * @param indent - number of tabs with which to indent the text
+	 * @param fmt - format string for the trace data (include the method name)
+	 * @param args - trace data
 	 */
-	public void trace(String meth) {
-		if (traceFlag) InputAgent.trace(0, this, meth);
+	public void trace(int indent, String fmt, Object... args) {
+		simModel.trace(indent, this, fmt, args);
 	}
 
 	/**
-	 * Track the given subroutine.
+	 * Prints an additional line of trace info.
+	 * The entity name is NOT included in the output
+	 * @param indent - number of tabs with which to indent the text
+	 * @param fmt - format string for the trace data
+	 * @param args - trace data
 	 */
-	public void trace(int level, String meth) {
-		if (traceFlag) InputAgent.trace(level, this, meth);
+	public void traceLine(int indent, String fmt, Object... args) {
+		simModel.trace(indent, null, fmt, args);
 	}
 
 	/**
-	 * Track the given subroutine (one line of text).
+	 * Throws an ErrorException for this entity with the specified message.
+	 * @param fmt - format string for the error message
+	 * @param args - objects used by the format string
+	 * @throws ErrorException
 	 */
-	public void trace(String meth, String text1) {
-		if (traceFlag) InputAgent.trace(0, this, meth, text1);
-	}
-
-	/**
-	 * Track the given subroutine (two lines of text).
-	 */
-	public void trace(String meth, String text1, String text2) {
-		if (traceFlag) InputAgent.trace(0, this, meth, text1, text2);
-	}
-
-	/**
-	 * Print an addition line of tracing.
-	 */
-	public void traceLine(String text) {
-		this.trace( 1, text );
-	}
-
 	public void error(String fmt, Object... args)
 	throws ErrorException {
-		final StringBuilder sb = new StringBuilder(this.getName());
-		sb.append(": ");
-		sb.append(String.format(fmt, args));
-		throw new ErrorException(sb.toString());
-	}
+		if (fmt == null)
+			throw new ErrorException(this, "null");
 
-	/**
-	 * Print an error message.
-	 */
-	public void error( String meth, String text1, String text2 ) {
-		double time = 0.0d;
-		if (EventManager.hasCurrent())
-			time = EventManager.simSeconds();
-		InputAgent.logError("Time:%.5f Entity:%s%n%s%n%s%n%s%n",
-		                    time, getName(),
-							meth, text1, text2);
-
-		// We don't want the model to keep executing, throw an exception and let
-		// the higher layers figure out if we should terminate the run or not.
-		throw new ErrorException("ERROR: %s", getName());
-	}
-
-	/**
-	 * Print a warning message.
-	 */
-	public void warning( String meth, String text1, String text2 ) {
-		double time = 0.0d;
-		if (EventManager.hasCurrent())
-			time = EventManager.simSeconds();
-		InputAgent.logWarning("Time:%.5f Entity:%s%n%s%n%s%n%s%n",
-				time, getName(),
-				meth, text1, text2);
+		throw new ErrorException(this, String.format(fmt, args));
 	}
 
 	/**
 	 * Returns a user specific unit type. This is needed for entity types like distributions that may change the unit type
 	 * that is returned at runtime.
-	 * @return
 	 */
 	public Class<? extends Unit> getUserUnitType() {
 		return DimensionlessUnit.class;
@@ -620,11 +762,21 @@ public class Entity {
 
 
 	public final OutputHandle getOutputHandle(String outputName) {
-		if (hasAttribute(outputName))
-			return attributeMap.get(outputName);
+		OutputHandle ret;
+		ret = attributeMap.get(outputName);
+		if (ret != null)
+			return ret;
+
+		ret = customOutputMap.get(outputName);
+		if (ret != null)
+			return ret;
+
+		ret = inputOutputMap.get(outputName);
+		if (ret != null)
+			return ret;
 
 		if (hasOutput(outputName)) {
-			OutputHandle ret = new OutputHandle(this, outputName);
+			ret = new OutputHandle(this, outputName);
 			if (ret.getUnitType() == UserSpecifiedUnit.class)
 				ret.setUnitType(getUserUnitType());
 
@@ -634,120 +786,27 @@ public class Entity {
 		return null;
 	}
 
-	/**
-	 * Optimized version of getOutputHandle() for output names that are known to be interned
-	 * @param outputName
-	 * @return
-	 */
-	public final OutputHandle getOutputHandleInterned(String outputName) {
-		if (hasAttribute(outputName))
-			return attributeMap.get(outputName);
-
-		if (OutputHandle.hasOutputInterned(this.getClass(), outputName)) {
-			OutputHandle ret = new OutputHandle(this, outputName);
-			if (ret.getUnitType() == UserSpecifiedUnit.class)
-				ret.setUnitType(getUserUnitType());
-
-			return ret;
-		}
-
-		return null;
+	public boolean hasOutput(String name) {
+		return (OutputHandle.hasOutput(this.getClass(), name))
+				|| hasAttribute(name) || hasCustomOutput(name) || hasInputOutput(name);
 	}
 
-	public boolean hasOutput(String outputName) {
-		if (OutputHandle.hasOutput(this.getClass(), outputName))
-			return true;
-		if (attributeMap.containsKey(outputName))
-			return true;
-
-		return false;
+	public void addCustomOutput(String name, Expression exp, Class<? extends Unit> unitType) {
+		ExpressionHandle eh = new ExpressionHandle(this, exp, name);
+		eh.setUnitType(unitType);
+		customOutputMap.put(name, eh);
 	}
 
-	private static final String OUTPUT_FORMAT = "%s\t%s\t%s\t%s%n";
-	private static final String LIST_OUTPUT_FORMAT = "%s\t%s[%s]\t%s\t%s%n";
+	public void removeCustomOutput(String name) {
+		customOutputMap.remove(name);
+	}
 
-	/**
-	 * Writes the entry in the output report for this entity.
-	 * @param file - the file in which the outputs are written
-	 * @param simTime - simulation time at which the outputs are evaluated
-	 */
-	public void printReport(FileEntity file, double simTime) {
+	public boolean hasCustomOutput(String name) {
+		return customOutputMap.containsKey(name);
+	}
 
-		// Loop through the outputs
-		ArrayList<OutputHandle> handles = OutputHandle.getOutputHandleList(this);
-		for (OutputHandle out : handles) {
-
-			// Should this output appear in the report?
-			if (!out.isReportable())
-				continue;
-
-			// Determine the preferred unit for this output
-			Class<? extends Unit> ut = out.getUnitType();
-			double factor = Unit.getDisplayedUnitFactor(ut);
-			String unitString = Unit.getDisplayedUnit(ut);
-			if (ut == Unit.class || ut == DimensionlessUnit.class)
-				unitString = "-";
-
-			// Numerical output
-			if (out.isNumericValue()) {
-				double val = out.getValueAsDouble(simTime, Double.NaN)/factor;
-				file.format(OUTPUT_FORMAT,
-						this.getName(), out.getName(), val, unitString);
-			}
-
-			// DoubleVector output
-			else if (out.getReturnType() == DoubleVector.class) {
-				DoubleVector vec = out.getValue(simTime, DoubleVector.class);
-				for (int i=0; i<vec.size(); i++) {
-					double val = vec.get(i);
-					file.format(LIST_OUTPUT_FORMAT,
-							this.getName(), out.getName(), i, val/factor, unitString);
-				}
-			}
-
-			// ArrayList output
-			else if (out.getReturnType() == ArrayList.class) {
-				ArrayList<?> array = out.getValue(simTime, ArrayList.class);
-				for (int i=0; i<array.size(); i++) {
-					Object obj = array.get(i);
-					if (obj instanceof Double) {
-						double val = (Double)obj;
-						file.format(LIST_OUTPUT_FORMAT,
-								this.getName(), out.getName(), i, val/factor, unitString);
-					}
-					else {
-						file.format(LIST_OUTPUT_FORMAT,
-							this.getName(), out.getName(), i, obj, unitString);
-					}
-				}
-			}
-
-			// Keyed output
-			else if (out.getReturnType() == LinkedHashMap.class) {
-				LinkedHashMap<?, ?> map = out.getValue(simTime, LinkedHashMap.class);
-				for (Object key : map.keySet()) {
-					Object obj = map.get(key);
-					if (obj instanceof Double) {
-						double val = (Double)obj;
-						file.format(LIST_OUTPUT_FORMAT,
-								this.getName(), out.getName(), key, val/factor, unitString);
-					}
-					else {
-						file.format(LIST_OUTPUT_FORMAT,
-								this.getName(), out.getName(), key, obj, unitString);
-					}
-				}
-			}
-
-			// All other outputs
-			else {
-				if (ut != Unit.class && ut != DimensionlessUnit.class)
-					unitString = Unit.getSIUnit(ut);  // other outputs are not converted to preferred units
-				String str = out.getValue(simTime, out.getReturnType()).toString();
-				file.format(OUTPUT_FORMAT,
-						this.getName(), out.getName(), str, unitString);
-			}
-		}
+	public boolean hasInputOutput(String name) {
+		return inputOutputMap.containsKey(name);
 	}
 
 	/**
@@ -776,16 +835,65 @@ public class Entity {
 		return h.getUnitType();
 	}
 
-	public void setAttribute(String name, double value, Class<? extends Unit> ut) {
+	// Utility function to help set attribute values for nested indices
+	private ExpResult setAttribIndices(ExpResult.Collection coll, ExpResult[] indices, int indNum, ExpResult value) throws ExpError {
+		assert(indNum < indices.length);
+		ExpResType indType = indices[indNum].type;
+		if (indType != ExpResType.NUMBER && indType != ExpResType.STRING) {
+			this.error("Assigning to attributes must have numeric or string indices. Index #%d is %s",
+			           indNum, ExpValResult.typeString(indices[indNum].type));
+		}
+		if (indNum == indices.length-1) {
+			// Last index, assign the value
+			ExpResult.Collection newCol = coll.assign(indices[indNum], value.getCopy());
+			return ExpResult.makeCollectionResult(newCol);
+		}
+		// Otherwise, recurse one level deeper
+		ExpResult nestedColl = coll.index(indices[indNum]);
+		if (nestedColl.type != ExpResType.COLLECTION)
+		{
+			this.error("Assigning to value that is not a collection. Value is a %s", ExpValResult.typeString(nestedColl.type));
+		}
+		ExpResult recurseRes = setAttribIndices(nestedColl.colVal, indices, indNum+1, value);
+		ExpResult.Collection newCol = coll.assign(indices[indNum], recurseRes);
+		return ExpResult.makeCollectionResult(newCol);
+	}
+
+	public void setAttribute(String name, ExpResult[] indices, ExpResult value) throws ExpError {
 		AttributeHandle h = attributeMap.get(name);
 		if (h == null)
-			this.error("Invalid attribute name: %s", name);
+			throw new ExpError(null, -1, "Invalid attribute name for %s: %s", this, name);
 
-		if (h.getUnitType() != ut)
-			this.error("Invalid unit returned by an expression. Received: %s, expected: %s",
-					ut.getSimpleName(), h.getUnitType().getSimpleName(), "");
+		ExpResult assignValue = null;
 
-		h.setValue(value);
+		// Collection Attribute
+		if (indices != null) {
+			ExpResult attribValue = h.getValue(getSimTime(), ExpResult.class);
+			if (attribValue.type != ExpResType.COLLECTION) {
+				throw new ExpError(null, -1, "Trying to set %s attribute: %s with an index, "
+						+ "but it is not a collection", this, name);
+			}
+
+			try {
+				assignValue = setAttribIndices(attribValue.colVal, indices, 0, value);
+
+			} catch (ExpError err) {
+				throw new ExpError(err.source, err.pos, "Error during assignment to %s: %s",
+						this, err.getMessage());
+			}
+		}
+
+		// Single-Valued Attribute
+		else {
+			if (value.type == ExpResType.NUMBER && h.getUnitType() != value.unitType) {
+				throw new ExpError(null, -1, "Unit returned by the expression does not match the "
+						+ "attribute. Received: %s, expected: %s",
+						value.unitType.getSimpleName(), h.getUnitType().getSimpleName());
+			}
+			assignValue = value.getCopy();
+		}
+
+		h.setValue(assignValue);
 	}
 
 	public ArrayList<String> getAttributeNames(){
@@ -796,22 +904,41 @@ public class Entity {
 		return ret;
 	}
 
+	public ArrayList<String> getCustomOutputNames(){
+		ArrayList<String> ret = new ArrayList<>();
+		for (String name : customOutputMap.keySet()) {
+			ret.add(name);
+		}
+		return ret;
+	}
+	public ArrayList<String> getInputOutputNames(){
+		ArrayList<String> ret = new ArrayList<>();
+		for (String name : inputOutputMap.keySet()) {
+			ret.add(name);
+		}
+		return ret;
+	}
+
+
 	public ObjectType getObjectType() {
-		return ObjectType.getObjectTypeForClass(this.getClass());
+		return simModel.getObjectTypeForClass(this.getClass());
 	}
 
 	@Output(name = "Name",
 	 description = "The unique input name for this entity.",
 	    sequence = 0)
-	public String getNameOutput(double simTime) {
-		return entityName;
+	public final String getNameOutput(double simTime) {
+		return getName();
 	}
 
 	@Output(name = "ObjectType",
 	 description = "The class of objects that this entity belongs to.",
 	    sequence = 1)
 	public String getObjectTypeName(double simTime) {
-		return this.getObjectType().getName();
+		ObjectType ot = this.getObjectType();
+		if (ot == null)
+			return null;
+		return ot.getName();
 	}
 
 	@Output(name = "SimTime",
@@ -820,6 +947,13 @@ public class Entity {
 	    sequence = 2)
 	public double getSimTime(double simTime) {
 		return simTime;
+	}
+
+	@Output(name = "Parent",
+	 description = "The parent entity for this entity.",
+	    sequence = 3)
+	public Entity getParentOutput(double simTime) {
+		return getParent();
 	}
 
 }

@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2014 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2016 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,34 +21,14 @@ public class ExpError extends Exception {
 	public final String source;
 	public final int pos;
 
-	ExpError(String source, int pos, String msg) {
+	public ExpError(String source, int pos, String msg) {
 		super(msg);
 		this.source = source;
 		this.pos = pos;
 	}
 
-	ExpError(String source, int pos, String fmt, Object... args) {
+	public ExpError(String source, int pos, String fmt, Object... args) {
 		this(source, pos, String.format(fmt, args));
 	}
 
-	@Override
-	public String toString() {
-		StringBuilder sb = new StringBuilder();
-		sb.append(super.getMessage()).append("\n");
-
-		if (source == null)
-			return sb.toString();
-
-		// Otherwise, append the source expression and an 'arrow' pointing at the error
-		String src = source.replaceAll("%", "%%");
-		sb.append(src).append("\n");
-
-		for (int i = 0; i < pos; ++i) {
-			sb.append(" ");
-		}
-
-		sb.append("^\n");
-
-		return sb.toString();
-	}
 }

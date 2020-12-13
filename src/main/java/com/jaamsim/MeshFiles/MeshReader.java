@@ -1,7 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2013 Ausenco Engineering Canada Inc.
- * Copyright (C) 2015 KMA Technologies
+ * Copyright (C) 2015 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -463,15 +463,12 @@ public class MeshReader {
 		parseAssert((armIndex==-1) == (boneNames==null));
 
 		XmlNode actionsNode = instNode.findChildTag("Actions", false);
-		ArrayList<Action> actions = null;
 		if (actionsNode != null) {
-			actions = new ArrayList<>();
 			for (XmlNode child : actionsNode.children()) {
 				if (!child.getTag().equals("Action")) {
 					continue;
 				}
 				Action act = parseInstAction(child);
-				actions.add(act);
 				parseAssert(act.channels.size() == 1); // Sub instance key frames can only have one channel
 			}
 		}

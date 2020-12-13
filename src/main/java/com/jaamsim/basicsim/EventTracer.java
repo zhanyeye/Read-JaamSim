@@ -26,7 +26,7 @@ import java.util.ArrayList;
 import com.jaamsim.events.EventManager;
 import com.jaamsim.events.EventTraceListener;
 import com.jaamsim.events.ProcessTarget;
-import com.jaamsim.ui.LogBox;
+import com.jaamsim.input.InputAgent;
 
 class EventTracer implements EventTraceListener {
 	private BufferedReader eventVerifyReader;
@@ -43,7 +43,7 @@ class EventTracer implements EventTraceListener {
 		}
 		catch (FileNotFoundException e) {}
 		if (eventVerifyReader == null)
-			LogBox.logLine("Unable to open an event verification file.");
+			InputAgent.logMessage("Unable to open an event verification file.");
 
 		reader = new EventTraceRecord();
 	}
@@ -73,14 +73,14 @@ class EventTracer implements EventTraceListener {
 
 			// Parse the key information from the record
 			temp.parse();
-			if (temp.isDefaultEventManager() && temp.getInternalTime() > bufferTime) {
+			if (temp.getInternalTime() > bufferTime) {
 				bufferTime = temp.getInternalTime();
 			}
 			eventBuffer.add(temp);
 		}
 	}
 
-	private void findEventInBuffer(EventManager e, EventTraceRecord record) {
+	private void findEventInBuffer(EventTraceRecord record) {
 		// Ensure we have read enough from the log to find this record
 		this.fillBufferUntil(record.getInternalTime());
 
@@ -90,7 +90,7 @@ class EventTracer implements EventTraceListener {
 				continue;
 			}
 
-			for (int i = 1; i < record.size(); i++) {
+			for (int i = 0; i < record.size(); i++) {
 				if (!record.get(i).equals(each.get(i))) {
 					System.out.println("Difference in event stream detected");
 					System.out.println("Received:");
@@ -107,7 +107,7 @@ class EventTracer implements EventTraceListener {
 					System.out.println("R:" + record.get(i));
 					System.out.println("E:" + each.get(i));
 
-					e.pause();
+					EventManager.current().pause();
 					new Throwable().printStackTrace();
 					break;
 				}
@@ -130,71 +130,77 @@ class EventTracer implements EventTraceListener {
 			}
 			System.out.println();
 		}
-		e.pause();
+		EventManager.current().pause();
 	}
 
-	private void finish(EventManager e) {
-		if (reader.traceLevel != 1)
+	private void finish() {
+		if (reader.traceLevel != 0)
 			return;
 
 		reader.add("");
 		reader.parse();
-		findEventInBuffer(e, reader);
+		findEventInBuffer(reader);
 		reader.clear();
-		reader.traceLevel--;
 	}
 
 	@Override
-	public void traceWait(EventManager e, long curTick, long tick, int priority, ProcessTarget t) {
-		reader.traceWait(e, curTick, tick, priority, t);
-		this.finish(e);
+	public void traceWait(long tick, int priority, ProcessTarget t) {
+		reader.traceWait(tick, priority, t);
+		this.finish();
 	}
 
 	@Override
-	public void traceEvent(EventManager e, long curTick, long tick, int priority, ProcessTarget t) {
-		reader.traceEvent(e, curTick, tick, priority, t);
-		this.finish(e);
+	public void traceEvent(long tick, int priority, ProcessTarget t) {
+		reader.traceEvent(tick, priority, t);
 	}
 
 	@Override
-	public void traceSchedProcess(EventManager e, long curTick, long tick, int priority, ProcessTarget t) {
-		reader.traceSchedProcess(e, curTick, tick, priority, t);
-		this.finish(e);
+	public void traceSchedProcess(long tick, int priority, ProcessTarget t) {
+		reader.traceSchedProcess(tick, priority, t);
 	}
 
 	@Override
-	public void traceProcessStart(EventManager e, ProcessTarget t, long tick) {
-		reader.traceProcessStart(e, t, tick);
-		this.finish(e);
+	public void traceProcessStart(ProcessTarget t) {
+		reader.traceProcessStart(t);
 	}
 
 	@Override
-	public void traceProcessEnd(EventManager e, long tick) {
-		reader.traceProcessEnd(e, tick);
-		this.finish(e);
+	public void traceProcessEnd() {
+		reader.traceProcessEnd();
+		this.finish();
 	}
 
 	@Override
-	public void traceInterrupt(EventManager e, long curTick, long tick, int priority, ProcessTarget t) {
-		reader.traceInterrupt(e, curTick, tick, priority, t);
-		this.finish(e);
+	public void traceInterrupt(long tick, int priority, ProcessTarget t) {
+		reader.traceInterrupt(tick, priority, t);
 	}
 
 	@Override
-	public void traceKill(EventManager e, long curTick, long tick, int priority, ProcessTarget t) {
-		reader.traceKill(e, curTick, tick, priority, t);
-		this.finish(e);
+	public void traceKill(long tick, int priority, ProcessTarget t) {
+		reader.traceKill(tick, priority, t);
 	}
 
 	@Override
-	public void traceWaitUntil(EventManager e, long tick) {
-		reader.traceWaitUntil(e, tick);
-		this.finish(e);
+	public void traceWaitUntil() {
+		reader.traceWaitUntil();
+		this.finish();
 	}
 
 	@Override
-	public void traceWaitUntilEnded(EventManager e, long curTick, ProcessTarget t) {
-		reader.traceWaitUntilEnded(e, curTick, t);
-		this.finish(e);
+	public void traceSchedUntil(ProcessTarget t) {
+		reader.traceSchedUntil(t);
 	}
+
+	@Override
+	public void traceConditionalEval(ProcessTarget t) {}
+
+	@Override
+	public void traceConditionalEvalEnded(boolean wakeup, ProcessTarget t) {
+		//FIXME: disable conditional tracing under the event recorder is also fixed
+		//if (!wakeup)
+		//	return;
+		//reader.traceConditionalEvalEnded(wakeup, t);
+		//this.finish(EventManager.current());
+	}
+
 }

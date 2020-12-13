@@ -33,37 +33,38 @@ import com.jaamsim.units.ViscosityUnit;
 public class Fluid extends DisplayEntity {
 
 	@Keyword(description = "The density of the fluid (default = water).",
-	         example = "Fluid1 Density { 1000 kg/m3 }")
+	         exampleList = {"1000 kg/m3"})
 	private final ValueInput densityInput;
 
 	@Keyword(description = "The dynamic viscosity of the fluid (default = water).",
-	         example = "Fluid1 Viscosity { 0.001002 Pa-s }")
+	         exampleList = {"0.001002 Pa-s"})
 	private final ValueInput viscosityInput;
 
-	@Keyword(description = "The colour of the product, defined using a colour keyword or RGB values.",
-	         example = "Fluid1 Colour { red }")
+	@Keyword(description = "The colour used to represent the fluid.",
+	         exampleList = {"red"})
 	private final ColourInput colourInput;
 
-	@Keyword(description = "The acceleration of gravity.",
-	         example = "Fluid1 Gravity { 9.81 m/s2 }")
+	@Keyword(description = "The acceleration of gravity to be used in the fluid flow "
+	                     + "calculations.",
+	         exampleList = {"9.81 m/s2"})
 	private final ValueInput gravityInput;
 
 	{
-		densityInput = new ValueInput( "Density", "Key Inputs", 1000.0d);
+		densityInput = new ValueInput( "Density", KEY_INPUTS, 1000.0d);
 		densityInput.setValidRange( 0.0, Double.POSITIVE_INFINITY);
 		densityInput.setUnitType( DensityUnit.class );
 		this.addInput( densityInput);
 
-		viscosityInput = new ValueInput( "Viscosity", "Key Inputs", 0.001002d);
+		viscosityInput = new ValueInput( "Viscosity", KEY_INPUTS, 0.001002d);
 		viscosityInput.setValidRange( 0.0, Double.POSITIVE_INFINITY);
 		viscosityInput.setUnitType( ViscosityUnit.class );
 		this.addInput( viscosityInput);
 
-		colourInput = new ColourInput( "Colour", "Key Inputs", ColourInput.RED);
+		colourInput = new ColourInput( "Colour", KEY_INPUTS, ColourInput.RED);
 		this.addInput(colourInput);
 		this.addSynonym(colourInput, "Color");
 
-		gravityInput = new ValueInput( "Gravity", "Key Inputs", 9.81d);
+		gravityInput = new ValueInput( "Gravity", KEY_INPUTS, 9.81d);
 		gravityInput.setValidRange( 0.0, Double.POSITIVE_INFINITY);
 		gravityInput.setUnitType( AccelerationUnit.class );
 		this.addInput( gravityInput);

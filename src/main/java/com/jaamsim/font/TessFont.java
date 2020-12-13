@@ -22,6 +22,7 @@ import java.awt.Font;
 import java.awt.Shape;
 import java.awt.font.FontRenderContext;
 import java.awt.font.GlyphVector;
+import java.awt.font.TextLayout;
 import java.awt.geom.AffineTransform;
 import java.awt.geom.PathIterator;
 import java.awt.geom.Rectangle2D;
@@ -30,15 +31,14 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Vector;
 
-import com.jogamp.opengl.GL2GL3;
-import com.jogamp.opengl.glu.GLU;
-import com.jogamp.opengl.glu.GLUtessellator;
-import com.jogamp.opengl.glu.GLUtessellatorCallbackAdapter;
-
 import com.jaamsim.math.Vec3d;
 import com.jaamsim.render.RenderUtils;
 import com.jaamsim.render.Renderer;
 import com.jaamsim.render.TessFontKey;
+import com.jogamp.opengl.GL2GL3;
+import com.jogamp.opengl.glu.GLU;
+import com.jogamp.opengl.glu.GLUtessellator;
+import com.jogamp.opengl.glu.GLUtessellatorCallbackAdapter;
 
 
 /**
@@ -61,6 +61,8 @@ private final Font _font;
 private final TessFontKey _key;
 private final FontRenderContext _frc;
 private final ArrayList<double[]> _vertices;
+
+private final float _lineAdvance;
 
 private boolean _glBufferDirty = true;
 
@@ -86,6 +88,9 @@ public TessFont(TessFontKey key) {
 		generateChar(initialChars.charAt(i)); // Note, none of these are supplementary, so this is safe
 	}
 
+	TextLayout tl = new TextLayout(initialChars, _font, _frc);
+	_lineAdvance = tl.getAscent() + tl.getDescent() + tl.getLeading();
+
 	_id = Renderer.getAssetID();
 
 	_nominalHeight = _charMap.get((int)'A').getHeight();
@@ -97,8 +102,7 @@ public TessFont(TessFontKey key) {
  * only need to be done once. See preloadCache() to avoid lazy
  * initialization
  *
- * @param c
- * @return
+ * @param cp
  */
 
 public synchronized TessChar getTessChar(int cp) {
@@ -389,6 +393,10 @@ public int getAssetID() {
 	return _id;
 }
 
+public double getLineAdvance() {
+	return _lineAdvance;
+}
+
 public synchronized int getGLBuffer(GL2GL3 gl) {
 
 	// The buffer may not have been initialized yet
@@ -424,7 +432,6 @@ public synchronized int getGLBuffer(GL2GL3 gl) {
  * Get the dimensions of the fully rendered string (useful for app level layout)
  * @param textHeight - the requested text height
  * @param string - the string to render
- * @return
  */
 public Vec3d getStringSize(double textHeight, String string) {
 	return new Vec3d(getStringLength(textHeight, string), textHeight, 0.0d);

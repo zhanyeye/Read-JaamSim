@@ -1,7 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2013 Ausenco Engineering Canada Inc.
- * Copyright (C) 2015 KMA Technologies
+ * Copyright (C) 2015 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -266,7 +266,6 @@ public class DataBlock {
 	/**
 	 * Returns the first child with a matching name. Utility
 	 * @param name
-	 * @return
 	 */
 	public DataBlock findChildByName(String name) {
 		for (DataBlock b : children) {

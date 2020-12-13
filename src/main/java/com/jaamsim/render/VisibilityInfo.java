@@ -19,7 +19,7 @@ package com.jaamsim.render;
 import java.util.ArrayList;
 import java.util.Arrays;
 
-import com.jaamsim.ui.View;
+import com.jaamsim.Graphics.View;
 
 public class VisibilityInfo {
 	private static final int[] ALL_VIEWS = new int[0];
@@ -73,5 +73,12 @@ public class VisibilityInfo {
 
 		VisibilityInfo vi = (VisibilityInfo)o;
 		return Arrays.equals(vi.viewIDs, viewIDs) && vi.minDist == minDist && vi.maxDist == maxDist;
+	}
+
+	public double getMinDist() {
+		return minDist;
+	}
+	public double getMaxDist() {
+		return maxDist;
 	}
 }

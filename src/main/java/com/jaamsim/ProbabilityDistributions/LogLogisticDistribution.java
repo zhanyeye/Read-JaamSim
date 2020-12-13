@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2013 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2016 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,8 +17,9 @@
  */
 package com.jaamsim.ProbabilityDistributions;
 
+import com.jaamsim.Samples.SampleConstant;
+import com.jaamsim.Samples.SampleInput;
 import com.jaamsim.input.Keyword;
-import com.jaamsim.input.ValueInput;
 import com.jaamsim.rng.MRG1999a;
 import com.jaamsim.units.DimensionlessUnit;
 import com.jaamsim.units.Unit;
@@ -30,26 +32,26 @@ import com.jaamsim.units.UserSpecifiedUnit;
 public class LogLogisticDistribution extends Distribution {
 
 	@Keyword(description = "The scale parameter for the Log-Logistic distribution.",
-	         exampleList = {"3.0"})
-	private final ValueInput scaleInput;
+	         exampleList = {"3.0", "InputValue1", "'2 * [InputValue1].Value'"})
+	private final SampleInput scaleInput;
 
 	@Keyword(description = "The shape parameter for the Log-Logistic distribution.  A decimal value > 0.0.",
-	         exampleList = {"1.0"})
-	private final ValueInput shapeInput;
+	         exampleList = {"1.0", "InputValue1", "'2 * [InputValue1].Value'"})
+	private final SampleInput shapeInput;
 
 	private final MRG1999a rng = new MRG1999a();
 
 	{
-		minValueInput.setDefaultValue(0.0);
+		minValueInput.setDefaultValue(new SampleConstant(0.0d));
 
-		scaleInput = new ValueInput("Scale", "Key Inputs", 1.0d);
-		scaleInput.setValidRange( 0.0, Double.POSITIVE_INFINITY);
-		scaleInput.setUnitType( UserSpecifiedUnit.class );
+		scaleInput = new SampleInput("Scale", KEY_INPUTS, new SampleConstant(1.0d));
+		scaleInput.setValidRange(0.0, Double.POSITIVE_INFINITY);
+		scaleInput.setUnitType(UserSpecifiedUnit.class);
 		this.addInput(scaleInput);
 
-		shapeInput = new ValueInput("Shape", "Key Inputs", 1.0d);
-		shapeInput.setValidRange( 2.000001d, Double.POSITIVE_INFINITY);
-		shapeInput.setUnitType( DimensionlessUnit.class );
+		shapeInput = new SampleInput("Shape", KEY_INPUTS, new SampleConstant(1.0d));
+		shapeInput.setValidRange(2.000001d, Double.POSITIVE_INFINITY);
+		shapeInput.setUnitType(DimensionlessUnit.class);
 		this.addInput(shapeInput);
 	}
 
@@ -68,22 +70,28 @@ public class LogLogisticDistribution extends Distribution {
 	}
 
 	@Override
-	protected double getNextSample() {
+	protected double getSample(double simTime) {
 
 		// Inverse transform method
 		double u = rng.nextUniform();
-		return scaleInput.getValue() * Math.pow( u / (1 - u), 1.0 / shapeInput.getValue() );
+		double scale = scaleInput.getValue().getNextSample(simTime);
+		double shape = shapeInput.getValue().getNextSample(simTime);
+		return scale * Math.pow( u / (1 - u), 1.0 / shape );
 	}
 
 	@Override
-	protected double getMeanValue() {
-		double theta = Math.PI / shapeInput.getValue();
-		return scaleInput.getValue() * theta / Math.sin( theta );
+	protected double getMean(double simTime) {
+		double scale = scaleInput.getValue().getNextSample(simTime);
+		double shape = shapeInput.getValue().getNextSample(simTime);
+		double theta = Math.PI / shape;
+		return scale * theta / Math.sin( theta );
 	}
 
 	@Override
-	protected double getStandardDeviation() {
-		double theta = Math.PI / shapeInput.getValue();
-		return scaleInput.getValue() * Math.sqrt( theta * ( 2.0/Math.sin(2.0*theta) - theta/Math.pow( Math.sin(theta), 2.0) ) );
+	protected double getStandardDev(double simTime) {
+		double scale = scaleInput.getValue().getNextSample(simTime);
+		double shape = shapeInput.getValue().getNextSample(simTime);
+		double theta = Math.PI / shape;
+		return scale * Math.sqrt( theta * ( 2.0/Math.sin(2.0*theta) - theta/Math.pow( Math.sin(theta), 2.0) ) );
 	}
 }

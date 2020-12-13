@@ -31,39 +31,39 @@ import com.jaamsim.units.VolumeFlowUnit;
 public class FluidCentrifugalPump extends FluidComponent {
 
 	@Keyword(description = "Maximum volumetric flow rate that the pump can generate.",
-	         example = "Pump1 MaxFlowRate { 1.0 m3/s }")
+	         exampleList = {"1.0 m3/s"})
 	private final ValueInput maxFlowRateInput;
 
 	@Keyword(description = "Maximum static pressure that the pump can generate (at zero flow rate).",
-	         example = "Pump1 MaxPressure { 1.0 Pa }")
+	         exampleList = {"1.0 Pa"})
 	private final ValueInput maxPressureInput;
 
-	@Keyword(description = "Maximum static pressure loss speed for the pump (at maximum flow rate).",
-	         example = "Pump1 MaxPressureLoss { 1.0 Pa }")
+	@Keyword(description = "Maximum static pressure loss for the pump (at maximum flow rate).",
+	         exampleList = {"1.0 Pa"})
 	private final ValueInput maxPressureLossInput;
 
-	@Keyword(description = "The CalculationEntity whose output sets the rotational speed of the pump.  " +
-			"The output value is ratio of present speed to maximum speed (0.0 - 1.0).",
-	         example = "Pump1 SpeedController { Calc1 }")
+	@Keyword(description = "The CalculationEntity whose output sets the rotational speed of the pump. "
+	                     + "The output value is ratio of present speed to maximum speed (0.0 - 1.0).",
+	         exampleList = {"Calc1"})
 	private final EntityInput<DoubleCalculation> speedControllerInput;
 
 	{
-		maxFlowRateInput = new ValueInput( "MaxFlowRate", "Key Inputs", 1.0d);
+		maxFlowRateInput = new ValueInput( "MaxFlowRate", KEY_INPUTS, 1.0d);
 		maxFlowRateInput.setValidRange( 0.0, Double.POSITIVE_INFINITY);
 		maxFlowRateInput.setUnitType( VolumeFlowUnit.class );
 		this.addInput( maxFlowRateInput);
 
-		maxPressureInput = new ValueInput( "MaxPressure", "Key Inputs", 1.0d);
+		maxPressureInput = new ValueInput( "MaxPressure", KEY_INPUTS, 1.0d);
 		maxPressureInput.setValidRange( 0.0, Double.POSITIVE_INFINITY);
 		maxPressureInput.setUnitType( PressureUnit.class );
 		this.addInput( maxPressureInput);
 
-		maxPressureLossInput = new ValueInput( "MaxPressureLoss", "Key Inputs", 1.0d);
+		maxPressureLossInput = new ValueInput( "MaxPressureLoss", KEY_INPUTS, 1.0d);
 		maxPressureLossInput.setValidRange( 0.0, Double.POSITIVE_INFINITY);
 		maxPressureLossInput.setUnitType( PressureUnit.class );
 		this.addInput( maxPressureLossInput);
 
-		speedControllerInput = new EntityInput<>( DoubleCalculation.class, "SpeedController", "Key Inputs", null);
+		speedControllerInput = new EntityInput<>( DoubleCalculation.class, "SpeedController", KEY_INPUTS, null);
 		this.addInput( speedControllerInput);
 		speedControllerInput.setRequired(true);
 	}
@@ -73,7 +73,7 @@ public class FluidCentrifugalPump extends FluidComponent {
 	 */
 	@Override
 	public double calcOutletPressure( double inletPres, double flowAccel ) {
-		double speedFactor = speedControllerInput.getValue().getValue();
+		double speedFactor = speedControllerInput.getValue().getLastValue();
 		speedFactor = Math.max(speedFactor, 0.0);
 		speedFactor = Math.min(speedFactor, 1.0);
 		double flowFactor = this.getFluidFlow().getFlowRate() / maxFlowRateInput.getValue();

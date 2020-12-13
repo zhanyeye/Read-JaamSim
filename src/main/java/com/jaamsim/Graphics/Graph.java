@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2009-2012 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2017 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +20,7 @@ package com.jaamsim.Graphics;
 
 import java.util.ArrayList;
 
-import com.jaamsim.Samples.SampleExpListInput;
+import com.jaamsim.Samples.SampleListInput;
 import com.jaamsim.Samples.SampleProvider;
 import com.jaamsim.datatypes.DoubleVector;
 import com.jaamsim.events.ProcessTarget;
@@ -34,121 +35,115 @@ import com.jaamsim.math.Color4d;
 import com.jaamsim.units.DimensionlessUnit;
 import com.jaamsim.units.TimeUnit;
 import com.jaamsim.units.Unit;
-import com.jaamsim.units.UserSpecifiedUnit;
 
 public class Graph extends GraphBasics  {
 
 	// Key Inputs category
 
-	@Keyword(description = "The number of data points that can be displayed on the graph.\n" +
-			" This parameter determines the resolution of the graph.",
+	@Keyword(description = "The number of data points for each line on the graph.",
 	         exampleList = {"200"})
 	protected final IntegerInput numberOfPoints;
 
-	@Keyword(description = "The unit type for the primary y-axis.",
+	@Keyword(description = "The unit type for the primary y-axis. "
+	                     + "MUST be entered before most other inputs for this axis.",
 	         exampleList = {"DistanceUnit"})
 	private final UnitTypeInput unitType;
 
-	@Keyword(description = "One or more sources of data to be graphed on the primary y-axis.\n" +
-			"Each source is graphed as a separate line and is specified by an Expression. Also" +
-			"acceptable are: a constant value, a Probability Distribution, TimeSeries, or a " +
-			"Calculation Object.",
+	@Keyword(description = "One or more sources of data to be graphed against the primary y-axis. "
+	                     + "Each source is graphed as a separate line. "
+	                     + "BEFORE entering this input, specify the unit type for the primary "
+	                     + "y-axis using the 'UnitType' keyword.",
 	         exampleList = {"{ [Entity1].Output1 } { [Entity2].Output2 }"})
-	protected final SampleExpListInput dataSource;
+	protected final SampleListInput dataSource;
 
-	@Keyword(description = "A list of colors for the line series to be displayed.\n" +
-			"Each color can be specified by either a color keyword or an RGB value.\n" +
-			"For multiple lines, each color must be enclosed in braces.\n" +
-			"If only one color is provided, it is used for all the lines.",
+	@Keyword(description = "A list of colours for the lines graphed against the primary y-axis. "
+	                     + "If only one colour is provided, it is used for all the lines.",
 	         exampleList = {"{ red } { green }"})
 	protected final ColorListInput lineColorsList;
 
-	@Keyword(description = "A list of line widths (in pixels) for the line series to be displayed.\n" +
-			"If only one line width is provided, it is used for all the lines.",
+	@Keyword(description = "A list of line widths (in pixels) for the line series to be displayed. "
+	                     + "If only one line width is provided, it is used for all the lines.",
 	         exampleList = {"2 1"})
 	protected final ValueListInput lineWidths;
 
-	@Keyword(description = "The unit type for the secondary y-axis.",
+	@Keyword(description = "The unit type for the secondary y-axis. "
+	                     + "MUST be entered before most other inputs for this axis.",
 	         exampleList = {"DistanceUnit"})
 	private final UnitTypeInput secondaryUnitType;
 
-	@Keyword(description = "One or more sources of data to be graphed on the secondary y-axis.\n" +
-			"Each source is graphed as a separate line and is specified by an Expression. Also" +
-			"acceptable are: a constant value, a Probability Distribution, TimeSeries, or a " +
-			"Calculation Object.",
+	@Keyword(description = "One or more sources of data to be graphed against the secondary y-axis. "
+	                     + "Each source is graphed as a separate line. "
+	                     + "BEFORE entering this input, specify the unit type for the secondary "
+	                     + "y-axis using the 'SecondaryUnitType' keyword.",
 	         exampleList = {"{ [Entity1].Output1 } { [Entity2].Output2 }"})
-	protected final SampleExpListInput secondaryDataSource;
+	protected final SampleListInput secondaryDataSource;
 
-	@Keyword(description = "A list of colors for the secondary line series to be displayed.\n" +
-			"Each color can be specified by either a color keyword or an RGB value.\n" +
-			"For multiple lines, each color must be enclosed in braces.\n" +
-			"If only one color is provided, it is used for all the lines.",
+	@Keyword(description = "A list of colours for the lines graphed against the secondary y-axis. "
+	                     + "If only one colour is provided, it is used for all the lines.",
 	         exampleList = {"{ red } { green }"})
 	protected final ColorListInput secondaryLineColorsList;
 
-	@Keyword(description = "A list of line widths (in pixels) for the seconardy line series to be displayed.\n" +
-			"If only one line width is provided, it is used for all the lines.",
+	@Keyword(description = "A list of line widths (in pixels) for the seconardy line series to be displayed. "
+	                     + "If only one line width is provided, it is used for all the lines.",
 	         exampleList = {"2 1"})
 	protected final ValueListInput secondaryLineWidths;
 
 	{
 		// Key Inputs category
 
-		numberOfPoints = new IntegerInput("NumberOfPoints", "Key Inputs", 100);
+		numberOfPoints = new IntegerInput("NumberOfPoints", KEY_INPUTS, 100);
 		numberOfPoints.setValidRange(0, Integer.MAX_VALUE);
 		this.addInput(numberOfPoints);
 
-		unitType = new UnitTypeInput("UnitType", "Key Inputs", UserSpecifiedUnit.class);
-		unitType.setRequired(true);
+		unitType = new UnitTypeInput("UnitType", KEY_INPUTS, DimensionlessUnit.class);
 		this.addInput(unitType);
 
-		dataSource = new SampleExpListInput("DataSource", "Key Inputs", null);
-		dataSource.setUnitType(UserSpecifiedUnit.class);
-		dataSource.setEntity(this);
+		dataSource = new SampleListInput("DataSource", KEY_INPUTS, null);
+		dataSource.setUnitType(DimensionlessUnit.class);
 		dataSource.setRequired(true);
 		this.addInput(dataSource);
 
 		ArrayList<Color4d> defLineColor = new ArrayList<>(0);
 		defLineColor.add(ColourInput.getColorWithName("red"));
-		lineColorsList = new ColorListInput("LineColours", "Key Inputs", defLineColor);
+		lineColorsList = new ColorListInput("LineColours", KEY_INPUTS, defLineColor);
 		lineColorsList.setValidCountRange(1, Integer.MAX_VALUE);
 		this.addInput(lineColorsList);
 		this.addSynonym(lineColorsList, "LineColors");
 
 		DoubleVector defLineWidths = new DoubleVector(1);
 		defLineWidths.add(1.0);
-		lineWidths = new ValueListInput("LineWidths", "Key Inputs", defLineWidths);
+		lineWidths = new ValueListInput("LineWidths", KEY_INPUTS, defLineWidths);
 		lineWidths.setUnitType(DimensionlessUnit.class);
 		lineWidths.setValidCountRange(1, Integer.MAX_VALUE);
 		this.addInput(lineWidths);
 
-		secondaryUnitType = new UnitTypeInput("SecondaryUnitType", "Key Inputs", UserSpecifiedUnit.class);
+		secondaryUnitType = new UnitTypeInput("SecondaryUnitType", KEY_INPUTS, DimensionlessUnit.class);
 		this.addInput(secondaryUnitType);
 
-		secondaryDataSource = new SampleExpListInput("SecondaryDataSource", "Key Inputs", null);
-		secondaryDataSource.setUnitType(UserSpecifiedUnit.class);
-		secondaryDataSource.setEntity(this);
+		secondaryDataSource = new SampleListInput("SecondaryDataSource", KEY_INPUTS, null);
+		secondaryDataSource.setUnitType(DimensionlessUnit.class);
 		this.addInput(secondaryDataSource);
 
 		ArrayList<Color4d> defSecondaryLineColor = new ArrayList<>(0);
 		defSecondaryLineColor.add(ColourInput.getColorWithName("black"));
-		secondaryLineColorsList = new ColorListInput("SecondaryLineColours", "Key Inputs", defSecondaryLineColor);
+		secondaryLineColorsList = new ColorListInput("SecondaryLineColours", KEY_INPUTS, defSecondaryLineColor);
 		secondaryLineColorsList.setValidCountRange(1, Integer.MAX_VALUE);
 		this.addInput(secondaryLineColorsList);
 		this.addSynonym(secondaryLineColorsList, "SecondaryLineColors");
 
 		DoubleVector defSecondaryLineWidths = new DoubleVector(1);
 		defSecondaryLineWidths.add(1.0);
-		secondaryLineWidths = new ValueListInput("SecondaryLineWidths", "Key Inputs", defSecondaryLineWidths);
+		secondaryLineWidths = new ValueListInput("SecondaryLineWidths", KEY_INPUTS, defSecondaryLineWidths);
 		secondaryLineWidths.setUnitType(DimensionlessUnit.class);
 		secondaryLineWidths.setValidCountRange(1, Integer.MAX_VALUE);
 		this.addInput(secondaryLineWidths);
 	}
 
 	public Graph() {
-
 		timeTrace = true;
 		this.setXAxisUnit(TimeUnit.class);
+		this.setYAxisUnit(DimensionlessUnit.class);
+		this.setSecondaryYAxisUnit(DimensionlessUnit.class);
 	}
 
 	@Override
@@ -164,35 +159,13 @@ public class Graph extends GraphBasics  {
 
 		if (in == secondaryUnitType) {
 			Class<? extends Unit> ut = secondaryUnitType.getUnitType();
-			showSecondaryYAxis = (ut != UserSpecifiedUnit.class);
 			secondaryDataSource.setUnitType(ut);
 			this.setSecondaryYAxisUnit(ut);
 			return;
 		}
 
-		if (in == dataSource) {
-			// Hack for backwards compatibility
-			// When an entity and output are entered, the unit type will be set automatically
-			// FIXME remove when backwards compatibility is no longer required
-			if (dataSource.getValue() != null && dataSource.getValue().size() > 0) {
-				Class<? extends Unit> ut = dataSource.getValue().get(0).getUnitType();
-				if (ut != null && ut != UserSpecifiedUnit.class)
-					this.setYAxisUnit(ut);
-			}
-			return;
-		}
-
 		if (in == secondaryDataSource) {
-			// Hack for backwards compatibility
-			// When an entity and output are entered, the unit type will be set automatically
-			// FIXME remove when backwards compatibility is no longer required
-			if (secondaryDataSource.getValue() != null && secondaryDataSource.getValue().size() > 0) {
-				Class<? extends Unit> ut = secondaryDataSource.getValue().get(0).getUnitType();
-				if (ut != null && ut != UserSpecifiedUnit.class) {
-					this.setSecondaryYAxisUnit(ut);
-					showSecondaryYAxis = (ut != UserSpecifiedUnit.class);
-				}
-			}
+			showSecondaryYAxis = !secondaryDataSource.isDefault();
 			return;
 		}
 
@@ -241,7 +214,7 @@ public class Graph extends GraphBasics  {
 		populateSeriesInfo(secondarySeries, secondaryDataSource);
 	}
 
-	private void populateSeriesInfo(ArrayList<SeriesInfo> infos, SampleExpListInput data) {
+	private void populateSeriesInfo(ArrayList<SeriesInfo> infos, SampleListInput data) {
 		ArrayList<SampleProvider> sampList = data.getValue();
 		if( sampList == null )
 			return;
@@ -308,6 +281,7 @@ public class Graph extends GraphBasics  {
 	private void setupSeriesData(SeriesInfo info, double xLength, double xInterval) {
 
 		info.numPoints = 0;
+		info.indexOfLastEntry = -1;
 
 		for( int i = 0; i * xInterval < xAxisEnd.getValue(); i++ ) {
 			double t = i * xInterval;
@@ -381,16 +355,17 @@ public class Graph extends GraphBasics  {
 
 		double t = getSimTime() + xAxisEnd.getValue();
 		double presentValue = this.getCurrentValue(t, info);
-		if (info.numPoints < info.yValues.length) {
-			info.xValues[info.numPoints] = t;
-			info.yValues[info.numPoints] = presentValue;
-			info.numPoints++;
+
+		info.indexOfLastEntry++;
+		if (info.indexOfLastEntry == info.yValues.length) {
+			info.indexOfLastEntry = 0;
 		}
-		else {
-			System.arraycopy(info.xValues, 1, info.xValues, 0, info.xValues.length - 1);
-			System.arraycopy(info.yValues, 1, info.yValues, 0, info.yValues.length - 1);
-			info.xValues[info.xValues.length - 1] = t;
-			info.yValues[info.yValues.length - 1] = presentValue;
+
+		info.xValues[info.indexOfLastEntry] = t;
+		info.yValues[info.indexOfLastEntry] = presentValue;
+
+		if (info.numPoints < info.yValues.length) {
+			info.numPoints++;
 		}
 	}
 

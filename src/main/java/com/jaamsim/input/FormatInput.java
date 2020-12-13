@@ -16,6 +16,7 @@
  */
 package com.jaamsim.input;
 
+import com.jaamsim.basicsim.Entity;
 
 public class FormatInput extends StringInput {
 	public FormatInput(String key, String cat, String def) {
@@ -23,7 +24,7 @@ public class FormatInput extends StringInput {
 	}
 
 	@Override
-	public void parse(KeywordIndex kw) throws InputErrorException {
+	public void parse(Entity thisEnt, KeywordIndex kw) throws InputErrorException {
 		Input.assertCount(kw, 1);
 		String temp = kw.getArg(0);
 		try {
@@ -34,5 +35,10 @@ public class FormatInput extends StringInput {
 		}
 
 		value = temp;
+	}
+
+	@Override
+	public String getValidInputDesc() {
+		return Input.VALID_FORMAT;
 	}
 }

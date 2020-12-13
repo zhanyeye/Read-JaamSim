@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2002-2011 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2019-2020 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,23 +17,101 @@
  */
 package com.jaamsim.Graphics;
 
+import com.jaamsim.input.Input;
+import com.jaamsim.input.Keyword;
+import com.jaamsim.input.ValueInput;
 import com.jaamsim.math.Quaternion;
 import com.jaamsim.math.Transform;
+import com.jaamsim.math.Vec3d;
+import com.jaamsim.units.DimensionlessUnit;
 
 public class Region extends DisplayEntity {
+
+	@Keyword(description = "The graphical scale for the Region's local coordinate system relative "
+	                     + "to the coordinate system in which it is embedded. "
+	                     + "For example, an input of 0.5 would make objects appear to be one-half "
+	                     + "smaller and closer together.",
+	         exampleList = {"0.5"})
+	protected final ValueInput scaleInput;
+
+	private double scale = 1.0d;
 
 	{
 		this.addSynonym(positionInput, "Origin");
 
 		desc.setHidden(true);
-		sizeInput.setHidden(true);
-		alignmentInput.setHidden(true);
-		regionInput.setHidden(true);
-		relativeEntity.setHidden(true);
-		displayModelListInput.setHidden(true);
+
+		scaleInput = new ValueInput("Scale", KEY_INPUTS, 1.0d);
+		scaleInput.setUnitType(DimensionlessUnit.class);
+		this.addInput(scaleInput);
 	}
 
 	public Region() {}
+
+	@Override
+	public void setInputsForDragAndDrop() {}
+
+	@Override
+	public void updateForInput( Input<?> in ) {
+		super.updateForInput( in );
+
+		if (in == scaleInput) {
+			this.setScale(scaleInput.getValue());
+			return;
+		}
+	}
+
+	@Override
+	public void resetGraphics() {
+		super.resetGraphics();
+		setScale(scaleInput.getValue());
+	}
+
+	public void setScale(double val) {
+		synchronized (scaleInput) {
+			scale = val;
+		}
+	}
+
+	public double getScale() {
+		synchronized (scaleInput) {
+			return scale;
+		}
+	}
+
+	public double getGlobalScale() {
+		double ret = getScale();
+		if (getCurrentRegion() != null)
+			ret *= getCurrentRegion().getGlobalScale();
+		return ret;
+	}
+
+	public Quaternion getGlobalRotation() {
+		Quaternion ret = new Quaternion();
+		ret.setEuler3(getOrientation());
+		if (getCurrentRegion() == null)
+			return ret;
+		ret.mult(ret, getCurrentRegion().getGlobalRotation());
+		return ret;
+	}
+
+	public Vec3d getInternalSize() {
+		Vec3d ret = getSize();
+		ret.scale3(1.0d/getScale());
+		return ret;
+	}
+
+	/**
+	 * Sets the scale factor and internal dimensions for the region.
+	 * @param scale - ratio between external and internal coordinates
+	 * @param internalSize - size of the region measured in its internal coordinate system
+	 */
+	public void setScaleAndSize(double scale, Vec3d internalSize) {
+		setScale(scale);
+		Vec3d size = new Vec3d(internalSize);
+		size.scale3(scale);
+		setSize(size);
+	}
 
 	/**
 	 * Return the transformation that converts the local coordinates for a
@@ -40,9 +119,7 @@ public class Region extends DisplayEntity {
 	 * @return transformation to global coordinates
 	 */
 	public Transform getRegionTrans() {
-		Quaternion rot = new Quaternion();
-		rot.setEuler3(getOrientation());
-		return new Transform(getPosition(), rot, 1.0d);
+		return new Transform(getGlobalPosition(), getGlobalRotation(), getGlobalScale());
 	}
 
 	/**
@@ -51,9 +128,7 @@ public class Region extends DisplayEntity {
 	 * @return transformation to global coordinates
 	 */
 	public Transform getRegionTransForVectors() {
-		Quaternion rot = new Quaternion();
-		rot.setEuler3(getOrientation());
-		return new Transform(null, rot, 1.0d);
+		return new Transform(null, getGlobalRotation(), getGlobalScale());
 	}
 
 	/**

@@ -18,6 +18,8 @@ package com.jaamsim.input;
 
 import java.util.ArrayList;
 
+import com.jaamsim.basicsim.Entity;
+
 
 public class EnumInput<T extends Enum<T>> extends Input<T> {
 	private final Class<T> type;
@@ -28,14 +30,14 @@ public class EnumInput<T extends Enum<T>> extends Input<T> {
 	}
 
 	@Override
-	public void parse(KeywordIndex kw)
+	public void parse(Entity thisEnt, KeywordIndex kw)
 	throws InputErrorException {
 		Input.assertCount(kw, 1);
 		value = Input.parseEnum(type, kw.getArg(0));
 	}
 
 	@Override
-	public ArrayList<String> getValidOptions() {
+	public ArrayList<String> getValidOptions(Entity ent) {
 		ArrayList<String> tmp = new ArrayList<>();
 		for (T each : type.getEnumConstants())
 			tmp.add(each.name());

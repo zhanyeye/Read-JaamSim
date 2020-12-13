@@ -18,6 +18,8 @@ package com.jaamsim.input;
 
 import java.util.ArrayList;
 
+import com.jaamsim.basicsim.Entity;
+import com.jaamsim.basicsim.JaamSimModel;
 import com.jaamsim.datatypes.DoubleVector;
 import com.jaamsim.math.Vec3d;
 import com.jaamsim.units.DimensionlessUnit;
@@ -37,24 +39,24 @@ public class KeyedVec3dInput extends Input<Vec3d> {
 	}
 
 	@Override
-	public void copyFrom(Input<?> in) {
-		super.copyFrom(in);
+	public void copyFrom(Entity thisEnt, Input<?> in) {
+		super.copyFrom(thisEnt, in);
 		curve = ((KeyedVec3dInput) in).curve;
 	}
 
 	@Override
-	public void parse(KeywordIndex kw) throws InputErrorException {
+	public void parse(Entity thisEnt, KeywordIndex kw) throws InputErrorException {
 		ArrayList<String> strings = new ArrayList<>(kw.numArgs());
 		for (int i = 0; i < kw.numArgs(); i++) {
 			strings.add(kw.getArg(i));
 		}
 		ArrayList<ArrayList<String>> keys = InputAgent.splitForNestedBraces(strings);
 		for( ArrayList<String> key : keys) {
-			parseKey(key);
+			parseKey(thisEnt.getJaamSimModel(), key);
 		}
 	}
 
-	private void parseKey(ArrayList<String> key) throws InputErrorException {
+	private void parseKey(JaamSimModel simModel, ArrayList<String> key) throws InputErrorException {
 		if (key.size() <= 2 || !key.get(0).equals("{") || !key.get(key.size()-1).equals("}")) {
 			throw new InputErrorException("Malformed key entry: %s", key.toString());
 		}
@@ -74,8 +76,12 @@ public class KeyedVec3dInput extends Input<Vec3d> {
 			throw new InputErrorException("Value entry not formated correctly: %s", valInput.toString());
 		}
 
-		DoubleVector time = Input.parseDoubles(timeInput.subList(1, 3), 0.0d, Double.POSITIVE_INFINITY, TimeUnit.class);
-		DoubleVector vals = Input.parseDoubles(valInput.subList(1, 5), Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, unitType);
+		KeywordIndex timeKw = new KeywordIndex("", timeInput, 1, 3, null);
+		DoubleVector time = Input.parseDoubles(simModel, timeKw, 0.0d, Double.POSITIVE_INFINITY, TimeUnit.class);
+
+		KeywordIndex valKw = new KeywordIndex("", valInput, 1, 5, null);
+		DoubleVector vals = Input.parseDoubles(simModel, valKw, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, unitType);
+
 		Vec3d val = new Vec3d(vals.get(0), vals.get(1), vals.get(2));
 		curve.addKey(time.get(0), val);
 	}

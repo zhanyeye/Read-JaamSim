@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2010-2012 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2016-2020 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,32 +20,37 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 import java.util.regex.Pattern;
 
+import com.jaamsim.EntityProviders.EntityProvConstant;
+import com.jaamsim.EntityProviders.EntityProvExpression;
+import com.jaamsim.EntityProviders.EntityProvider;
 import com.jaamsim.Samples.SampleConstant;
 import com.jaamsim.Samples.SampleExpression;
-import com.jaamsim.Samples.SampleOutput;
 import com.jaamsim.Samples.SampleProvider;
 import com.jaamsim.Samples.TimeSeriesConstantDouble;
-import com.jaamsim.StringProviders.StringProvOutput;
+import com.jaamsim.StringProviders.StringProvConstant;
+import com.jaamsim.StringProviders.StringProvExpression;
 import com.jaamsim.StringProviders.StringProvSample;
 import com.jaamsim.StringProviders.StringProvider;
 import com.jaamsim.basicsim.Entity;
 import com.jaamsim.basicsim.Group;
+import com.jaamsim.basicsim.JaamSimModel;
 import com.jaamsim.basicsim.ObjectType;
 import com.jaamsim.datatypes.BooleanVector;
 import com.jaamsim.datatypes.DoubleVector;
 import com.jaamsim.datatypes.IntegerVector;
-import com.jaamsim.input.ExpParser.Expression;
 import com.jaamsim.math.Color4d;
+import com.jaamsim.math.MathUtils;
+import com.jaamsim.ui.NaturalOrderComparator;
 import com.jaamsim.units.DimensionlessUnit;
 import com.jaamsim.units.TimeUnit;
 import com.jaamsim.units.Unit;
 import com.jaamsim.units.UserSpecifiedUnit;
 
 public abstract class Input<T> {
-	// 各种异常提示
 	protected static final String INP_ERR_COUNT = "Expected an input with %s value(s), received: %s";
 	protected static final String INP_ERR_RANGECOUNT = "Expected an input with %d to %d values, received: %s";
 	protected static final String INP_ERR_RANGECOUNTMIN = "Expected an input with at least %d values, received: %s";
@@ -58,6 +64,7 @@ public abstract class Input<T> {
 	protected static final String INP_ERR_TIME = "Expected a time value (hh:mm or hh:mm:ss), received: %s";
 	protected static final String INP_ERR_TIMEVALUE = "Expected a numeric value, 12 numeric values, or a probabilty distribution, received: %s";
 	protected static final String INP_ERR_BADSUM = "List must sum to %f, received:%f";
+	protected static final String INP_ERR_SUMRANGE = "Sum of list must be between %s and %s, sum: %s";
 	protected static final String INP_ERR_MONOTONIC = "List must %s monotonically. Values starting at index %s are %s s, %s s, ...";
 	protected static final String INP_ERR_BADCHOICE = "Expected one of %s, received: %s";
 	protected static final String INP_ERR_ELEMENT = "Error parsing element %d: %s";
@@ -72,83 +79,120 @@ public abstract class Input<T> {
 	protected static final String INP_ERR_UNITUNSPECIFIED = "Unit type has not been specified";
 	protected static final String INP_ERR_NOTSUBCLASS = "Expected a subclass of %s, got %s";
 	protected static final String INP_ERR_BADDATE = "Expected a valid RFC8601 datetime, got: %s";
+	protected static final String INP_ERR_BADEXP = "Error parsing expression: %s";
 	protected static final String INP_VAL_LISTSET = "Values found for %s without %s being set";
 	protected static final String INP_VAL_LISTSIZE = "%s and %s must be of equal size";
+	protected static final String INP_ERR_BRACES = "List must contain equal numbers of opening and closing braces";
+
+	protected static final String VALID_SAMPLE_PROV = "Accepts a number with units of type %s, an object that returns such a number, or an expression that returns such a number.";
+	protected static final String VALID_SAMPLE_PROV_DIMLESS = "Accepts a dimensionless number, an object that returns such a number, or an expression that returns such a number.";
+	protected static final String VALID_SAMPLE_PROV_UNIT = "Accepts a number with or without units, an object that returns such a number, or an expression that returns such a number. "
+	                                                     + "An input to the UnitType keyword MUST BE PROVIDED before an input to this keyword can be entered.";
+	protected static final String VALID_STRING_PROV = "Accepts a string or an expression that returns a string. "
+	                                                + "Also accepts other types of expressions whose outputs will be converted to a string.";
+	protected static final String VALID_ENTITY_PROV = "Accepts an entity name or an expression that returns an entity.";
+	protected static final String VALID_ENTITY_PROV_TYPE = "Accepts the name of an entity of type %s or an expression that returns such an entity.";
+	protected static final String VALID_COLOUR = "Accepts a colour name, an RGB value, or an RGB/transparency value.";
+	protected static final String VALID_INTEGER = "Accepts a dimensionless integer value.";
+	protected static final String VALID_VALUE = "Accepts a number with units of type %s.";
+	protected static final String VALID_VALUE_DIMLESS = "Accepts a dimensionless number.";
+	protected static final String VALID_VALUE_UNIT = "Accepts a number with or without units. "
+	                                               + "An input to the UnitType keyword MUST BE PROVIDED before an input to this keyword can be entered.";
+	protected static final String VALID_ENTITY = "Accepts the name of an entity.";
+	protected static final String VALID_ENTITY_TYPE = "Accepts the name of an entity of type %s.";
+	protected static final String VALID_INTERFACE_ENTITY = "Accepts the name of an entity that supports the %s interface.";
+	protected static final String VALID_BOOLEAN = "Accepts the text TRUE or FALSE. Inputs of T, t, and 1 are interpreted as TRUE, while F, f, and 0 are interpreted as FALSE.";
+	protected static final String VALID_STRING = "Accepts a text string. The string must be enclosed by single quotes if it includes a space.";
+	protected static final String VALID_DATE = "Accepts a calendar date and time in one of the following formats: 'YYYY-MM-DD hh:mm:ss.sss', 'YYYY-MM-DD hh:mm:ss', 'YYYY-MM-DD'";
+	protected static final String VALID_FILE = "Accepts a file path enclosed by single quotes.";
+	protected static final String VALID_DIR = "Accepts a directory path enclosed by single quotes.";
+	protected static final String VALID_EXP_DIMLESS = "Accepts an expression that returns a dimensionless number. A value of zero implies FALSE; non-zero implies TRUE.";
+	protected static final String VALID_EXP_NUM = "Accepts an expression that returns a number.";
+	protected static final String VALID_EXP_STR = "Accepts an expression that returns a string.";
+	protected static final String VALID_EXP_ENT = "Accepts an expression that returns an entity.";
+	protected static final String VALID_EXP = "Accepts an expression.";
+	protected static final String VALID_KEYEVENT = "Accepts a single character representing a key on the keyboard. "
+	                                             + "For non-printing keys, enter the key's name such as HOME, ESCAPE, SPACE, F1, etc.";
+	protected static final String VALID_VALUE_LIST = "Accepts a list of numbers separated by spaces, followed by a unit for these values, if required.";
+	protected static final String VALID_VALUE_LIST_DIMLESS = "Accepts a list of dimensionless numbers separated by spaces.";
+	protected static final String VALID_SAMPLE_LIST = "Accepts a list containing numbers with or without units, objects that return such a number, or expressions that return such a number. "
+	                                                + "Each entry in the list must be enclosed by braces.";
+	protected static final String VALID_SAMPLE_LIST_DIMLESS = "Accepts a list containing dimensionless numbers, objects that return such a number, or expressions that return such a number. "
+	                                                        + "Each entry in the list can be enclosed by braces.";
+	protected static final String VALID_UNIT_TYPE_LIST = "Accepts a list of unit types separated by spaces.";
+	protected static final String VALID_STRING_PROV_LIST = "Accepts a list of strings or expressions that return strings. "
+	                                                     + "Also accepts other types of expressions whose outputs will be converted to strings. "
+	                                                     + "Each entry in the list must be enclosed by braces.";
+	protected static final String VALID_COLOR_LIST = "Accepts a list of colours that are expressed as either a colour name or an RGB value. "
+	                                               + "Each entry in the list must be enclosed by braces.";
+	protected static final String VALID_ENTITY_LIST = "Accepts a list of entity names separated by spaces.";
+	protected static final String VALID_FORMAT = "Accepts a Java format string for a number. For example, '%.3f' would print a number with three decimal places.";
+	protected static final String VALID_VEC3D = "Accepts three numbers separated by spaces followed by a unit of type %s. "
+	                                          + "If only two numbers are entered, the third value defaults to zero.";
+	protected static final String VALID_VEC3D_DIMLESS = "Accepts three dimensionless numbers separated by spaces.";
+	protected static final String VALID_VEC3D_LIST = "Accepts a list of vectors enclosed by braces. "
+	                                               + "Each vector consists of three numbers separated by spaces followed by a unit of type %s. "
+	                                               + "If a vector has only two numbers, the third value defaults to zero.";
+	protected static final String VALID_ATTRIB_DEF = "Accepts a list of attribute definitions each consisting of an attribute name followed by an expression "
+	                                               + "that sets the initial value for the attribute. "
+	                                               + "Each definition in the list must be enclosed by braces.";
+	protected static final String VALID_CUSTOM_OUT = "Accepts a list of custom output definitions each consisting of a custom output name, an expression, and a unit type (if required). "
+	                                               + "Each definition in the list must be enclosed by braces.";
 
 	public static final String POSITIVE_INFINITY = "Infinity";
 	public static final String NEGATIVE_INFINITY = "-Infinity";
-	protected static final String SEPARATOR = "  ";
+	public static final String SEPARATOR = "  ";
+	public static final String BRACE_SEPARATOR = " ";
 
-	/**
-	 * the preferred name for the input keyword
-	 */
-	private String keyword;
-
+	private String keyword; // the preferred name for the input keyword
 	private final String category;
 
 	protected T defValue;
-
 	protected T value;
-	/**
-	 * indicates if input has been edited for this entity
-	 */
-	private boolean edited;
-	/**
-	 * indicates whether to prompt the user to save the configuration file
-	 */
-	private boolean promptReqd;
-	/**
-	 * Hide this input from the EditBox
-	 */
-	private boolean hidden;
-	/**
-	 * Is this input still the default value?
-	 */
-	private boolean isDef;
-	/**
-	 * value from .cfg file
-	 */
-	private String[] valueTokens;
-	/**
-	 * special text to show in the default column of the Input Editor
-	 */
-	private String defText;
-	/**
-	 * indicates whether this input must be provided by the user
-	 */
-	private boolean isReqd;
 
-	/**
-	 * @param key 关键字
-	 * @param cat 分类
-	 * @param def 默认值
-	 */
+	private boolean edited; // indicates if input has been edited for this entity
+	private boolean promptReqd; // indicates whether to prompt the user to save the configuration file
+	private boolean hidden; // Hide this input from the EditBox
+	protected boolean isDef; // Is this input still the default value?
+	protected String[] valueTokens; // value from .cfg file
+	private String defText; // special text to show in the default column of the Input Editor
+	private boolean isReqd;     // indicates whether this input must be provided by the user
+	private boolean isValid;  // if false, the input is no longer valid and must be re-entered
+	private boolean isLocked; // indicates whether the input can be changed through by the user
+
+	public static final Comparator<Object> uiSortOrder = new NaturalOrderComparator();
+
 	public Input(String key, String cat, T def) {
 		keyword = key;
 		category = cat;
-		setDefaultValue(def);
+		defValue = def;
 
-		edited = false;
 		promptReqd = true;
-		isDef = true;
 		hidden = false;
-		valueTokens = null;
 		defText = null;
 		isReqd = false;
-	}
 
-	public void reset() {
-		this.setDefaultValue( this.getDefaultValue() );
-		valueTokens = null;
-		edited = false;
-		isDef = true;
+		reset();
 	}
 
 	/**
-	 * Assigns the internal state for this input to the same values as the specified input.
+	 * Sets the input to its default value.
+	 */
+	public void reset() {
+		value = defValue;
+		valueTokens = null;
+		edited = false;
+		isDef = true;
+		isValid = true;
+	}
+
+	/**
+	 * Assigns the internal state for this input to the same values as the
+	 * specified input.
+	 * @param thisEnt TODO
 	 * @param in - input object to be copied.
 	 */
-	public void copyFrom(Input<?> in) {
+	public void copyFrom(Entity thisEnt, Input<?> in) {
 
 		@SuppressWarnings("unchecked")
 		Input<T> inp = (Input<T>) in;
@@ -158,6 +202,49 @@ public abstract class Input<T> {
 		valueTokens = inp.valueTokens;
 		isDef = false;
 		edited = true;
+		isValid = true;
+	}
+
+	/**
+	 * Assigns the internal state for this input to the same values as the
+	 * specified input.
+	 * <p>
+	 * This method provides the same function as copyFrom by re-parsing the input data instead of
+	 * copying the internal variables. This operation is much slower, but is needed for inputs that
+	 * cannot be copied successfully using copyFrom, such as inputs that accept an expression.
+	 * @param thisEnt TODO
+	 * @param in - input object to be copied.
+	 */
+	public void parseFrom(Entity thisEnt, Input<?> in) {
+		ArrayList<String> toks = new ArrayList<>(Arrays.asList(valueTokens));
+		KeywordIndex kw = new KeywordIndex(in.getKeyword(), toks, null);
+		parse(thisEnt, kw);
+	}
+
+	/**
+	 * Deletes any use of the specified entity from this input.
+	 * @param ent - entity whose references are to be deleted
+	 * @return true if a reference was removed
+	 */
+	public boolean removeReferences(Entity ent) {
+		return false;
+	}
+
+	/**
+	 * Describes the valid inputs for this type of input.
+	 * @return description of valid inputs
+	 */
+	public String getValidInputDesc() {
+		return null;
+	}
+
+	/**
+	 * Corrects common input errors that can be detected prior to parsing.
+	 * @param str - uncorrected input string
+	 * @return corrected input string
+	 */
+	public String applyConditioning(String str) {
+		return str;
 	}
 
 	@Override
@@ -189,15 +276,33 @@ public abstract class Input<T> {
 		return defText;
 	}
 
+	/**
+	 * Sets the default value and returns the input to its new default state.
+	 * @param val - new default value
+	 */
 	public void setDefaultValue(T val) {
 		defValue = val;
-		value = val;
+		reset();
 	}
 
 	public T getDefaultValue() {
 		return defValue;
 	}
 
+	/**
+	 * Returns a string representing the default value for the input using the preferred units
+	 * specified for the simulation model.
+	 * @param simModel - simulation model
+	 * @return string representing the default value
+	 */
+	public String getDefaultString(JaamSimModel simModel) {
+		return getDefaultString();
+	}
+
+	/**
+	 * Returns a string representing the default value for the input.
+	 * @return string representing the default value
+	 */
 	public String getDefaultString() {
 		if (defValue == null)
 			return "";
@@ -240,6 +345,38 @@ public abstract class Input<T> {
 		return isReqd;
 	}
 
+	public void setValid(boolean bool) {
+		isValid = bool;
+	}
+
+	public boolean isValid() {
+		return isValid;
+	}
+
+	public void setLocked(boolean bool) {
+		isLocked = bool;
+	}
+
+	public boolean isLocked() {
+		return isLocked;
+	}
+
+	public boolean useExpressionBuilder() {
+		return false;
+	}
+
+	/**
+	 * Returns a string representing the value for this input at the present simulation time and
+	 * using the preferred units specified for the simulation model. Any expressions included in
+	 * the input are evaluated.
+	 * @param simModel - simulation model
+	 * @param simTime - present simulation time
+	 * @return string representing the input value
+	 */
+	public String getPresentValueString(JaamSimModel simModel, double simTime) {
+		return getValueString();
+	}
+
 	public void validate() throws InputErrorException {
 		if (isReqd && isDef && !hidden)
 			throw new InputErrorException("An input must be provided for the keyword '%s'.", keyword);
@@ -247,18 +384,167 @@ public abstract class Input<T> {
 
 	public void setTokens(KeywordIndex kw) {
 		isDef = false;
-		if (kw.numArgs() > 1000) {
-			valueTokens = null;
-			return;
+		valueTokens = kw.getArgArray();
+	}
+
+	/**
+	 * Add the given tokens to the present value tokens
+	 */
+	public void addTokens(String[] args) {
+
+		// Create an array sized for the addition of new tokens
+		String[] newValueTokens;
+		if (valueTokens == null) {
+			newValueTokens = new String[args.length - 1];
+
+			// Copy the new tokens into the array
+			System.arraycopy(args, 1, newValueTokens, 0, args.length - 1);
+		}
+		else {
+			newValueTokens = new String[valueTokens.length + args.length - 1];
+
+			// Copy the old tokens into the array
+			System.arraycopy(valueTokens, 0, newValueTokens, 0, valueTokens.length);
+
+			// Copy the new tokens into the array
+			System.arraycopy(args, 1, newValueTokens, valueTokens.length, args.length - 1);
 		}
 
-		valueTokens = kw.getArgArray();
+		valueTokens = newValueTokens;
+	}
+
+	/**
+	 * Remove the given tokens from the present value tokens
+	 * @return - true if all the tokens were successfully removed
+	 */
+	public boolean removeTokens(String[] args) {
+
+		int newSize = valueTokens.length - (args.length - 1);
+		if( newSize >= 0 ) {
+
+			// Create an array sized for the removal of tokens
+			String[] newValueTokens = new String[newSize];
+			int index = 0;
+
+			// Loop through the original tokens
+			for (int i = 0; i < valueTokens.length; i++ ) {
+
+				// Determine if this token is to be kept
+				boolean keep = true;
+				for (int j = 1; j < args.length; j++) {
+					if (args[j].equals(valueTokens[i])) {
+						keep = false;
+						break;
+					}
+				}
+
+				// If the token is to be kept, add it to the array
+				if (keep) {
+					newValueTokens[index] = valueTokens[i];
+					index++;
+				}
+			}
+
+			// If the correct number of items were kept, reset valueTokens
+			if (index == newSize) {
+				valueTokens = newValueTokens;
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Append the given tokens to the present value tokens
+	 */
+	public void appendTokens(String[] args) {
+
+		// Determine if braces need to be added around original tokens
+		boolean addBracesAroundOriginalTokens = false;
+
+		// Determine the size for an array with original and new tokens
+		int newSize;
+		int valueTokensLength = 0;
+		if (valueTokens == null)
+			newSize = args.length;
+		else {
+			valueTokensLength = valueTokens.length;
+			newSize = valueTokens.length + args.length;
+
+			if (! valueTokens[0].equals( "{" )) {
+				addBracesAroundOriginalTokens = true;
+				newSize += 2;
+			}
+		}
+
+		// Determine if braces need to be added around new tokens
+		boolean addBracesAroundNewTokens = false;
+		if (! args[0].equals( "{" )) {
+			addBracesAroundNewTokens = true;
+			newSize += 2;
+		}
+
+		// Create an array sized for the addition of new tokens
+		String[] newValueTokens = new String[newSize];
+
+		// Copy the old and new tokens into the array
+		if (addBracesAroundOriginalTokens) {
+			newValueTokens[0] = "{";
+			System.arraycopy(valueTokens, 0, newValueTokens, 1, valueTokens.length);
+			newValueTokens[valueTokens.length + 1] = "}";
+
+			if (addBracesAroundNewTokens) {
+				newValueTokens[valueTokens.length + 2] = "{";
+				System.arraycopy(args, 0, newValueTokens, valueTokens.length+3, args.length);
+				newValueTokens[newSize-1] = "}";
+			}
+			else {
+				System.arraycopy(args, 0, newValueTokens, valueTokens.length+2, args.length);
+			}
+		}
+		else {
+			if (valueTokens != null)
+				System.arraycopy(valueTokens, 0, newValueTokens, 0, valueTokens.length);
+
+			if (addBracesAroundNewTokens) {
+				newValueTokens[valueTokensLength] = "{";
+				System.arraycopy(args, 0, newValueTokens, valueTokensLength+1, args.length);
+				newValueTokens[newSize-1] = "}";
+			}
+			else {
+				System.arraycopy(args, 0, newValueTokens, valueTokensLength, args.length);
+			}
+		}
+
+		valueTokens = newValueTokens;
 	}
 
 	public boolean isDefault() {
 		return isDef;
 	}
 
+	public int getSequenceNumber() {
+		if (InputAgent.isEarlyInput(this))
+			return 0;
+		return 1;
+	}
+
+	/**
+	 * Returns an array of white-space delimited strings that can be used to generate the input
+	 * file entry for this input value.
+	 * @return array of strings
+	 */
+	public ArrayList<String> getValueTokens() {
+		ArrayList<String> ret = new ArrayList<>();
+		getValueTokens(ret);
+		return ret;
+	}
+
+	/**
+	 * Populates an array of white-space delimited strings that can be used to generate the input
+	 * file string for this input value.
+	 * @param toks - array of strings to be populated
+	 */
 	public void getValueTokens(ArrayList<String> toks) {
 		if (valueTokens == null)
 			return;
@@ -267,19 +553,53 @@ public abstract class Input<T> {
 			toks.add(each);
 	}
 
+	/**
+	 * Returns the input file entry for this input value.
+	 * @return input file text
+	 */
 	public final String getValueString() {
 		if (isDefault()) return "";
-
 		ArrayList<String> tmp = new ArrayList<>();
-		getValueTokens(tmp);
-		if (tmp.size() == 0) return "";
+		try {
+			getValueTokens(tmp);
+		} catch (Exception e) {
+			InputAgent.logMessage("Error in input, value has been cleared. Keyword: %s",
+					this.getKeyword());
+			InputAgent.logStackTrace(e);
+			this.reset();
+		}
+		return getValueString(tmp, false);
+	}
+
+	/**
+	 * Returns the input file entry for the specified array of white-space delimited strings.
+	 * @param tokens - array of strings for the input
+	 * @param addLF - true if a newline character is to be added before each inner brace
+	 * @return input file text
+	 */
+	public static final String getValueString(ArrayList<String> tokens, boolean addLF) {
+		if (tokens.size() == 0) return "";
 
 		StringBuilder sb = new StringBuilder();
-		for (int i = 0; i < tmp.size(); i++) {
-			String dat = tmp.get(i);
+		for (int i = 0; i < tokens.size(); i++) {
+			String dat = tokens.get(i);
 			if (dat == null) continue;
-			if (i > 0)
-				sb.append("  ");
+			if (i > 0) {
+				if (dat.equals("}") || tokens.get(i-1).equals("{")) {
+					sb.append(Input.BRACE_SEPARATOR);
+				}
+				else if (dat.equals("{")) {
+					if (addLF) {
+						sb.append("\n");
+					}
+					else {
+						sb.append(Input.BRACE_SEPARATOR);
+					}
+				}
+				else {
+					sb.append(Input.SEPARATOR);
+				}
+			}
 
 			if (Parser.needsQuoting(dat) && !dat.equals("{") && !dat.equals("}"))
 				sb.append("'").append(dat).append("'");
@@ -289,7 +609,7 @@ public abstract class Input<T> {
 		return sb.toString();
 	}
 
-	public abstract void parse(KeywordIndex kw) throws InputErrorException;
+	public abstract void parse(Entity thisEnt, KeywordIndex kw) throws InputErrorException;
 
 
 	public static void assertCount(DoubleVector input, int... counts)
@@ -435,6 +755,15 @@ public abstract class Input<T> {
 		throw new InputErrorException(INP_ERR_BADSUM, sum, vec.sum());
 	}
 
+	public static void assertSumRange(DoubleVector vec, double min, double max)
+	throws InputErrorException {
+		double sum = vec.sum();
+		if ((MathUtils.nearGT(sum, min) || min == Double.NEGATIVE_INFINITY) && (MathUtils.nearLT(sum, max) || max == Double.POSITIVE_INFINITY))
+			return;
+
+		throw new InputErrorException(INP_ERR_SUMRANGE, min, max, sum);
+	}
+
 	public static void assertMonotonic(DoubleVector vec, int direction)
 	throws InputErrorException {
 		if (direction == 0)
@@ -451,80 +780,21 @@ public abstract class Input<T> {
 		}
 	}
 
-	public static <T> T parse(List<String> data, Class<T> aClass, String units, double minValue, double maxValue, int minCount, int maxCount, Class<? extends Unit> unitType) {
-
-		if( aClass == Double.class ) {
-			if( units != null )
-				return aClass.cast( Input.parseDouble( data, minValue, maxValue, units) );
-			else{
-				DoubleVector tmp = Input.parseDoubles( data, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, unitType );
-				Input.assertCount(tmp, 1);
-				return aClass.cast( tmp.get(0));
+	public static void assertBracesMatch(KeywordIndex kw)
+	throws InputErrorException {
+		int depth = 0;
+		for (int i= 0; i < kw.numArgs(); i++) {
+			if (kw.getArg(i).equals("{")) {
+				depth++;
+				continue;
+			}
+			if (kw.getArg(i).equals("}")) {
+				depth--;
+				continue;
 			}
 		}
-
-		if( aClass == DoubleVector.class ) {
-			if( units != null ){
-				DoubleVector value = Input.parseDoubleVector( data, minValue, maxValue, units);
-				if (value.size() < minCount || value.size() > maxCount) {
-					if (maxCount == Integer.MAX_VALUE)
-						throw new InputErrorException(INP_ERR_RANGECOUNTMIN, minCount, data);
-					throw new InputErrorException(INP_ERR_RANGECOUNT, minCount, maxCount, data);
-				}
-				return aClass.cast( value );
-			}
-			else {
-				DoubleVector tmp = Input.parseDoubles( data, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, unitType );
-				return aClass.cast( tmp );
-			}
-		}
-
-		if( Entity.class.isAssignableFrom(aClass) ) {
-			Class<? extends Entity> temp = aClass.asSubclass(Entity.class);
-			Input.assertCount(data, 1, 1);
-			return aClass.cast( Input.parseEntity(data.get(0), temp) );
-		}
-
-		if( aClass == Boolean.class ) {
-			Input.assertCount(data, 1);
-			Boolean value = Boolean.valueOf(Input.parseBoolean(data.get(0)));
-			return aClass.cast(value);
-		}
-
-		if( aClass == Integer.class ) {
-			Input.assertCount(data, 1);
-			Integer value = Input.parseInteger(data.get( 0 ), (int)minValue, (int)maxValue);
-			return aClass.cast(value);
-		}
-
-		if( aClass == SampleProvider.class ) {
-
-			// Try to parse as a constant value
-			try {
-				DoubleVector tmp = Input.parseDoubles(data, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, unitType);
-				Input.assertCount(tmp, 1);
-				return aClass.cast( new SampleConstant(unitType, tmp.get(0)) );
-			}
-			catch (InputErrorException e) {}
-
-			// If not a constant, try parsing a SampleProvider
-			Input.assertCount(data, 1);
-			Entity ent = Input.parseEntity(data.get(0), Entity.class);
-			SampleProvider s = Input.castImplements(ent, SampleProvider.class);
-			if( s.getUnitType() != UserSpecifiedUnit.class )
-				Input.assertUnitsMatch(unitType, s.getUnitType());
-			return aClass.cast(s);
-		}
-
-		if( aClass == IntegerVector.class ) {
-			IntegerVector value = Input.parseIntegerVector(data, (int)minValue, (int)maxValue);
-			if (value.size() < minCount || value.size() > maxCount)
-				throw new InputErrorException(INP_ERR_RANGECOUNT, minCount, maxCount, data);
-			return aClass.cast(value);
-		}
-
-		// TODO - parse other classes
-		throw new InputErrorException("%s is not supported for parsing yet", aClass);
+		if (depth != 0)
+			throw new InputErrorException(INP_ERR_BRACES);
 	}
 
 	/**
@@ -582,38 +852,23 @@ public abstract class Input<T> {
 				boolean element = Input.parseBoolean(kw.getArg(i));
 				temp.add(element);
 			} catch (InputErrorException e) {
-				throw new InputErrorException(INP_ERR_ELEMENT, i, e.getMessage());
+				throw new InputErrorException(INP_ERR_ELEMENT, i+1, e.getMessage());
 			}
 		}
 		return temp;
 	}
 
-	public static BooleanVector parseBooleanVector(List<String> input)
-	throws InputErrorException {
-		BooleanVector temp = new BooleanVector(input.size());
-
-		for (int i = 0; i < input.size(); i++) {
-			try {
-				boolean element = Input.parseBoolean(input.get(i));
-				temp.add(element);
-			} catch (InputErrorException e) {
-				throw new InputErrorException(INP_ERR_ELEMENT, i, e.getMessage());
-			}
-		}
-		return temp;
-	}
-
-	public static ArrayList<Color4d> parseColorVector(KeywordIndex kw)
+	public static ArrayList<Color4d> parseColorVector(JaamSimModel simModel, KeywordIndex kw)
 	throws InputErrorException {
 		ArrayList<KeywordIndex> subArgs = kw.getSubArgs();
 		ArrayList<Color4d> temp = new ArrayList<>(subArgs.size());
 
 		for (int i = 0; i < subArgs.size(); i++) {
 			try {
-				Color4d element = Input.parseColour(subArgs.get(i));
+				Color4d element = Input.parseColour(simModel, subArgs.get(i));
 				temp.add(element);
 			} catch (InputErrorException e) {
-				throw new InputErrorException(INP_ERR_ELEMENT, i, e.getMessage());
+				throw new InputErrorException(INP_ERR_ELEMENT, i+1, e.getMessage());
 			}
 		}
 		return temp;
@@ -668,21 +923,6 @@ public abstract class Input<T> {
 		catch (NumberFormatException e) { return false; }
 	}
 
-	public static IntegerVector parseIntegerVector(List<String> input, int minValue, int maxValue)
-	throws InputErrorException {
-		IntegerVector temp = new IntegerVector(input.size());
-
-		for (int i = 0; i < input.size(); i++) {
-			try {
-				int element = Input.parseInteger(input.get(i), minValue, maxValue);
-				temp.add(element);
-			} catch (InputErrorException e) {
-				throw new InputErrorException(INP_ERR_ELEMENT, i, e.getMessage());
-			}
-		}
-		return temp;
-	}
-
 	public static IntegerVector parseIntegerVector(KeywordIndex kw, int minValue, int maxValue)
 	throws InputErrorException {
 		IntegerVector temp = new IntegerVector(kw.numArgs());
@@ -692,7 +932,7 @@ public abstract class Input<T> {
 				int element = Input.parseInteger(kw.getArg(i), minValue, maxValue);
 				temp.add(element);
 			} catch (InputErrorException e) {
-				throw new InputErrorException(INP_ERR_ELEMENT, i, e.getMessage());
+				throw new InputErrorException(INP_ERR_ELEMENT, i+1, e.getMessage());
 			}
 		}
 		return temp;
@@ -711,7 +951,7 @@ public abstract class Input<T> {
 		double value = 0.0d;
 
 		// check for hh:mm:ss or hh:mm
-		if (data.indexOf(":") > -1) {
+		if (data.indexOf(':') > -1) {
 			String[] splitDouble = data.split( ":" );
 			if (splitDouble.length != 2 && splitDouble.length != 3)
 				throw new InputErrorException(INP_ERR_TIME, data);
@@ -741,8 +981,10 @@ public abstract class Input<T> {
 	}
 
 	private static final Pattern is8601date = Pattern.compile("\\d{4}-\\d{2}-\\d{2}");
+	private static final Pattern is8601short = Pattern.compile("\\d{4}-\\d{2}-\\d{2}[ T]\\d{2}:\\d{2}");
 	private static final Pattern is8601time = Pattern.compile("\\d{4}-\\d{2}-\\d{2}[ T]\\d{2}:\\d{2}:\\d{2}");
 	private static final Pattern is8601full = Pattern.compile("\\d{4}-\\d{2}-\\d{2}[ T]\\d{2}:\\d{2}:\\d{2}\\.\\d{1,6}");
+	private static final Pattern isextendshort = Pattern.compile("\\d{1,}:\\d{2}");
 	private static final Pattern isextendtime = Pattern.compile("\\d{1,}:\\d{2}:\\d{2}");
 	private static final Pattern isextendfull = Pattern.compile("\\d{1,}:\\d{2}:\\d{2}.\\d{1,6}");
 	private static final long usPerSec = 1000000;
@@ -752,65 +994,52 @@ public abstract class Input<T> {
 	public static final long usPerYr  = 365 * usPerDay;
 
 	public static boolean isRFC8601DateTime(String input) {
-		if (is8601time.matcher(input).matches()) return true;
-		if (is8601full.matcher(input).matches()) return true;
-		if (is8601date.matcher(input).matches()) return true;
+		if (isRFC8601Date(input)) return true;
+		if (isextendshort.matcher(input).matches()) return true;
 		if (isextendtime.matcher(input).matches()) return true;
 		if (isextendfull.matcher(input).matches()) return true;
 		return false;
 	}
 
+	public static boolean isRFC8601Date(String input) {
+		if (is8601short.matcher(input).matches()) return true;
+		if (is8601time.matcher(input).matches()) return true;
+		if (is8601full.matcher(input).matches()) return true;
+		if (is8601date.matcher(input).matches()) return true;
+		return false;
+	}
+
 	/**
-	 * Parse an RFC8601 date time and return it as an offset in microseconds from
-	 * 0AD. This assumes a very simple concept of a 365 day year with no leap years
-	 * and no leap seconds.
-	 *
+	 * Parse an RFC8601 date time and returns the corresponding simulation time in seconds from the
+	 * start of the simulation run.
 	 * An RFC8601 date time looks like YYYY-MM-DD HH:MM:SS.mmm or YYYY-MM-DDTHH:MM:SS.mmm
-	 *
-	 * @param input
-	 * @param datumYear
-	 * @return
+	 * @param simModel - JaamSimModel
+	 * @param input - date string
+	 * @return simulation time in seconds
 	 */
-	public static long parseRFC8601DateTime(String input) {
-		if (is8601time.matcher(input).matches()) {
-			int YY = Integer.parseInt(input.substring(0, 4));
-			int MM = Integer.parseInt(input.substring(5, 7));
-			int DD = Integer.parseInt(input.substring(8, 10));
-			int hh = Integer.parseInt(input.substring(11, 13));
-			int mm = Integer.parseInt(input.substring(14, 16));
-			int ss = Integer.parseInt(input.substring(17, 19));
-			return getUS(input, YY, MM, DD, hh, mm, ss, 0);
+	public static double parseRFC8601DateTime(JaamSimModel simModel, String input) {
+		if (isRFC8601Date(input)) {
+			int[] date = parseRFC8601Date(input);
+			long millis = simModel.getCalendarMillis(date[0], date[1] - 1, date[2], date[3], date[4], date[5], date[6]);
+			return simModel.calendarMillisToSimTime(millis);
 		}
 
-		if (is8601full.matcher(input).matches()) {
-			int YY = Integer.parseInt(input.substring(0, 4));
-			int MM = Integer.parseInt(input.substring(5, 7));
-			int DD = Integer.parseInt(input.substring(8, 10));
-			int hh = Integer.parseInt(input.substring(11, 13));
-			int mm = Integer.parseInt(input.substring(14, 16));
-			int ss = Integer.parseInt(input.substring(17, 19));
+		// hh:mm format
+		if (isextendshort.matcher(input).matches()) {
+			int len = input.length();
+			int hh = Integer.parseInt(input.substring(0, len - 3));
+			int mm = Integer.parseInt(input.substring(len - 2, len));
 
-			// grab the us values and zero-pad to a full 6-digit number
-			String usChars =  input.substring(20, input.length());
-			int us = 0;
-			switch (usChars.length()) {
-			case 1: us =  Integer.parseInt(usChars) * 100000; break;
-			case 2: us =  Integer.parseInt(usChars) *  10000; break;
-			case 3: us =  Integer.parseInt(usChars) *   1000; break;
-			case 4: us =  Integer.parseInt(usChars) *    100; break;
-			case 5: us =  Integer.parseInt(usChars) *     10; break;
-			case 6: us =  Integer.parseInt(usChars) *      1; break;
-			}
-			return getUS(input, YY, MM, DD, hh, mm, ss, us);
+			if (mm < 0 || mm > 59)
+				throw new InputErrorException(INP_ERR_BADDATE, input);
+
+			long ret = 0;
+			ret += hh * usPerHr;
+			ret += mm * usPerMin;
+			return ret * 1e-6;
 		}
 
-		if (is8601date.matcher(input).matches()) {
-			int YY = Integer.parseInt(input.substring(0, 4));
-			int MM = Integer.parseInt(input.substring(5, 7));
-			int DD = Integer.parseInt(input.substring(8, 10));
-			return getUS(input, YY, MM, DD, 0, 0, 0, 0);
-		}
-
+		// hh:mm:ss format
 		if (isextendtime.matcher(input).matches()) {
 			int len = input.length();
 			int hh = Integer.parseInt(input.substring(0, len - 6));
@@ -824,11 +1053,12 @@ public abstract class Input<T> {
 			ret += hh * usPerHr;
 			ret += mm * usPerMin;
 			ret += ss * usPerSec;
-			return ret;
+			return ret * 1e-6;
 		}
 
+		// hh:mm:ss.ssssss format
 		if (isextendfull.matcher(input).matches()) {
-			int len = input.indexOf(".");
+			int len = input.indexOf('.');
 			int hh = Integer.parseInt(input.substring(0, len - 6));
 			int mm = Integer.parseInt(input.substring(len - 5, len - 3));
 			int ss = Integer.parseInt(input.substring(len - 2, len));
@@ -852,14 +1082,84 @@ public abstract class Input<T> {
 			ret += mm * usPerMin;
 			ret += ss * usPerSec;
 			ret += us;
-			return ret;
+			return ret * 1e-6;
 		}
 
 		throw new InputErrorException(INP_ERR_BADDATE, input);
 	}
 
+	/**
+	 * Parse an RFC8601 date time and return an array containing the date numbers.
+	 * An RFC8601 date time looks like YYYY-MM-DD HH:MM:SS.mmm or YYYY-MM-DDTHH:MM:SS.mmm
+	 * @param input - date string
+	 * @return integer array containing the year, month (0 - 11), day of month (1 - 31),
+	 *         hour of day (0 - 23), minute (0 - 59), second (0 - 59), millisecond (0 - 999)
+	 */
+	public static int[] parseRFC8601Date(String input) {
+		int YY = 0, MM = 0, DD = 0, hh = 0, mm = 0, ss = 0, ms = 0;
+
+		// YY-MM-DD hh:mm format
+		if (is8601short.matcher(input).matches()) {
+			YY = Integer.parseInt(input.substring(0, 4));
+			MM = Integer.parseInt(input.substring(5, 7));
+			DD = Integer.parseInt(input.substring(8, 10));
+			hh = Integer.parseInt(input.substring(11, 13));
+			mm = Integer.parseInt(input.substring(14, 16));
+		}
+
+		// YY-MM-DD hh:mm:ss format
+		else if (is8601time.matcher(input).matches()) {
+			YY = Integer.parseInt(input.substring(0, 4));
+			MM = Integer.parseInt(input.substring(5, 7));
+			DD = Integer.parseInt(input.substring(8, 10));
+			hh = Integer.parseInt(input.substring(11, 13));
+			mm = Integer.parseInt(input.substring(14, 16));
+			ss = Integer.parseInt(input.substring(17, 19));
+		}
+
+		// YY-MM-DD hh:mm:ss.sss format
+		else if (is8601full.matcher(input).matches()) {
+			YY = Integer.parseInt(input.substring(0, 4));
+			MM = Integer.parseInt(input.substring(5, 7));
+			DD = Integer.parseInt(input.substring(8, 10));
+			hh = Integer.parseInt(input.substring(11, 13));
+			mm = Integer.parseInt(input.substring(14, 16));
+			ss = Integer.parseInt(input.substring(17, 19));
+
+			// grab the us values and zero-pad to a full 6-digit number
+			String usChars =  input.substring(20, input.length());
+			int us = 0;
+			switch (usChars.length()) {
+			case 1: us =  Integer.parseInt(usChars) * 100000; break;
+			case 2: us =  Integer.parseInt(usChars) *  10000; break;
+			case 3: us =  Integer.parseInt(usChars) *   1000; break;
+			case 4: us =  Integer.parseInt(usChars) *    100; break;
+			case 5: us =  Integer.parseInt(usChars) *     10; break;
+			case 6: us =  Integer.parseInt(usChars) *      1; break;
+			}
+			ms = us/1000;
+		}
+
+		// YY-MM-DD format
+		else if (is8601date.matcher(input).matches()) {
+			YY = Integer.parseInt(input.substring(0, 4));
+			MM = Integer.parseInt(input.substring(5, 7));
+			DD = Integer.parseInt(input.substring(8, 10));
+		}
+
+		else {
+			throw new InputErrorException(INP_ERR_BADDATE, input);
+		}
+
+		if (MM < 1 || MM > 12 || DD < 1 || DD > daysInMonth[MM - 1]
+				|| hh < 0 || hh > 23 || mm < 0 || mm > 59
+				|| ss < 0 || ss > 59 || ms < 0 || ms > 999)
+			throw new InputErrorException(INP_ERR_BADDATE, input);
+
+		return new int[]{YY, MM, DD, hh, mm, ss, ms};
+	}
+
 	private static final int[] daysInMonth;
-	private static final int[] firstDayOfMonth;
 
 	static {
 		daysInMonth = new int[12];
@@ -875,38 +1175,6 @@ public abstract class Input<T> {
 		daysInMonth[9] = 31;
 		daysInMonth[10] = 30;
 		daysInMonth[11] = 31;
-
-		firstDayOfMonth = new int[12];
-		firstDayOfMonth[0] = 1;
-		for (int i = 1; i < firstDayOfMonth.length; i++) {
-			firstDayOfMonth[i] = firstDayOfMonth[i - 1] + daysInMonth[i - 1];
-		}
-	}
-
-	private static final long getUS(String input, int YY, int MM, int DD, int hh, int mm, int ss, int us) {
-		// Validate ranges
-		if (MM <= 0 || MM > 12)
-			throw new InputErrorException(INP_ERR_BADDATE, input);
-
-		if (DD <= 0 || DD > daysInMonth[MM - 1])
-			throw new InputErrorException(INP_ERR_BADDATE, input);
-
-		if (hh < 0 || hh > 23)
-			throw new InputErrorException(INP_ERR_BADDATE, input);
-
-		if (mm < 0 || mm > 59 || ss < 0 || ss > 59)
-			throw new InputErrorException(INP_ERR_BADDATE, input);
-
-		long ret = 0;
-		ret += YY * usPerYr;
-		ret += (firstDayOfMonth[MM - 1] - 1) * usPerDay;
-		ret += (DD - 1) * usPerDay;
-		ret += hh * usPerHr;
-		ret += mm * usPerMin;
-		ret += ss * usPerSec;
-		ret += us;
-
-		return ret;
 	}
 
 	public static double parseDouble(String data)
@@ -939,62 +1207,9 @@ public abstract class Input<T> {
 	}
 
 	/**
-	 * Convert the given String to a double including a unit conversion, if necessary
-	 */
-	public static double parseDouble(List<String> input, double minValue, double maxValue, String defaultUnitString)
-	throws InputErrorException {
-		Input.assertCountRange(input, 1, 2);
-
-		// Warn if the default unit is assumed by the input data
-		if( input.size() == 1 && defaultUnitString.length() > 0 )
-			InputAgent.logWarning( "Missing units.  Assuming %s.", defaultUnitString );
-
-		// If there are two values, then assume the last one is a unit
-		double conversionFactor = 1.0;
-		if( input.size() == 2 ) {
-
-			// Determine the units
-			Unit unit = Input.parseUnit( input.get(1) );
-
-			// Determine the default units
-			Unit defaultUnit = Input.tryParseUnit( defaultUnitString, Unit.class );
-			if( defaultUnit == null ) {
-				throw new InputErrorException( "Could not determine default units " + defaultUnitString );
-			}
-
-			if (defaultUnit.getClass() != unit.getClass())
-				throw new InputErrorException( "Cannot convert from %s to %s", defaultUnit.getName(), unit.getName());
-
-			// Determine the conversion factor from units to default units
-			conversionFactor = unit.getConversionFactorToUnit( defaultUnit );
-		}
-
-		// Parse and convert the value
-		return Input.parseDouble( input.get(0), minValue, maxValue, conversionFactor);
-	}
-
-	/**
 	 * Convert the given input to a DoubleVector and apply the given conversion factor
 	 */
-	public static DoubleVector parseDoubleVector(List<String> input, double minValue, double maxValue, double factor)
-	throws InputErrorException {
-		DoubleVector temp = new DoubleVector(input.size());
-
-		for (int i = 0; i < input.size(); i++) {
-			try {
-				double element = Input.parseDouble(input.get(i), minValue, maxValue, factor);
-				temp.add(element);
-			} catch (InputErrorException e) {
-				throw new InputErrorException(INP_ERR_ELEMENT, i, e.getMessage());
-			}
-		}
-		return temp;
-	}
-
-	/**
-	 * Convert the given input to a DoubleVector and apply the given conversion factor
-	 */
-	public static DoubleVector parseDoubles(KeywordIndex kw, double minValue, double maxValue, Class<? extends Unit> unitType)
+	public static DoubleVector parseDoubles(JaamSimModel simModel, KeywordIndex kw, double minValue, double maxValue, Class<? extends Unit> unitType)
 	throws InputErrorException {
 
 		if (unitType == UserSpecifiedUnit.class)
@@ -1006,7 +1221,8 @@ public abstract class Input<T> {
 		boolean includeIndex = true;
 
 		// Parse the unit portion of the input
-		Unit unit = Input.tryParseUnit(kw.getArg(numArgs-1), unitType);
+		String unitName = Parser.removeEnclosure("[", kw.getArg(numArgs-1), "]");
+		Unit unit = Input.tryParseUnit(simModel, unitName, unitType);
 
 
 		// A unit is mandatory except for dimensionless values and time values in RFC8601 date/time format
@@ -1027,7 +1243,7 @@ public abstract class Input<T> {
 
 					// RFC8601 date/time format
 					if (Input.isRFC8601DateTime(kw.getArg(i))) {
-						double element = Input.parseRFC8601DateTime(kw.getArg(i))/1e6;
+						double element = Input.parseRFC8601DateTime(simModel, kw.getArg(i));
 						if (element < minValue || element > maxValue)
 							throw new InputErrorException(INP_ERR_DOUBLERANGE, minValue, maxValue, temp);
 						temp.add(element);
@@ -1049,113 +1265,12 @@ public abstract class Input<T> {
 				}
 			} catch (InputErrorException e) {
 				if (includeIndex && numDoubles > 1)
-					throw new InputErrorException(INP_ERR_ELEMENT, i, e.getMessage());
+					throw new InputErrorException(INP_ERR_ELEMENT, i+1, e.getMessage());
 				else
 					throw e;
 			}
 		}
 		return temp;
-	}
-
-	/**
-	 * Convert the given input to a DoubleVector and apply the given conversion factor
-	 */
-	public static DoubleVector parseDoubles(List<String> input, double minValue, double maxValue, Class<? extends Unit> unitType)
-	throws InputErrorException {
-
-		if (unitType == UserSpecifiedUnit.class)
-			throw new InputErrorException(INP_ERR_UNITUNSPECIFIED);
-
-		double factor = 1.0d;
-		int numDoubles = input.size();
-
-		// Parse the unit portion of the input
-		Unit unit = Input.tryParseUnit(input.get(numDoubles-1), unitType);
-
-		// A unit is mandatory except for dimensionless values and time values in RFC8601 date/time format
-		if (unit == null && unitType != DimensionlessUnit.class && unitType != TimeUnit.class)
-			throw new InputErrorException(INP_ERR_NOUNITFOUND, input.get(numDoubles-1), unitType.getSimpleName());
-
-		if (unit != null) {
-			factor = unit.getConversionFactorToSI();
-			numDoubles = numDoubles - 1;
-		}
-
-		// Parse the numeric portion of the input
-		DoubleVector temp = new DoubleVector(numDoubles);
-		for (int i = 0; i < numDoubles; i++) {
-			try {
-				// Time input
-				if (unitType == TimeUnit.class) {
-
-					// RFC8601 date/time format
-					if (Input.isRFC8601DateTime(input.get(i))) {
-						double element = Input.parseRFC8601DateTime(input.get(i))/1e6;
-						if (element < minValue || element > maxValue)
-							throw new InputErrorException(INP_ERR_DOUBLERANGE, minValue, maxValue, temp);
-						temp.add(element);
-					}
-					// Normal format
-					else {
-						if (unit == null)
-							throw new InputErrorException(INP_ERR_NOUNITFOUND, input.get(numDoubles-1), unitType.getSimpleName());
-						double element = Input.parseDouble(input.get(i), minValue, maxValue, factor);
-						temp.add(element);
-					}
-				}
-				// Non-time input
-				else {
-					double element = Input.parseDouble(input.get(i), minValue, maxValue, factor);
-					temp.add(element);
-				}
-			} catch (InputErrorException e) {
-				if (numDoubles == 1)
-					throw e;
-				else
-					throw new InputErrorException(INP_ERR_ELEMENT, i, e.getMessage());
-			}
-		}
-		return temp;
-	}
-
-	/**
-	 * Convert the given input to a DoubleVector including a unit conversion, if necessary
-	 */
-	public static DoubleVector parseDoubleVector(List<String> data, double minValue, double maxValue, String defaultUnitString)
-	throws InputErrorException {
-		// If there is more than one value, and the last one is not a number, then assume it is a unit
-		String unitString = data.get( data.size()-1 );
-		if( data.size() > 1 && !Input.isDouble(unitString) ) {
-
-			// Determine the units
-			Unit unit = Input.parseUnit(unitString);
-
-			// Determine the default units
-			Unit defaultUnit = Input.tryParseUnit( defaultUnitString, Unit.class );
-			if( defaultUnit == null ) {
-				throw new InputErrorException( "Could not determine default units " + defaultUnitString );
-			}
-
-			if (defaultUnit.getClass() != unit.getClass())
-				throw new InputErrorException( "Cannot convert from %s to %s", defaultUnit.getName(), unit.getName());
-
-			// Determine the conversion factor to the default units
-			double conversionFactor = unit.getConversionFactorToUnit( defaultUnit );
-
-			// grab all but the final argument (the unit)
-			ArrayList<String> numericData = new ArrayList<>(data.size() - 1);
-			for (int i = 0; i < data.size() -1; i++)
-				numericData.add(data.get(i));
-
-			return Input.parseDoubleVector( numericData, minValue, maxValue, conversionFactor);
-		}
-		else {
-			if( defaultUnitString.length() > 0 )
-				InputAgent.logWarning( "Missing units.  Assuming %s.", defaultUnitString );
-		}
-
-		// Parse and convert the values
-		return Input.parseDoubleVector( data, minValue, maxValue, 1.0d);
 	}
 
 	public static String parseString(String input, ArrayList<String> validList)
@@ -1185,7 +1300,7 @@ public abstract class Input<T> {
 				String element = Input.parseString(kw.getArg(i), validList);
 				temp.add(element);
 			} catch (InputErrorException e) {
-				throw new InputErrorException(INP_ERR_ELEMENT, i, e.getMessage());
+				throw new InputErrorException(INP_ERR_ELEMENT, i+1, e.getMessage());
 			}
 		}
 		return temp;
@@ -1201,9 +1316,23 @@ public abstract class Input<T> {
 		}
 	}
 
-	public static Class<? extends Entity> parseEntityType(String input)
+	public static <T extends Enum<T>> ArrayList<T> parseEnumList(Class<T> aClass, KeywordIndex kw) {
+		ArrayList<T> ret = new ArrayList<>(kw.numArgs());
+		for (int i=0; i<kw.numArgs(); i++) {
+			try {
+				ret.add(Enum.valueOf(aClass, kw.getArg(i)));
+			} catch (IllegalArgumentException e) {
+				throw new InputErrorException(INP_ERR_BADCHOICE, Arrays.toString(aClass.getEnumConstants()), kw.getArg(i));
+			} catch (NullPointerException e) {
+				throw new InputErrorException(INP_ERR_BADCHOICE, Arrays.toString(aClass.getEnumConstants()), kw.getArg(i));
+			}
+		}
+		return ret;
+	}
+
+	public static Class<? extends Entity> parseEntityType(JaamSimModel simModel, String input)
 	throws InputErrorException {
-		ObjectType type = Input.tryParseEntity( input, ObjectType.class );
+		ObjectType type = Input.tryParseEntity(simModel, input, ObjectType.class);
 		if (type == null)
 			throw new InputErrorException("Entity type not found: %s", input);
 
@@ -1249,9 +1378,9 @@ public abstract class Input<T> {
 		}
 	}
 
-	public static <T extends Entity> T parseEntity(String choice, Class<T> aClass)
+	public static <T extends Entity> T parseEntity(JaamSimModel simModel, String choice, Class<T> aClass)
 	throws InputErrorException {
-		Entity ent = Entity.getNamedEntity(choice);
+		Entity ent = simModel.getNamedEntity(choice);
 		if (ent == null) {
 			throw new InputErrorException(INP_ERR_ENTNAME, choice);
 		}
@@ -1262,35 +1391,41 @@ public abstract class Input<T> {
 		return t;
 	}
 
-	public static <T extends Entity> T tryParseEntity(String choice, Class<T> aClass) {
-		return Input.castEntity(Entity.getNamedEntity(choice), aClass);
+	public static <T extends Entity> T tryParseEntity(JaamSimModel simModel, String choice, Class<T> aClass) {
+		return Input.castEntity(simModel.getNamedEntity(choice), aClass);
 	}
 
-	public static <T extends Unit> T tryParseUnit(String choice, Class<T> aClass) {
-		return Input.castEntity(Entity.getNamedEntity(choice), aClass);
+	public static <T extends Unit> T tryParseUnit(JaamSimModel simModel, String choice, Class<T> aClass) {
+		return Input.castEntity(simModel.getNamedEntity(choice), aClass);
 	}
 
-	public static Unit parseUnit(String str)
+	public static Unit parseUnit(JaamSimModel simModel, String str)
 	throws InputErrorException {
-		Unit u = Input.tryParseUnit(str, Unit.class);
+		Unit u = Input.tryParseUnit(simModel, str, Unit.class);
 		if (u == null)
 			throw new InputErrorException("Could not find a unit named: %s", str);
 
 		return u;
 	}
 
-	public static <T extends Entity> ArrayList<T> parseEntityList(KeywordIndex kw, Class<T> aClass, boolean unique)
+	public static Class<? extends Unit> parseUnitType(JaamSimModel simModel, String utName) {
+		ObjectType ot = Input.parseEntity(simModel, utName, ObjectType.class);
+		Class<? extends Unit> ut = Input.checkCast(ot.getJavaClass(), Unit.class);
+		return ut;
+	}
+
+	public static <T extends Entity> ArrayList<T> parseEntityList(JaamSimModel simModel, KeywordIndex kw, Class<T> aClass, boolean unique)
 	throws InputErrorException {
 		ArrayList<T> temp = new ArrayList<>(kw.numArgs());
 
 		for (int i = 0; i < kw.numArgs(); i++) {
-			Entity ent = Entity.getNamedEntity(kw.getArg(i));
+			Entity ent = simModel.getNamedEntity(kw.getArg(i));
 			if (ent == null) {
 				throw new InputErrorException(INP_ERR_ENTNAME, kw.getArg(i));
 			}
 
 			// If we found a group, expand the list of Entities
-			if (ent instanceof Group) {
+			if (ent instanceof Group && aClass != Group.class) {
 				ArrayList<Entity> gList = ((Group)ent).getList();
 				for (int j = 0; j < gList.size(); j++) {
 					T t = Input.castEntity(gList.get(j), aClass);
@@ -1314,65 +1449,43 @@ public abstract class Input<T> {
 		return temp;
 	}
 
-
-	public static <T extends Entity> ArrayList<T> parseEntityList(List<String> input, Class<T> aClass, boolean unique)
-	throws InputErrorException {
-		ArrayList<T> temp = new ArrayList<>(input.size());
-
-		for (int i = 0; i < input.size(); i++) {
-			Entity ent = Entity.getNamedEntity(input.get(i));
-			if (ent == null) {
-				throw new InputErrorException(INP_ERR_ENTNAME, input.get(i));
-			}
-
-			// If we found a group, expand the list of Entities
-			if (ent instanceof Group) {
-				ArrayList<Entity> gList = ((Group)ent).getList();
-				for (int j = 0; j < gList.size(); j++) {
-					T t = Input.castEntity(gList.get(j), aClass);
-					if (t == null) {
-						throw new InputErrorException(INP_ERR_ENTCLASS, aClass.getSimpleName(), gList.get(j), gList.get(j).getClass().getSimpleName());
-					}
-					temp.add(t);
-				}
-			} else {
-				T t = Input.castEntity(ent, aClass);
-				if (t == null) {
-					throw new InputErrorException(INP_ERR_ENTCLASS, aClass.getSimpleName(), input.get(i), ent.getClass().getSimpleName());
-				}
-				temp.add(t);
-			}
-		}
-
-		if (unique)
-			Input.assertUnique(temp);
-
-		return temp;
-	}
-
-
-	public static <T extends Entity> ArrayList<ArrayList<T>> parseListOfEntityLists(KeywordIndex kw, Class<T> aClass, boolean unique)
+	public static <T extends Entity> ArrayList<ArrayList<T>> parseListOfEntityLists(JaamSimModel simModel, KeywordIndex kw, Class<T> aClass, boolean unique)
 	throws InputErrorException {
 		ArrayList<KeywordIndex> subArgs = kw.getSubArgs();
 		ArrayList<ArrayList<T>> temp = new ArrayList<>(subArgs.size());
 
 		for (int i = 0; i < subArgs.size(); i++) {
 			try {
-				ArrayList<T> element = Input.parseEntityList(subArgs.get(i), aClass, unique);
+				ArrayList<T> element = Input.parseEntityList(simModel, subArgs.get(i), aClass, unique);
 				temp.add(element);
 			} catch (InputErrorException e) {
-				throw new InputErrorException(INP_ERR_ELEMENT, i, e.getMessage());
+				throw new InputErrorException(INP_ERR_ELEMENT, i+1, e.getMessage());
 			}
 		}
 		return temp;
 	}
 
-	public static <T> ArrayList<T> parseInterfaceEntityList(KeywordIndex kw, Class<T> aClass, boolean unique)
+	public static <T> T parseInterfaceEntity(JaamSimModel simModel, String choice, Class<T> aClass) {
+
+		Entity ent = simModel.getNamedEntity(choice);
+		if (ent == null) {
+			throw new InputErrorException(INP_ERR_ENTNAME, choice);
+		}
+
+		T temp = Input.castImplements(ent, aClass);
+		if (temp == null) {
+			throw new InputErrorException(INP_ERR_ENTCLASS, aClass.getSimpleName(), choice, ent.getClass().getSimpleName());
+		}
+
+		return temp;
+	}
+
+	public static <T> ArrayList<T> parseInterfaceEntityList(JaamSimModel simModel, KeywordIndex kw, Class<T> aClass, boolean unique)
 	throws InputErrorException {
 		ArrayList<T> temp = new ArrayList<>(kw.numArgs());
 
 		for (int i = 0; i < kw.numArgs(); i++) {
-			Entity ent = Entity.getNamedEntity(kw.getArg(i));
+			Entity ent = simModel.getNamedEntity(kw.getArg(i));
 			if (ent == null) {
 				throw new InputErrorException(INP_ERR_ENTNAME, kw.getArg(i));
 			}
@@ -1402,13 +1515,13 @@ public abstract class Input<T> {
 		return temp;
 	}
 
-	public static Color4d parseColour(KeywordIndex kw) {
+	public static Color4d parseColour(JaamSimModel simModel, KeywordIndex kw) {
 
 		Input.assertCountRange(kw, 1, 4);
 
 		// Color names
 		if (kw.numArgs() <= 2) {
-			Color4d colAtt = ColourInput.getColorWithName(kw.getArg(0).toLowerCase());
+			Color4d colAtt = ColourInput.getColorWithName(kw.getArg(0));
 			if( colAtt == null )
 				throw new InputErrorException( "Color " + kw.getArg( 0 ) + " not found" );
 
@@ -1418,12 +1531,12 @@ public abstract class Input<T> {
 			double a = Input.parseDouble(kw.getArg(1), 0.0d, 255.0d);
 			if (a > 1.0f)
 				a /= 255.0d;
-			return new Color4d(colAtt.r, colAtt.b, colAtt.g, a);
+			return new Color4d(colAtt.r, colAtt.g, colAtt.b, a);
 		}
 
 		// RGB
 		else {
-			DoubleVector dbuf = Input.parseDoubles(kw, 0.0d, 255.0d, DimensionlessUnit.class);
+			DoubleVector dbuf = Input.parseDoubles(simModel, kw, 0.0d, 255.0d, DimensionlessUnit.class);
 			double r = dbuf.get(0);
 			double g = dbuf.get(1);
 			double b = dbuf.get(2);
@@ -1444,122 +1557,81 @@ public abstract class Input<T> {
 		}
 	}
 
-	public static OutputChain parseOutputChain(KeywordIndex kw) {
-		String entName = "";
-		String outputName = "";
-		ArrayList<String> outputNameList = new ArrayList<>();
+	public static <T extends Entity> EntityProvider<T> parseEntityProvider(KeywordIndex kw, Entity thisEnt, Class<T> entClass) {
+		assertCount(kw, 1);
 
-		// 1) Expression syntax
-		if (kw.numArgs() == 1) {
-			String exp = kw.getArg(0);
-			if (exp.charAt(0) != '[')
-				throw new InputErrorException("Left bracket not found");
-			int k = exp.indexOf(']');
-			if (k == -1)
-				throw new InputErrorException("Right bracket not found");
-			entName = exp.substring(1, k);
-
-			if (exp.charAt(k+1) != '.')
-				throw new InputErrorException("Missing period after the right bracket");
-
-			StringBuilder sb = new StringBuilder();
-			for (int i=k+2; i<exp.length(); i++) {
-				char ch = exp.charAt(i);
-				if (ch == '.') {
-					outputNameList.add(sb.toString());
-					sb = new StringBuilder();
-					continue;
-				}
-				sb.append(ch);
-			}
-			outputNameList.add(sb.toString());
-			outputName = outputNameList.remove(0);
+		// Parse the input as an Entity
+		try {
+			T ent = parseEntity(thisEnt.getJaamSimModel(), kw.getArg(0), entClass);
+			return new EntityProvConstant<>(ent);
 		}
+		catch (InputErrorException e) {}
 
-		// 2) Output syntax
-		else {
-			entName = kw.getArg(0);
-			outputName = kw.getArg(1);
-			for (int i=2; i<kw.numArgs(); i++) {
-				outputNameList.add(kw.getArg(i));
-			}
+		// Parse the input as an Expression
+		try {
+			return new EntityProvExpression<>(kw.getArg(0), thisEnt, entClass);
 		}
-
-		// Construct the OutputChain
-		Entity ent = Entity.getNamedEntity(entName);
-		if (ent == null)
-			throw new InputErrorException(INP_ERR_ENTNAME, entName);
-		if (ent instanceof ObjectType)
-			throw new InputErrorException("%s is the name of a class, not an instance",
-					ent.getName());
-
-		OutputHandle out = ent.getOutputHandle(outputName);
-		if (out == null)
-			throw new InputErrorException("Output named %s not found for Entity %s",
-					outputName, entName);
-
-		if (!outputNameList.isEmpty() && !(Entity.class).isAssignableFrom(out.getReturnType()))
-			throw new InputErrorException("The first output in an output chain must return an Entity");
-
-		return new OutputChain(ent, outputName, out, outputNameList);
+		catch (ExpError e) {
+			throw new InputErrorException(e);
+		}
 	}
 
 	public static StringProvider parseStringProvider(KeywordIndex kw, Entity thisEnt, Class<? extends Unit> unitType) {
 
-		// Try to parse the input as an OutputChain
-		try {
-			OutputChain chain = Input.parseOutputChain(kw);
-			return new StringProvOutput(chain, unitType);
+		// Parse the input as a StringProvExpression
+		if (kw.numArgs() == 1) {
+			try {
+				return new StringProvExpression(kw.getArg(0), thisEnt, unitType);
+			} catch (ExpError e) {}
 		}
-		catch (InputErrorException e) {}
 
-		// Parse the input as a SampleProvider
-		SampleProvider samp = Input.parseSampleExp(kw, thisEnt, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, unitType);
-		return new StringProvSample(samp);
+		// Parse the input as a SampleProvider object
+		try {
+			SampleProvider samp = Input.parseSampleExp(kw, thisEnt, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, unitType);
+			return new StringProvSample(samp);
+		} catch (InputErrorException e) {}
+
+		// If nothing else works, return the constant string
+		assertCount(kw, 1);
+		return new StringProvConstant(kw.getArg(0));
 	}
 
 	public static SampleProvider parseSampleExp(KeywordIndex kw,
 			Entity thisEnt, double minValue, double maxValue, Class<? extends Unit> unitType) {
 
-		// If there are two or more inputs, it could be a chain of outputs
-		if (kw.numArgs() >= 2) {
-			try {
-				return new SampleOutput(Input.parseOutputChain(kw), unitType);
-			}
-			catch (InputErrorException e) {
-				if (kw.numArgs() > 2 || unitType == null)
-					throw new InputErrorException(e.getMessage());
-			}
-		}
+		if (unitType == UserSpecifiedUnit.class)
+			throw new InputErrorException(INP_ERR_UNITUNSPECIFIED);
 
-		// If there are exactly two inputs, and it is not an output chain, then it must be a number and its unit
+		if (unitType == DimensionlessUnit.class)
+			assertCount(kw, 1);
+		else
+			assertCountRange(kw, 1, 2);
+
+		// If there are exactly two inputs, then it must be a number and its unit
 		if (kw.numArgs() == 2) {
-			if (unitType == DimensionlessUnit.class)
-				throw new InputErrorException(INP_ERR_COUNT, 1, kw.argString());
-			DoubleVector tmp = Input.parseDoubles(kw, minValue, maxValue, unitType);
+			DoubleVector tmp = Input.parseDoubles(thisEnt.getJaamSimModel(), kw, minValue, maxValue, unitType);
 			return new SampleConstant(unitType, tmp.get(0));
 		}
 
 		// If there is only one input, it could be a SampleProvider, a dimensionless constant, or an expression
 
-		// 1) Try parsing a SampleProvider
+		// 1) Try parsing a SampleProvider object
 		SampleProvider s = null;
 		try {
-			Entity ent = Input.parseEntity(kw.getArg(0), Entity.class);
+			Entity ent = Input.parseEntity(thisEnt.getJaamSimModel(), kw.getArg(0), Entity.class);
 			s = Input.castImplements(ent, SampleProvider.class);
 		}
 		catch (InputErrorException e) {}
 
 		if (s != null) {
-			if (s.getUnitType() != UserSpecifiedUnit.class)
-				Input.assertUnitsMatch(unitType, s.getUnitType());
+			Input.assertUnitsMatch(unitType, s.getUnitType());
 			return s;
 		}
 
 		// 2) Try parsing a constant value
 		DoubleVector tmp = null;
 		try {
-			tmp = Input.parseDoubles(kw, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, DimensionlessUnit.class);
+			tmp = Input.parseDoubles(thisEnt.getJaamSimModel(), kw, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, DimensionlessUnit.class);
 		}
 		catch (InputErrorException e) {}
 
@@ -1573,12 +1645,11 @@ public abstract class Input<T> {
 
 		// 3) Try parsing an expression
 		try {
-			Expression exp = ExpParser.parseExpression(ExpEvaluator.getParseContext(), kw.getArg(0));
-			ExpValidator.validateExpression(exp, thisEnt, unitType);
-			return new SampleExpression(exp, thisEnt, unitType);
+			String expString = kw.getArg(0);
+			return new SampleExpression(expString, thisEnt, unitType);
 		}
 		catch (ExpError e) {
-			throw new InputErrorException(e.toString());
+			throw new InputErrorException(e);
 		}
 	}
 
@@ -1654,19 +1725,13 @@ public abstract class Input<T> {
 	 * <p>
 	 * This method must be overridden for an input to be shown with a drop-down
 	 * menu in the Input Editor.
+	 * @param ent TODO
 	 */
-	public ArrayList<String> getValidOptions() {
-		if (defValue != null && defValue.getClass() == Boolean.class) {
-			ArrayList<String> validOptions = new ArrayList<>();
-			validOptions.add("TRUE");
-			validOptions.add("FALSE");
-			return validOptions;
-		}
-		else
-			return null;
+	public ArrayList<String> getValidOptions(Entity ent) {
+		return null;
 	}
 
-	public String getDefaultStringForKeyInputs(Class<? extends Unit> unitType, String unitString) {
+	public String getDefaultStringForKeyInputs(Class<? extends Unit> unitType) {
 
 		if (defValue == null)
 			return "";
@@ -1719,14 +1784,8 @@ public abstract class Input<T> {
 			return "?????";
 		}
 
-		if (unitString==null) {
-			tmp.append(SEPARATOR);
-			tmp.append(Unit.getSIUnit(unitType));
-		}
-		else {
-			tmp.append(SEPARATOR);
-			tmp.append(unitString);
-		}
+		tmp.append(SEPARATOR);
+		tmp.append(Unit.getSIUnit(unitType));
 		return tmp.toString();
 	}
 }

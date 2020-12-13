@@ -18,7 +18,76 @@ package com.jaamsim.events;
 
 import org.junit.Test;
 
+import com.jaamsim.basicsim.Entity;
+import com.jaamsim.basicsim.JaamSimModel;
+
 public class TestSchedEvent {
+
+	@Test
+	public void testEntityCreate() {
+		JaamSimModel simModel = new JaamSimModel();
+
+		long[] nanoStamps = new long[11];
+		for (int i = 0; i <= 1000000; i++) {
+			if (i % 100000 == 0) {
+				int idx = i / 100000;
+				nanoStamps[idx] = System.nanoTime();
+			}
+			simModel.createInstance(Entity.class);
+		}
+		long endSchedNanos = System.nanoTime();
+
+		long endExecNanos = System.nanoTime();
+
+		outputResults("Entity Create", nanoStamps, endSchedNanos, endExecNanos);
+	}
+
+
+	@Test
+	public void testEntityKillFirst() {
+		JaamSimModel simModel = new JaamSimModel();
+
+		for (int i = 0; i <= 1000000; i++) {
+			simModel.createInstance(Entity.class);
+		}
+
+		long[] nanoStamps = new long[11];
+		for (int i = 0; i <= 1000000; i++) {
+			if (i % 100000 == 0) {
+				int idx = i / 100000;
+				nanoStamps[idx] = System.nanoTime();
+			}
+			simModel.getHeadEntity().kill();
+		}
+		long endSchedNanos = System.nanoTime();
+
+		long endExecNanos = System.nanoTime();
+
+		outputResults("Entity Kill First", nanoStamps, endSchedNanos, endExecNanos);
+	}
+
+	@Test
+	public void testEntityKillLast() {
+		JaamSimModel simModel = new JaamSimModel();
+
+		for (int i = 0; i <= 1000000; i++) {
+			simModel.createInstance(Entity.class);
+		}
+
+		long[] nanoStamps = new long[11];
+		for (int i = 0; i <= 1000000; i++) {
+			if (i % 100000 == 0) {
+				int idx = i / 100000;
+				nanoStamps[idx] = System.nanoTime();
+			}
+			simModel.getTailEntity().kill();
+		}
+		long endSchedNanos = System.nanoTime();
+
+		long endExecNanos = System.nanoTime();
+
+		outputResults("Entity Kill Last", nanoStamps, endSchedNanos, endExecNanos);
+	}
 
 	@Test
 	public void testLIFOEvents() {
@@ -126,6 +195,7 @@ public class TestSchedEvent {
 		System.out.format("Sched total - %d ns%n", (endSchedNanos - nanoStamps[0]));
 		System.out.format("Done exec - %12d ns (%f ns/evt)%n", execNanos, perEvtExec);
 		System.out.format("Done all - %d ns%n%n", (endExecNanos - nanoStamps[0]));
+		System.out.format("Total Time - %f sec%n%n", (endExecNanos - nanoStamps[0])/1e9d);
 	}
 
 	private static class TestTarget extends ProcessTarget {

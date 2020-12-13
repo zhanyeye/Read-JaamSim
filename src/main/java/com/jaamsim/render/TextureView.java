@@ -16,7 +16,6 @@
  */
 package com.jaamsim.render;
 
-import java.net.URI;
 import java.nio.FloatBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -25,6 +24,7 @@ import com.jaamsim.math.AABB;
 import com.jaamsim.math.Mat4d;
 import com.jaamsim.math.Ray;
 import com.jaamsim.math.Transform;
+import com.jaamsim.math.Vec2d;
 import com.jaamsim.math.Vec3d;
 import com.jaamsim.math.Vec4d;
 import com.jogamp.opengl.GL2GL3;
@@ -37,15 +37,14 @@ import com.jogamp.opengl.GL2GL3;
  */
 public class TextureView implements Renderable {
 
-	private final URI _imageURI;
+	private final TexLoader _texLoader;
 	private final Transform _trans;
 	private final Vec3d _scale;
 	private final long _pickingID;
+	private ArrayList<Vec2d> _texCoords;
+	private GraphicsMemManager.BufferHandle _texCoordHandle;
 
 	private final AABB _bounds;
-
-	private final boolean _isTransparent;
-	private final boolean _isCompressed;
 
 	private final VisibilityInfo _visInfo;
 
@@ -88,17 +87,16 @@ public class TextureView implements Renderable {
 		identMat[ 3] = 0.0f; identMat[ 7] = 0.0f; identMat[11] = 0.0f; identMat[15] = 1.0f;
 	}
 
-	public TextureView(URI imageURI, Transform trans, Vec3d scale, boolean isTransparent, boolean isCompressed,
-	                   VisibilityInfo visInfo, long pickingID) {
-		_imageURI = imageURI;
+	public TextureView(TexLoader loader, ArrayList<Vec2d> texCoords, Transform trans, Vec3d scale,
+            VisibilityInfo visInfo, long pickingID) {
+		_texLoader = loader;
 		_trans = trans;
 		_scale = scale;
 		_scale.z = 1; // This object can only be scaled in X, Y
 		_pickingID = pickingID;
-		_isTransparent = isTransparent;
-		_isCompressed = isCompressed;
 		_visInfo = visInfo;
 
+		_texCoords = texCoords;
 
 		Mat4d modelMat = RenderUtils.mergeTransAndScale(_trans, _scale);
 
@@ -211,22 +209,46 @@ public class TextureView implements Renderable {
 		gl.glVertexAttribPointer(normalVar, 3, GL2GL3.GL_FLOAT, false, 0, 0);
 
 		// TexCoords
-		int texCoordVar = gl.glGetAttribLocation(progHandle, "texCoord");
-		gl.glEnableVertexAttribArray(texCoordVar);
+		if (_texCoords == null) {
+			// Use default buffer if custom coords have not been included
+			int texCoordVar = gl.glGetAttribLocation(progHandle, "texCoord");
+			gl.glEnableVertexAttribArray(texCoordVar);
 
-		gl.glBindBuffer(GL2GL3.GL_ARRAY_BUFFER, texCoordBuff);
-		gl.glVertexAttribPointer(texCoordVar, 2, GL2GL3.GL_FLOAT, false, 0, 0);
+			gl.glBindBuffer(GL2GL3.GL_ARRAY_BUFFER, texCoordBuff);
+			gl.glVertexAttribPointer(texCoordVar, 2, GL2GL3.GL_FLOAT, false, 0, 0);
 
-		gl.glBindBuffer(GL2GL3.GL_ARRAY_BUFFER, 0);
-
+			gl.glBindBuffer(GL2GL3.GL_ARRAY_BUFFER, 0);
+		}
 		gl.glBindVertexArray(0);
 
 	}
 
+	private void updateTexCoordBuffer(Renderer renderer) {
+		GL2GL3 gl = renderer.getGL();
+		int texCoordBuffSize = _texCoords.size()*2*4;
+		_texCoordHandle = renderer.getTexMemManager().allocateBuffer(texCoordBuffSize, gl);
+		int buffID = _texCoordHandle.bind();
+
+		FloatBuffer texData = FloatBuffer.allocate(_texCoords.size()*2);
+
+		for (Vec2d v : _texCoords) {
+			texData.put((float)v.x); texData.put((float)v.y);
+		}
+		texData.flip();
+		gl.glBindBuffer(GL2GL3.GL_ARRAY_BUFFER, buffID);
+		gl.glBufferData(GL2GL3.GL_ARRAY_BUFFER, texCoordBuffSize, texData, GL2GL3.GL_STATIC_DRAW);
+
+		int texCoordVar = gl.glGetAttribLocation(progHandle, "texCoord");
+		gl.glEnableVertexAttribArray(texCoordVar);
+
+		gl.glBindBuffer(GL2GL3.GL_ARRAY_BUFFER, buffID);
+		gl.glVertexAttribPointer(texCoordVar, 2, GL2GL3.GL_FLOAT, false, 0, 0);
+
+	}
 
 	@Override
 	public void render(int contextID, Renderer renderer, Camera cam, Ray pickRay) {
-		if (_isTransparent) {
+		if (_texLoader.hasTransparent()) {
 			// Return, this will be handled in the transparent render phase
 			return;
 		}
@@ -242,7 +264,7 @@ public class TextureView implements Renderable {
 
 		GL2GL3 gl = renderer.getGL();
 
-		int textureID = renderer.getTexCache().getTexID(gl, _imageURI, _isTransparent, _isCompressed, false);
+		int textureID = _texLoader.getTexID(renderer);
 
 		if (textureID == TexCache.LOADING_TEX_ID) {
 			return; // This texture is not ready yet
@@ -255,6 +277,10 @@ public class TextureView implements Renderable {
 		int vao = VAOMap.get(contextID);
 		gl.glBindVertexArray(vao);
 
+		if (	_texCoords != null &&
+				(_texCoordHandle == null || !_texCoordHandle.isValid()) ) {
+			updateTexCoordBuffer(renderer);
+		}
 
 		Mat4d modelViewMat = new Mat4d();
 
@@ -319,7 +345,7 @@ public class TextureView implements Renderable {
 
 	@Override
 	public boolean hasTransparent() {
-		return _isTransparent;
+		return _texLoader.hasTransparent();
 	}
 
 	@Override

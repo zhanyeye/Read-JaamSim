@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2014 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2018 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +17,7 @@
  */
 package com.jaamsim.Graphics;
 
+import com.jaamsim.units.DimensionlessUnit;
 
 /**
  * BillboardText is a DisplayEntity used to display billboarded text labels
@@ -26,7 +28,29 @@ public class BillboardText extends Text {
 
 	{
 		// Set the default text height to 10 pixels
+		textHeight.setUnitType(DimensionlessUnit.class);
 		textHeight.setDefaultValue(10.0);
+
+		// Alignment input is ignored
+		alignmentInput.setHidden(true);
+	}
+
+	public BillboardText() {}
+
+	@Override
+	public double getTextHeight() {
+		if (textHeight.isDefault()) {
+			return getTextModel().getTextHeightInPixels();
+		}
+		return textHeight.getValue();
+	}
+
+	@Override
+	public String getTextHeightString() {
+		if (textHeight.isDefault()) {
+			return getTextModel().getTextHeightInPixelsString();
+		}
+		return textHeight.getValueString();
 	}
 
 }

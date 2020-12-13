@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2012 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2020 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,12 +25,15 @@ import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.Buffer;
+import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
+import com.jaamsim.math.Color4d;
 import com.jaamsim.math.Mat4d;
 import com.jaamsim.math.Plane;
 import com.jaamsim.math.Ray;
@@ -38,6 +42,7 @@ import com.jaamsim.math.Vec2d;
 import com.jaamsim.math.Vec3d;
 import com.jaamsim.math.Vec4d;
 import com.jaamsim.ui.LogBox;
+import com.jogamp.opengl.GL2GL3;
 
 /**
  * A big pile of static methods that currently don't have a better place to live. All Rendering specific
@@ -49,6 +54,13 @@ public class RenderUtils {
 	public static List<Vec4d> CIRCLE_POINTS;
 	public static List<Vec4d> RECT_POINTS;
 	public static List<Vec4d> TRIANGLE_POINTS;
+	public static List<Vec4d> PENTAGON_POINTS;
+	public static List<Vec4d> HEXAGON_POINTS;
+	public static List<Vec4d> OCTAGON_POINTS;
+	public static List<Vec4d> PENTAGRAM_POINTS;
+	public static List<Vec4d> HEPTAGRAM_POINTS;
+	public static List<Vec4d> OCTAGRAM_POINTS;
+	public static List<Vec4d> ARROW2D_POINTS;
 
 	static {
 		CIRCLE_POINTS = getCirclePoints(32);
@@ -67,6 +79,23 @@ public class RenderUtils {
 		TRIANGLE_POINTS.add(new Vec4d( 0.5, -0.5, 0, 1.0d));
 		TRIANGLE_POINTS.add(new Vec4d( 0.5,  0.5, 0, 1.0d));
 		TRIANGLE_POINTS.add(new Vec4d(-0.5,  0.0, 0, 1.0d));
+
+		PENTAGON_POINTS = getStarPoints(0.5, 5, 1);
+		HEXAGON_POINTS = getStarPoints(0.5, 6, 1);
+		OCTAGON_POINTS = getStarPoints(0.5, 8, 1);
+
+		PENTAGRAM_POINTS = getStarPoints(0.5, 5, 2);
+		HEPTAGRAM_POINTS = getStarPoints(0.5, 7, 3);
+		OCTAGRAM_POINTS = getStarPoints(0.5, 8, 3);
+
+		ARROW2D_POINTS = new ArrayList<>(7);
+		ARROW2D_POINTS.add(new Vec4d( 0.5,  0.0, 0.0, 1.0d));
+		ARROW2D_POINTS.add(new Vec4d( 0.1,  0.5, 0.0, 1.0d));
+		ARROW2D_POINTS.add(new Vec4d( 0.1,  0.2, 0.0, 1.0d));
+		ARROW2D_POINTS.add(new Vec4d(-0.5,  0.2, 0.0, 1.0d));
+		ARROW2D_POINTS.add(new Vec4d(-0.5, -0.2, 0.0, 1.0d));
+		ARROW2D_POINTS.add(new Vec4d( 0.1, -0.2, 0.0, 1.0d));
+		ARROW2D_POINTS.add(new Vec4d( 0.1, -0.5, 0.0, 1.0d));
 	}
 
 	// Transform the list of points in place
@@ -114,9 +143,33 @@ static void putPointXYZW(FloatBuffer fb, Vec4d v) {
 	fb.put((float)v.w);
 }
 
+static void putColor4b(ByteBuffer bb, Color4d col) {
+	bb.put((byte)(col.r * 255.0));
+	bb.put((byte)(col.g * 255.0));
+	bb.put((byte)(col.b * 255.0));
+	bb.put((byte)(col.a * 255.0));
+}
+
+static void putMat4dCM(FloatBuffer fb, Mat4d mat) {
+	float[] floats = MarshalMat4d(mat);
+	fb.put(floats);
+}
+
+// Load a float buffer into the openGL buffer given
+// Assumes the buffer has not been flipped
+static void nioBuffToGL(GL2GL3 gl, Renderer r, int bufferHandle, int itemSize, Buffer buff) {
+
+	buff.flip();
+	int size = buff.limit() * itemSize;
+	gl.glBindBuffer(GL2GL3.GL_ARRAY_BUFFER, bufferHandle);
+	gl.glBufferData(GL2GL3.GL_ARRAY_BUFFER, size, buff, GL2GL3.GL_STATIC_DRAW);
+	gl.glBindBuffer(GL2GL3.GL_ARRAY_BUFFER, 0);
+	r.usingVRAM(size);
+
+}
+
 	/**
 	 * Returns a list of points for a circle in the XY plane at the origin
-	 * @return
 	 */
 	public static ArrayList<Vec4d> getCirclePoints(int numSegments) {
 		if (numSegments < 3) {
@@ -135,10 +188,27 @@ static void putPointXYZW(FloatBuffer fb, Vec4d v) {
 	}
 
 	/**
+	 * Returns a list of points for a polygon or star.
+	 * @param radius - distance from the centre of the polygon or star to each vertex
+	 * @param n - number of vertices
+	 * @param m - number of vertices spanned by each line
+	 * @return list of coordinates for the vertices
+	 */
+	public static ArrayList<Vec4d> getStarPoints(double radius, int n, int m) {
+		ArrayList<Vec4d> ret = new ArrayList<>(n + 1);
+		double angle = 2 * Math.PI / n * m;
+		for (int i = 0; i <= n; i++) {
+			double x = -radius * Math.sin(angle * i);
+			double y = radius * Math.cos(angle * i);
+			ret.add(new Vec4d(x, y, 0, 1));
+		}
+		return ret;
+	}
+
+	/**
 	 * Build up a rounded rectangle (similar to the existing stockpiles). Assumes rounding width-wise
 	 * @param width
 	 * @param height
-	 * @return
 	 */
 	public static ArrayList<Vec4d> getRoundedRectPoints(double width, double height, int numSegments) {
 		ArrayList<Vec4d> ret = new ArrayList<>();
@@ -179,7 +249,6 @@ static void putPointXYZW(FloatBuffer fb, Vec4d v) {
 	 * @param startAngle
 	 * @param endAngle
 	 * @param numSegments
-	 * @return
 	 */
 	public static ArrayList<Vec4d> getArcPoints(double radius, Vec4d center, double startAngle, double endAngle, int numSegments) {
 		if (numSegments < 3) {
@@ -193,8 +262,8 @@ static void putPointXYZW(FloatBuffer fb, Vec4d v) {
 			double theta0 = i * thetaStep + startAngle;
 			double theta1 = (i+1) * thetaStep + startAngle;
 
-			ret.add(new Vec4d(radius * Math.cos(theta0) + center.x, radius * Math.sin(theta0) + center.y, 0, 1.0d));
-			ret.add(new Vec4d(radius * Math.cos(theta1) + center.x, radius * Math.sin(theta1) + center.y, 0, 1.0d));
+			ret.add(new Vec4d(radius * Math.cos(theta0) + center.x, radius * Math.sin(theta0) + center.y, center.z, 1.0d));
+			ret.add(new Vec4d(radius * Math.cos(theta1) + center.x, radius * Math.sin(theta1) + center.y, center.z, 1.0d));
 		}
 
 		return ret;
@@ -208,7 +277,6 @@ static void putPointXYZW(FloatBuffer fb, Vec4d v) {
 	 * @param y - y coord in window space
 	 * @param width - window width
 	 * @param height - window height
-	 * @return
 	 */
 	public static Ray getPickRayForPosition(CameraInfo cameraInfo, int x, int y, int width, int height) {
 
@@ -223,7 +291,6 @@ static void putPointXYZW(FloatBuffer fb, Vec4d v) {
 	 * Get a Ray representing a line starting at the camera position and projecting through the current mouse pointer
 	 * in this window
 	 * @param mouseInfo
-	 * @return
 	 */
 	public static Ray getPickRay(Renderer.WindowMouseInfo mouseInfo) {
 
@@ -244,7 +311,6 @@ static void putPointXYZW(FloatBuffer fb, Vec4d v) {
 	 * @param aspectRatio
 	 * @param x - normalized [-1. 1] screen x coord
 	 * @param y - normalized [-1. 1] screen y coord
-	 * @return
 	 */
 	public static Ray getViewRay(CameraInfo camInfo, double aspectRatio, double x, double y) {
 
@@ -271,7 +337,6 @@ static void putPointXYZW(FloatBuffer fb, Vec4d v) {
 	 * Return a matrix that is the combination of the transform and non-uniform scale
 	 * @param trans
 	 * @param scale
-	 * @return
 	 */
 	public static Mat4d mergeTransAndScale(Transform trans, Vec3d scale) {
 		Mat4d ret = new Mat4d();
@@ -285,7 +350,6 @@ static void putPointXYZW(FloatBuffer fb, Vec4d v) {
 	 * Get the inverse (in Matrix4d form) of the combined Transform and non-uniform scale factors
 	 * @param trans
 	 * @param scale
-	 * @return
 	 */
 	public static Mat4d getInverseWithScale(Transform trans, Vec3d scale) {
 		Transform t = new Transform(trans);
@@ -422,7 +486,6 @@ static void putPointXYZW(FloatBuffer fb, Vec4d v) {
 	 * Marshal a Mat4d into a static scratch space, this should only be called by the render thread, but I'm not
 	 * putting a guard here for performance reasons. This returns a colum major float array
 	 * @param mat
-	 * @return
 	 */
 	public static float[] MarshalMat4d(Mat4d mat) {
 		MAT_MARSHAL[ 0] = (float)mat.d00;
@@ -490,7 +553,7 @@ static void putPointXYZW(FloatBuffer fb, Vec4d v) {
 	}
 
 	private static boolean isValidExtension(String fileName) {
-		int idx = fileName.lastIndexOf(".");
+		int idx = fileName.lastIndexOf('.');
 		if (idx < 0)
 			return false;
 
@@ -524,8 +587,13 @@ static void putPointXYZW(FloatBuffer fb, Vec4d v) {
 
 					// This zipEntry is a collada file, no need to look
 					// any further
+
+					// Abuse URI a bit to URI-encode the filename
+					URI encEntryURI = new URI(null, entryName, null);
+					String encEntry = encEntryURI.getRawSchemeSpecificPart();
+
 					meshURL = new URL("jar:" + meshURL + "!/"
-							+ entryName);
+							+ encEntry);
 					break;
 				}
 			}
@@ -550,7 +618,6 @@ static void putPointXYZW(FloatBuffer fb, Vec4d v) {
 	 * @param centerPoint
 	 * @param currentRay
 	 * @param lastRay
-	 * @return
 	 */
 	public static double getZDiff(Vec3d centerPoint, Ray currentRay, Ray lastRay) {
 

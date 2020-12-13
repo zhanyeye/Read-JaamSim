@@ -30,29 +30,29 @@ import com.jaamsim.units.VolumeFlowUnit;
 public abstract class FluidFlowCalculation extends CalculationEntity {
 
 	@Keyword(description = "The Fluid being moved by the flow.",
-	      example = "FluidFlow1 Fluid { Fluid1 }")
+	         exampleList = {"Fluid1"})
 	private final EntityInput<Fluid> fluidInput;
 
-	@Keyword(description = "The source for the flow.",
-	      example = "FluidFlow1 Source { Tank1 }")
+	@Keyword(description = "The source object for the flow.",
+	         exampleList = {"Tank1"})
 	protected final EntityInput<FluidComponent> sourceInput;
 
-	@Keyword(description = "The destination for the flow.",
-	      example = "FluidFlow1 Destination { Tank1 }")
+	@Keyword(description = "The destination object for the flow.",
+	         exampleList = {"Tank1"})
 	protected final EntityInput<FluidComponent> destinationInput;
 
 	private double flowRate;  // The volumetric flow rate (m3/s) for the route.
 	private double lastUpdateTime;  // The time at which the last update was performed.
 
 	{
-		fluidInput = new EntityInput<>( Fluid.class, "Fluid", "Key Inputs", null);
+		fluidInput = new EntityInput<>( Fluid.class, "Fluid", KEY_INPUTS, null);
 		this.addInput( fluidInput);
 		fluidInput.setRequired(true);
 
-		sourceInput = new EntityInput<>( FluidComponent.class, "Source", "Key Inputs", null);
+		sourceInput = new EntityInput<>( FluidComponent.class, "Source", KEY_INPUTS, null);
 		this.addInput( sourceInput);
 
-		destinationInput = new EntityInput<>( FluidComponent.class, "Destination", "Key Inputs", null);
+		destinationInput = new EntityInput<>( FluidComponent.class, "Destination", KEY_INPUTS, null);
 		this.addInput( destinationInput);
 	}
 

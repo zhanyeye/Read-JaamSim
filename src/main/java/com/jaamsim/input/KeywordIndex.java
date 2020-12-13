@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2014 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2019-2020 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,6 +31,14 @@ public class KeywordIndex {
 		this(word, arg, 0, arg.size(), ctxt);
 	}
 
+	public KeywordIndex(KeywordIndex kw, int s) {
+		this(kw.keyword, kw.input, kw.start + s, kw.end, kw.context);
+	}
+
+	public KeywordIndex(KeywordIndex kw, int s, int e) {
+		this(kw.keyword, kw.input, kw.start + s, kw.start + e, kw.context);
+	}
+
 	public KeywordIndex(String word, ArrayList<String> inp, int s, int e, ParseContext ctxt) {
 		input = inp;
 		keyword = word;
@@ -47,7 +56,7 @@ public class KeywordIndex {
 		for (int i = start; i < end; i++) {
 			String dat = this.input.get(i);
 			if (i > start)
-				sb.append("  ");
+				sb.append(Input.SEPARATOR);
 
 			if (Parser.needsQuoting(dat) && !dat.equals("{") && !dat.equals("}"))
 				sb.append("'").append(dat).append("'");
@@ -72,6 +81,7 @@ public class KeywordIndex {
 	}
 
 	public ArrayList<KeywordIndex> getSubArgs() {
+		Input.assertBracesMatch(this);
 		ArrayList<KeywordIndex> subArgs = new ArrayList<>();
 		for (int i= 0; i < this.numArgs(); i++) {
 			//skip over opening brace if present
@@ -95,4 +105,28 @@ public class KeywordIndex {
 
 		return subArgs;
 	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj) {
+			return true;
+		}
+		if (!(obj instanceof KeywordIndex))
+			return false;
+
+		KeywordIndex kw = (KeywordIndex) obj;
+		if (context == null && kw.context != null)
+			return false;
+		if (context != null && !context.equals(kw.context))
+			return false;
+
+		return input.equals(kw.input) && keyword.equals(kw.keyword)
+				&& start == kw.start && end == kw.end;
+    }
+
+	@Override
+	public String toString() {
+		return input.subList(start, end).toString();
+	}
+
 }

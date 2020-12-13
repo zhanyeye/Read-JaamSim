@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2013 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2018-2019 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,9 +19,12 @@ package com.jaamsim.input;
 
 import java.util.ArrayList;
 
+import com.jaamsim.Samples.TimeSeries;
 import com.jaamsim.Samples.TimeSeriesData;
-import com.jaamsim.basicsim.Simulation;
+import com.jaamsim.basicsim.Entity;
+import com.jaamsim.basicsim.JaamSimModel;
 import com.jaamsim.datatypes.DoubleVector;
+import com.jaamsim.events.EventManager;
 import com.jaamsim.units.DimensionlessUnit;
 import com.jaamsim.units.TimeUnit;
 import com.jaamsim.units.Unit;
@@ -38,18 +42,20 @@ public class TimeSeriesDataInput extends Input<TimeSeriesData> {
 	}
 
 	@Override
-	public void parse(KeywordIndex kw) throws InputErrorException {
+	public void parse(Entity thisEnt, KeywordIndex kw) throws InputErrorException {
+		JaamSimModel simModel = thisEnt.getJaamSimModel();
+		TimeSeries ts = (TimeSeries) thisEnt;
 
 		boolean braceOpened = false;
-
-		// Set the clock tick length
-		tickLength = Simulation.getTickLength();
 
 		if (unitType == UserSpecifiedUnit.class)
 			throw new InputErrorException(INP_ERR_UNITUNSPECIFIED);
 
-		long startingYearOffset = -1;
-		long lastTime = -1;
+		long offset = 0L;
+		if (ts.isOffsetToFirst())
+			offset = -1L;
+
+		long lastTime = Long.MIN_VALUE;
 
 		DoubleVector times = new DoubleVector(kw.numArgs()/4);
 		DoubleVector values = new DoubleVector(kw.numArgs()/4);
@@ -85,40 +91,42 @@ public class TimeSeriesDataInput extends Input<TimeSeriesData> {
 			long recordus;
 			if (Input.isRFC8601DateTime(each.get(0))) {
 				Input.assertCountRange(each, 2, 3);
-				recordus = Input.parseRFC8601DateTime(each.get(0));
+				double simTime = Input.parseRFC8601DateTime(simModel, each.get(0));
+				EventManager evt = simModel.getEventManager();
+				recordus = evt.secondsToNearestTick(simTime);
 				each.remove(0);
 			}
 			// Time input in number/unit format
 			else {
 				// Parse the unit portion of the time input
 				Input.assertCountRange(each, 3, 4);
-				TimeUnit unit = Input.tryParseUnit(each.get(1), TimeUnit.class);
+				String unitName = Parser.removeEnclosure("[", each.get(1), "]");
+				TimeUnit unit = Input.tryParseUnit(thisEnt.getJaamSimModel(), unitName, TimeUnit.class);
 				if (unit == null)
 					throw new InputErrorException(INP_ERR_NOUNITFOUND, each.get(1), "TimeUnit");
 
 				// Parse the numeric portion of the time input
 				double factor = unit.getConversionFactorToSI();
-				recordus = (long) (Input.parseDouble(each.get(0), 0.0, Double.POSITIVE_INFINITY, factor)*1e6);
+				recordus = (long) (Input.parseDouble(each.get(0), Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, factor)*1e6);
 				each.remove(0);
 				each.remove(0);
 			}
 
 			// Make sure the times are in increasing order
 			if (recordus <= lastTime)
-				throw new InputErrorException( "The times must be given in increasing order on " + each.get(0));
+				throw new InputErrorException("The times must be given in increasing order.");
 
 			lastTime = recordus;
 
 			// set the offset to the number of whole years from the first record
-			if (startingYearOffset == -1) {
-				startingYearOffset = recordus / Input.usPerYr;
-				startingYearOffset *= Input.usPerYr;
-			}
+			if (offset == -1)
+				offset = recordus;
 
-			long usOffset = recordus - startingYearOffset;
+			long usOffset = recordus - offset;
 
 			// Value portion of the record
-			DoubleVector v = Input.parseDoubles(each, minValue, maxValue, unitType);
+			KeywordIndex valKw = new KeywordIndex("", each, null);
+			DoubleVector v = Input.parseDoubles(thisEnt.getJaamSimModel(), valKw, minValue, maxValue, unitType);
 
 			// Store the time and value for this record
 			times.add( usOffset/(1.0e6*tickLength) );
@@ -128,8 +136,13 @@ public class TimeSeriesDataInput extends Input<TimeSeriesData> {
 		if (braceOpened)
 			throw new InputErrorException("Final closing brace ( } ) is missing.");
 
+		// Confirm that the first simulation time is less than or equal to zero
+		if (times.get(0) > 0.0d)
+			throw new InputErrorException("First simulation time must be less than or equal to "
+					+ "zero. Received %s seconds.", times.get(0));
+
 		// Set the value to a new time series data object
-		value = new TimeSeriesData( times, values );
+		value = new TimeSeriesData(times, values, simModel.getEventManager());
 	}
 
 	public void setUnitType(Class<? extends Unit> u) {
@@ -138,7 +151,17 @@ public class TimeSeriesDataInput extends Input<TimeSeriesData> {
 		unitType = u;
 	}
 
+	public void setTickLength(double val) {
+		tickLength = val;
+	}
+
 	public double getTickLength() {
 		return tickLength;
 	}
+
+	@Override
+	public boolean useExpressionBuilder() {
+		return true;
+	}
+
 }

@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2013 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2018-2019 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,9 +23,6 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
 
-import javax.swing.JFileChooser;
-import javax.swing.filechooser.FileNameExtensionFilter;
-
 import com.jaamsim.Graphics.DisplayEntity;
 import com.jaamsim.MeshFiles.BlockWriter;
 import com.jaamsim.MeshFiles.DataBlock;
@@ -32,11 +30,9 @@ import com.jaamsim.MeshFiles.MeshData;
 import com.jaamsim.basicsim.Entity;
 import com.jaamsim.collada.ColParser;
 import com.jaamsim.controllers.RenderManager;
-import com.jaamsim.input.ActionListInput;
 import com.jaamsim.input.FileInput;
 import com.jaamsim.input.Keyword;
 import com.jaamsim.input.Output;
-import com.jaamsim.input.OutputHandle;
 import com.jaamsim.math.AABB;
 import com.jaamsim.math.Transform;
 import com.jaamsim.math.Vec3d;
@@ -49,52 +45,31 @@ import com.jaamsim.render.MeshProxy;
 import com.jaamsim.render.RenderProxy;
 import com.jaamsim.render.RenderUtils;
 import com.jaamsim.render.VisibilityInfo;
-import com.jaamsim.ui.GUIFrame;
 import com.jaamsim.ui.LogBox;
-import com.jaamsim.ui.MenuItem;
-import com.jaamsim.ui.MenuItemEntity;
 
-public class ColladaModel extends DisplayModel implements MenuItemEntity {
+public class ColladaModel extends DisplayModel {
 
 	@Keyword(description = "The file containing the 3d object to show, valid formats are: "
 			+ "DAE, OBJ, JSM, and JSB, or a compressed version of any of these files in ZIP format.",
 	         exampleList = {"..\\graphics\\ship.dae", "..\\graphics\\ship.dae.zip" })
 	private final FileInput colladaFile;
 
-	@Keyword(description = "A list of active actions and the entity output that drives them",
-	         exampleList = { "{ ContentAction Contents } { BoomAngleAction BoomAngle }" })
-	private final ActionListInput actions;
-
 	private static HashMap<URI, MeshProtoKey> _cachedKeys = new HashMap<>();
 
-	private static final String[] validFileExtensions;
-	private static final String[] validFileDescriptions;
-	static {
-		validFileExtensions = new String[5];
-		validFileDescriptions = new String[5];
-
-		validFileExtensions[0] = "ZIP";
-		validFileExtensions[1] = "DAE";
-		validFileExtensions[2] = "OBJ";
-		validFileExtensions[3] = "JSM";
-		validFileExtensions[4] = "JSB";
-
-		validFileDescriptions[0] = "Zipped 3D Files (*.zip)";
-		validFileDescriptions[1] = "COLLADA Files (*.dae)";
-		validFileDescriptions[2] = "Wavefront Files (*.obj)";
-		validFileDescriptions[3] = "JaamSim 3D Files (*.jsm)";
-		validFileDescriptions[4] = "JaamSim 3D Binary Files (*.jsb)";
-	}
+	public static final String[] VALID_FILE_EXTENSIONS = {"ZIP", "DAE", "OBJ", "JSM", "JSB"};
+	public static final String[] VALID_FILE_DESCRIPTIONS = {
+			"Zipped 3D Files (*.zip)",
+			"COLLADA Files (*.dae)",
+			"Wavefront Files (*.obj)",
+			"JaamSim 3D Files (*.jsm)",
+			"JaamSim 3D Binary Files (*.jsb)"};
 
 	{
-		colladaFile = new FileInput( "ColladaFile", "Key Inputs", null );
+		colladaFile = new FileInput( "ColladaFile", KEY_INPUTS, null );
 		colladaFile.setFileType("3D");
-		colladaFile.setValidFileExtensions(validFileExtensions);
-		colladaFile.setValidFileDescriptions(validFileDescriptions);
+		colladaFile.setValidFileExtensions(VALID_FILE_EXTENSIONS);
+		colladaFile.setValidFileDescriptions(VALID_FILE_DESCRIPTIONS);
 		this.addInput( colladaFile);
-
-		actions = new ActionListInput("Actions", "Key Inputs", new ArrayList<Action.Binding>());
-		this.addInput(actions);
 	}
 
 	public ColladaModel() {}
@@ -121,20 +96,11 @@ public class ColladaModel extends DisplayModel implements MenuItemEntity {
 	 */
 	public static boolean isValidExtension(String str) {
 
-		for (String ext : validFileExtensions) {
+		for (String ext : VALID_FILE_EXTENSIONS) {
 			if (str.equalsIgnoreCase(ext))
 				return true;
 		}
 		return false;
-	}
-
-	/**
-	 * Returns a file name extension filter for each of the supported file types.
-	 *
-	 * @return an array of file name extension filters.
-	 */
-	public static FileNameExtensionFilter[] getFileNameExtensionFilters() {
-		return FileInput.getFileNameExtensionFilters("3D", validFileExtensions, validFileDescriptions);
 	}
 
 	public static MeshProtoKey getCachedMeshKey(URI shapeURI) {
@@ -160,7 +126,6 @@ public class ColladaModel extends DisplayModel implements MenuItemEntity {
 		private Transform transCache;
 		private Vec3d scaleCache;
 		private URI colCache;
-		private ArrayList<Action.Queue> actionsCache;
 		private VisibilityInfo viCache;
 
 		public Binding(Entity ent, DisplayModel dm) {
@@ -189,18 +154,6 @@ public class ColladaModel extends DisplayModel implements MenuItemEntity {
 			URI filename = colladaFile.getValue();
 
 			ArrayList<Action.Queue> aqList = new ArrayList<>();
-			for (Action.Binding b : actions.getValue()) {
-				Action.Queue aq = new Action.Queue();
-				aq.name = b.actionName;
-				OutputHandle handle = dispEnt.getOutputHandle(b.outputName);
-				aq.time = 0;
-				if (handle != null) {
-					aq.time = handle.getValueAsDouble(simTime, 0);
-				}
-
-				aqList.add(aq);
-			}
-
 			VisibilityInfo vi = getVisibilityInfo();
 
 			boolean dirty = false;
@@ -208,13 +161,11 @@ public class ColladaModel extends DisplayModel implements MenuItemEntity {
 			dirty = dirty || !compare(transCache, trans);
 			dirty = dirty || dirty_vec3d(scaleCache, scale);
 			dirty = dirty || !compare(colCache, filename);
-			dirty = dirty || !compare(actionsCache, aqList);
 			dirty = dirty || !compare(viCache, vi);
 
 			transCache = trans;
 			scaleCache = scale;
 			colCache = filename;
-			actionsCache = aqList;
 			viCache = vi;
 
 			if (cachedProxies != null && !dirty) {
@@ -322,19 +273,7 @@ public class ColladaModel extends DisplayModel implements MenuItemEntity {
 
 	}
 
-	@Output (name = "Actions")
-	public String getActionsOutput(double simTime) {
-		MeshProtoKey meshKey = getCachedMeshKey(colladaFile.getValue());
-		ArrayList<Action.Description> actionDescs = RenderManager.inst().getMeshActions(meshKey, true);
-
-		StringBuilder ret = new StringBuilder();
-		for (Action.Description desc : actionDescs) {
-			ret.append(desc.name + " ");
-		}
-		return ret.toString();
-	}
-
-	private void exportBinaryMesh(String outputName) {
+	public void exportBinaryMesh(String outputName) {
 		MeshProtoKey meshKey = getCachedMeshKey(colladaFile.getValue());
 
 		try {
@@ -351,56 +290,6 @@ public class ColladaModel extends DisplayModel implements MenuItemEntity {
 			LogBox.renderLogException(ex);
 		}
 
-	}
-
-	@Override
-	public void gatherMenuItems(ArrayList<MenuItem> list, int x, int y) {
-		list.add(new MenuItem("Export 3D Binary File (*.jsb)") {
-
-			@Override
-			public void action() {
-
-				// Create a file chooser
-				File colFile = new File(colladaFile.getValue());
-				final JFileChooser chooser = new JFileChooser(colFile);
-
-				// Set the file extension filters
-				chooser.setAcceptAllFileFilterUsed(true);
-				FileNameExtensionFilter jsbFilter = new FileNameExtensionFilter("JaamSim 3D Binary Files (*.jsb)", "JSB");
-				chooser.addChoosableFileFilter(jsbFilter);
-				chooser.setFileFilter(jsbFilter);
-
-				// Set the default name for the binary file
-				String defName = colFile.getName().concat(".jsb");
-				chooser.setSelectedFile(new File(defName));
-
-				// Show the file chooser and wait for selection
-				int returnVal = chooser.showDialog(null, "Export");
-
-				// Create the selected graphics files
-				if (returnVal == JFileChooser.APPROVE_OPTION) {
-		            File file = chooser.getSelectedFile();
-					String filePath = file.getPath();
-
-					// Add the file extension ".jsb" if needed
-					filePath = filePath.trim();
-					if (filePath.indexOf(".") == -1)
-						filePath = filePath.concat(".jsb");
-
-					// Confirm overwrite if file already exists
-					File temp = new File(filePath);
-					if (temp.exists()) {
-						boolean confirmed = GUIFrame.showSaveAsDialog(file.getName());
-						if (!confirmed) {
-							return;
-						}
-					}
-
-					// Export the JSB file
-		            exportBinaryMesh(temp.getPath());
-		        }
-			}
-		});
 	}
 
 }

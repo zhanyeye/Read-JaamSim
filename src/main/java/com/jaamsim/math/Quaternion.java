@@ -146,7 +146,6 @@ public void setAxisAngle(Vec3d axis, double angle) {
  * Only valid for vectors of the same length
  * @param from
  * @param to
- * @return
  */
 public static Quaternion transformVectors(Vec4d from, Vec4d to) {
 
@@ -186,7 +185,7 @@ public double mag() {
 
 private void _norm(Quaternion q) {
 	double mag = _dot4(q, q);
-	if (mag < Constants.EPSILON) { // The quaternion is of length 0, simply return an identity
+	if (MathUtils.isSmall(mag)) { // The quaternion is of length 0, simply return an identity
 		this.x = 0.0d; this.y = 0.0d; this.z = 0.0d; this.w = 1.0d;
 		return;
 	}
@@ -236,8 +235,8 @@ public void conjugate(Quaternion q) {
 /**
  * Quaternion multiplication, mathematically equivalent to applying both rotations in order.
  * Sets this to a*b
- * @param q
- * @param res
+ * @param a
+ * @param b
  */
 public void mult(Quaternion a, Quaternion b) {
 	double _x = a.w*b.x + a.x*b.w + a.y*b.z - a.z*b.y;
@@ -295,7 +294,7 @@ public void slerp(Quaternion q, double weight, Quaternion res) {
 	double theta = Math.acos(cosTheta);
 	double sinTheta = Math.sin(theta);
 
-	if (sinTheta < Constants.EPSILON) {
+	if (MathUtils.isSmall(sinTheta)) {
 		// TODO: some kind of decent default as the two quaternions are nearly opposite
 		throw new IllegalArgumentException("Cannot slerp two opposite quaternions");
 	}
@@ -325,7 +324,7 @@ public boolean near(Quaternion q) {
 
 @Override
 public int hashCode() {
-	assert false : "hashCode not designed";
+	//assert false : "hashCode not designed";
 	return 42; // any arbitrary constant will do
 }
 

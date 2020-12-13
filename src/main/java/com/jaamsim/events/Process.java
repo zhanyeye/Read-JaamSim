@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2002-2014 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2020 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,12 +40,6 @@ final class Process extends Thread {
 	private static int numProcesses = 0; // Total of all created processes to date (used to name new Processes)
 
 	private EventManager eventManager; // The EventManager that is currently managing this Process
-	/**
-	 * This is related to how the startProcess() API is implemented,
-	 * as sub-processes are started, the original process is paused until the subprocess either waits, or exists.
-	 * Upon waiting or exiting, the subprocess notifies whoever started it to continue execution,
-	 * the nextProcess filed is used to hold this reference.
-	 */
 	private Process nextProcess; // The Process from which the present process was created
 	private ProcessTarget target; // The entity whose method is to be executed
 
@@ -56,7 +51,6 @@ final class Process extends Thread {
 
 	private boolean dieFlag;
 	private boolean activeFlag;
-	private boolean condWait;
 
 	// Initialize the storage for the pooled Processes
 	static {
@@ -109,7 +103,6 @@ final class Process extends Thread {
 			// Ensure all state is cleared before returning to the pool
 			evt = null;
 			hasNext = false;
-			// 设置该线程的事件管理器，调用它的线程，和执行目标都为空
 			setup(null, null, null);
 		}
 	}
@@ -138,13 +131,8 @@ final class Process extends Thread {
 		}
 	}
 
-
-	/**
+	/*
 	 * Setup the process state for execution.
-	 * 设置线程执行状态，包括 EventManager, 该线程的调用线程，执行目标
-	 * @param evt
-	 * @param next
-	 * @param targ
 	 */
 	private synchronized void setup(EventManager evt, Process next, ProcessTarget targ) {
 		eventManager = evt;
@@ -152,15 +140,10 @@ final class Process extends Thread {
 		target = targ;
 		activeFlag = false;
 		dieFlag = false;
-		condWait = false;
 	}
 
-
-	/**
-	 * 从线程池拉取一个线程, 尝试执行给定eventManager中的事件
-     * Pull a process from the pool and have it attempt to execute events from the given eventManager
-	 * @param evt
-	 */
+	// Pull a process from the pool and have it attempt to execute events from the
+	// given eventManager
 	static void processEvents(EventManager evt) {
 		Process newProcess = Process.getProcess();
 		newProcess.setup(evt, null, null);
@@ -212,7 +195,6 @@ final class Process extends Thread {
 	/**
 	 * This is the wrapper to allow internal code to advance the state machine by waking
 	 * a Process.
-     * 
 	 */
 	final void wake() {
 		super.interrupt();
@@ -246,9 +228,7 @@ final class Process extends Thread {
 		Process ret = nextProcess;
 		nextProcess = null;
 		if (ret != null) {
-		    // 将线程的关闭flag设置为真
 			ret.dieFlag = true;
-			// 唤醒线程，线程被唤醒后会检查 cur.shouldDie()，从而抛出异常
 			ret.wake();
 		}
 		return ret;
@@ -269,18 +249,5 @@ final class Process extends Thread {
 	synchronized final void postCapture() {
 		activeFlag = true;
 		hasNext = (nextProcess != null);
-	}
-
-	final void begCondWait() {
-		condWait = true;
-	}
-
-	final void endCondWait() {
-		condWait = false;
-	}
-
-	final void checkCondWait() {
-		if (condWait)
-			throw new ProcessError("Event Control attempted from inside a Conditional callback");
 	}
 }

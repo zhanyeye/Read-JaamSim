@@ -1,7 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2012 Ausenco Engineering Canada Inc.
- * Copyright (C) 2015 KMA Technologies
+ * Copyright (C) 2015-2020 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.Stack;
 import java.util.TreeSet;
@@ -51,9 +52,19 @@ public class ColParser {
 
 	private static boolean SHOW_COL_DEBUG = false;
 
+	private static final Effect DEFAULT_EFFECT;
+	private static final String DEFAULT_MATERIAL_NAME = "JaamSimDefaultMaterial";
+
 	private static boolean keepRuntimeData = false;
 	public static void setKeepData(boolean keepData) {
 		keepRuntimeData = keepData;
+	}
+
+	static {
+		DEFAULT_EFFECT = new Effect();
+		DEFAULT_EFFECT.diffuse = new ColorTex();
+		DEFAULT_EFFECT.diffuse.color = new Color4d(0.5, 0.5, 0.5, 1);
+		DEFAULT_EFFECT.transType = MeshData.NO_TRANS;
 	}
 
 	public static MeshData parse(URI asset) throws RenderException {
@@ -61,9 +72,12 @@ public class ColParser {
 		try {
 			ColParser colParser = new ColParser(asset.toURL());
 
+			MeshData finalData = colParser.getData();
+			finalData.setSource(asset.toString());
+
 			colParser.processContent();
 
-			return colParser.getData();
+			return finalData;
 
 		} catch (Exception e) {
 			LogBox.renderLogException(e);
@@ -184,7 +198,8 @@ public class ColParser {
 
 	private final MeshData _finalData = new MeshData(keepRuntimeData);
 
-	private final HashMap<String, Vec4d[]> _dataSources = new HashMap<>();
+	private final HashMap<String, Vec4d[]> _vec4dSources = new HashMap<>();
+	private final HashMap<String, double[][]> _dataSources = new HashMap<>();
 	private final HashMap<String, String[]> _stringSources = new HashMap<>();
 
 	private XmlNode _colladaNode;
@@ -375,6 +390,10 @@ public class ColParser {
 	}
 
 	private Effect geoBindingToEffect(Map<String, String> materialMap, String symbol) {
+		if (symbol == DEFAULT_MATERIAL_NAME) {
+			return DEFAULT_EFFECT;
+		}
+
 		String materialId = materialMap.get(symbol);
 		parseAssert(materialId != null);
 
@@ -828,6 +847,12 @@ public class ColParser {
 
 		if (opaque == null) {
 			opaque = "A_ONE";
+			if (alpha == 0.0) {
+				// This model did not specify a transparency mode and has an alpha of 0
+				// This should lead to a completely transparent material, but this is an encountered bug
+				// in sketchup exported models, so we will assume they want it to be opaque
+				alpha = 1.0;
+			}
 		}
 
 		// There is a ton of conditions for us to handle transparency
@@ -1025,9 +1050,7 @@ public class ColParser {
 	}
 
 	private SceneNode processNode(XmlNode node, SceneNode parent) {
-		SceneNode sn = new SceneNode();
-		sn.id = node.getFragID();
-		sn.sid = node.getAttrib("sid");
+		SceneNode sn = new SceneNode(node.getFragID(), node.getAttrib("sid"));
 
 		if (sn.id != null) _namedNodes.put(sn.id, sn);
 
@@ -1092,7 +1115,7 @@ public class ColParser {
 		}
 
 		// Now we need to add in an extra scene not to accommodate the bind space matrix held in the controller
-		SceneNode sn = new SceneNode();
+		SceneNode sn = new SceneNode(null, null);
 
 		sn.transforms.add(new MatrixTrans(cont.bindSpaceMat));
 		sn.subGeo.add(instInfo);
@@ -1202,10 +1225,12 @@ public class ColParser {
 		// Now the SubMeshDesc should be fully populated, and we can actually produce the final triangle arrays
 		LineSubGeo lsg = new LineSubGeo(numVerts);
 
-		Vec4d[] posData = getDataArrayFromSource(smd.posDesc.source);
+		Vec4d[] posData = getVec4dArrayFromSource(smd.posDesc.source);
 
 		lsg.materialSymbol = subGeo.getAttrib("material");
-		parseAssert(lsg.materialSymbol != null);
+		if (lsg.materialSymbol == null) {
+			lsg.materialSymbol = DEFAULT_MATERIAL_NAME;
+		}
 
 		for (int i = 0; i < numVerts; ++i) {
 			lsg.verts[i] = posData[smd.posDesc.indices[i]];
@@ -1232,7 +1257,9 @@ public class ColParser {
 		}
 
 		String material = subGeo.getAttrib("material");
-		parseAssert(material != null);
+		if (material == null) {
+			material = DEFAULT_MATERIAL_NAME;
+		}
 
 		smd.material = material;
 
@@ -1269,11 +1296,11 @@ public class ColParser {
 		// Now the SubMeshDesc should be fully populated, and we can actually produce the final triangle arrays
 		FaceSubGeo fsg = new FaceSubGeo(numVerts);
 
-		Vec4d[] posData = getDataArrayFromSource(smd.posDesc.source);
+		Vec4d[] posData = getVec4dArrayFromSource(smd.posDesc.source);
 
 		Vec4d[] normData = null;
 		if (hasNormal) {
-			normData = getDataArrayFromSource(smd.normDesc.source);
+			normData = getVec4dArrayFromSource(smd.normDesc.source);
 		}
 
 		boolean hasTexCoords = false;
@@ -1284,7 +1311,7 @@ public class ColParser {
 			texSetDesc = smd.texCoordMap.get(smd.usedTexSet);
 			if (texSetDesc != null) {
 				hasTexCoords = true;
-				texCoordData = getDataArrayFromSource(texSetDesc.source);
+				texCoordData = getVec4dArrayFromSource(texSetDesc.source);
 			}
 		}
 
@@ -1368,7 +1395,11 @@ public class ColParser {
 			throw new ColException("No 'p' child in 'lines' in mesh.");
 
 		int[] ps = (int[])pNode.getContent();
-		parseAssert(ps.length >= count * 2 * smd.stride);
+
+		if (ps.length < count * 2 * smd.stride) {
+			// Collada error, there is not enough indices for the apparent count, but we will play along all the same
+			count = ps.length / (2 * smd.stride);
+		}
 
 		smd.posDesc.indices = new int[count*2];
 		for (int i = 0; i < count * 2; ++i) {
@@ -1688,16 +1719,50 @@ public class ColParser {
 	 * @param id
 	 * @return
 	 */
-	private Vec4d[] getDataArrayFromSource(String id) {
+	private Vec4d[] getVec4dArrayFromSource(String id) {
+		Vec4d[] cached = _vec4dSources.get(id);
+		if (cached != null)
+			return cached;
+
+		double[][] data = getDataArrayFromSource(id);
+
+		// convert to vec4ds
+		Vec4d[] ret = new Vec4d[data.length];
+
+		for (int i = 0; i < data.length; ++i) {
+			double[] ds = data[i];
+			switch (ds.length) {
+			case 1:
+				ret[i] = new Vec4d(ds[0], 0, 0, 1);
+				break;
+			case 2:
+				ret[i] = new Vec4d(ds[0], ds[1], 0, 1);
+				break;
+			case 3:
+				ret[i] = new Vec4d(ds[0], ds[1], ds[2], 1);
+				break;
+			case 4:
+				ret[i] = new Vec4d(ds[0], ds[1], ds[2], ds[3]);
+				break;
+			default:
+				throw new RenderException(String.format("Invalid number of elements in data Vector: %d", ds.length));
+			}
+		}
+		_vec4dSources.put(id, ret);
+		return ret;
+	}
+
+	private double[][] getDataArrayFromSource(String id) {
+
 		// First check the cache
-		Vec4d[] cached = _dataSources.get(id);
+		double[][] cached = _dataSources.get(id);
 		if (cached != null) {
 			return cached;
 		}
 
 		SourceInfo info = getInfoFromSource(id, "float_array");
 
-		Vec4d[] ret = new Vec4d[info.count];
+		double[][] ret = new double[info.count][];
 
 		double[] values = null;
 		try {
@@ -1708,20 +1773,11 @@ public class ColParser {
 
 		int valueOffset = info.offset;
 		for (int i = 0; i < info.count; ++i) {
-			switch(info.stride) {
-			case 1:
-				ret[i] = new Vec4d(values[valueOffset], 0, 0, 1);
-				break;
-			case 2:
-				ret[i] = new Vec4d(values[valueOffset], values[valueOffset+1], 0, 1);
-				break;
-			case 3:
-				ret[i] = new Vec4d(values[valueOffset], values[valueOffset+1], values[valueOffset+2], 1);
-				break;
-			case 4:
-				ret[i] = new Vec4d(values[valueOffset], values[valueOffset+1], values[valueOffset+2], values[valueOffset+3]);
-				break;
+			ret[i] = new double[info.stride];
+			for (int j = 0; j < info.stride; j++) {
+				ret[i][j] = values[valueOffset + j];
 			}
+
 			valueOffset += info.stride;
 		}
 
@@ -1762,7 +1818,13 @@ public class ColParser {
 
 	private AnimCurve buildAnimCurve(AnimSampler samp) {
 		AnimCurve.ColCurve colData = new AnimCurve.ColCurve();
-		colData.in =     getDataArrayFromSource(samp.inputSource);
+
+		double[][] inTemp = getDataArrayFromSource(samp.inputSource);
+		colData.in = new double[inTemp.length];
+		for (int i = 0; i < inTemp.length; ++i) {
+			colData.in[i] = inTemp[i][0];
+		}
+
 		colData.out =    getDataArrayFromSource(samp.outputSource);
 		colData.interp = getStringArrayFromSource(samp.interpSource);
 
@@ -1896,8 +1958,13 @@ public class ColParser {
 	 *
 	 */
 	private static abstract class SceneTrans {
-		public String sid;
-		protected Vec3d commonVect;
+		public final String sid;
+		protected final Vec3d commonVect;
+
+		protected SceneTrans(String sid) {
+			this.sid = sid;
+			commonVect = new Vec3d();
+		}
 
 		protected HashMap<String, AnimAction> actions = new HashMap<>();
 
@@ -1951,13 +2018,13 @@ public class ColParser {
 			}
 
 			if (act.attachedCurves[0] != null) {
-				ret.x = act.attachedCurves[0].getValueForTime(time).getByInd(act.attachedIndex[0]);
+				ret.x = act.attachedCurves[0].getValueForTime(time)[act.attachedIndex[0]];
 			}
 			if (act.attachedCurves[1] != null) {
-				ret.y = act.attachedCurves[1].getValueForTime(time).getByInd(act.attachedIndex[1]);
+				ret.y = act.attachedCurves[1].getValueForTime(time)[act.attachedIndex[1]];
 			}
 			if (act.attachedCurves[2] != null) {
-				ret.z = act.attachedCurves[2].getValueForTime(time).getByInd(act.attachedIndex[2]);
+				ret.z = act.attachedCurves[2].getValueForTime(time)[act.attachedIndex[2]];
 			}
 			return ret;
 		}
@@ -1983,16 +2050,34 @@ public class ColParser {
 			}
 			return ret;
 		}
+
+		// Return a list of times with (oversample-1) additional points interspersed in each gap
+		protected double[] oversampleTime(double[] originalTimes, int oversample) {
+			double[] times = new double[(originalTimes.length-1)*oversample + 1];
+			for (int i = 0; i < originalTimes.length - 1; ++i) {
+
+				double cur = originalTimes[i];
+				double next = originalTimes[i+1];
+				for (int j = 0; j < oversample; ++j) {
+					double scale = (double)j / (double)oversample;
+					times[i*oversample +j] = cur*(1-scale) + next*scale;
+				}
+			}
+			times[times.length-1] = originalTimes[originalTimes.length-1];
+
+			return times;
+		}
 	}
 
 	private static class TranslationTrans extends SceneTrans {
 
 		public TranslationTrans(XmlNode transNode) {
-			sid = transNode.getAttrib("sid");
+			super(transNode.getAttrib("sid"));
 
 			double[] vals = (double[])transNode.getContent();
-			parseAssert(vals != null && vals.length >= 3);
-			commonVect = new Vec3d(vals[0], vals[1], vals[2]);
+			parseAssert(vals != null);
+			parseAssert(vals.length >= 3);
+			commonVect.set3(vals[0], vals[1], vals[2]);
 		}
 
 		@Override
@@ -2060,11 +2145,12 @@ public class ColParser {
 		private final double angle;
 
 		public RotationTrans(XmlNode rotNode) {
-			sid = rotNode.getAttrib("sid");
+			super(rotNode.getAttrib("sid"));
 			double[] vals = (double[])rotNode.getContent();
-			parseAssert(vals != null && vals.length >= 4);
+			parseAssert(vals != null);
+			parseAssert(vals.length >= 4);
 
-			commonVect = new Vec3d(vals[0], vals[1], vals[2]);
+			commonVect.set3(vals[0], vals[1], vals[2]);
 			angle = (float)Math.toRadians(vals[3]);
 		}
 
@@ -2118,29 +2204,19 @@ public class ColParser {
 			String[] names = new String[actionNames.size()];
 
 			int actionInd = 0;
-			for (String actionName : actions.keySet()) {
+			for (Entry<String, AnimAction> eachAction : actions.entrySet()) {
+				final String actionName = eachAction.getKey();
 				double[] originalTimes = getKeyTimes(actionName);
-				AnimAction act = actions.get(actionName);
+				AnimAction act = eachAction.getValue();
 
 				// Add new sample points because linearly interpolating a rotation matrix usually does not work correctly
-				final int OVERSAMPLE = 4;
-				double[] times = new double[(originalTimes.length-1)*OVERSAMPLE + 1];
-				for (int i = 0; i < originalTimes.length - 1; ++i) {
-
-					double cur = originalTimes[i];
-					double next = originalTimes[i+1];
-					for (int j = 0; j < OVERSAMPLE; ++j) {
-						double scale = (double)j / (double)OVERSAMPLE;
-						times[i*OVERSAMPLE +j] = cur*(1-scale) + next*scale;
-					}
-				}
-				times[times.length-1] = originalTimes[originalTimes.length-1];
+				double[] times = oversampleTime(originalTimes, 4);
 
 				Mat4d[] mats = new Mat4d[times.length];
 				for (int i = 0; i < times.length; ++i) {
 					double animAngle = Math.toRadians(angle);
 					if (act.attachedCurves[3] != null) {
-						animAngle = Math.toRadians(act.attachedCurves[3].getValueForTime(times[i]).getByInd(act.attachedIndex[3]));
+						animAngle = Math.toRadians(act.attachedCurves[3].getValueForTime(times[i])[act.attachedIndex[3]]);
 					}
 
 					Vec3d animAxis = getAnimatedVectAtTime(times[i], actionName);
@@ -2162,11 +2238,12 @@ public class ColParser {
 	private static class ScaleTrans extends SceneTrans {
 
 		public ScaleTrans(XmlNode scaleNode) {
-			sid = scaleNode.getAttrib("sid");
+			super(scaleNode.getAttrib("sid"));
 
 			double[] vals = (double[])scaleNode.getContent();
-			parseAssert(vals != null && vals.length >= 3);
-			commonVect = new Vec3d(vals[0], vals[1], vals[2]);
+			parseAssert(vals != null);
+			parseAssert(vals.length >= 3);
+			commonVect.set3(vals[0], vals[1], vals[2]);
 		}
 
 		@Override
@@ -2237,13 +2314,15 @@ public class ColParser {
 		private final Mat4d matrix;
 
 		public MatrixTrans(Mat4d mat) {
+			super(null);
 			matrix = new Mat4d(mat);
 		}
 
 		public MatrixTrans(XmlNode matNode) {
-			sid = matNode.getAttrib("sid");
+			super(matNode.getAttrib("sid"));
 			double[] vals = (double[])matNode.getContent();
-			parseAssert(vals != null && vals.length >= 16);
+			parseAssert(vals != null);
+			parseAssert(vals.length >= 16);
 			matrix = new Mat4d(vals);
 		}
 
@@ -2253,12 +2332,48 @@ public class ColParser {
 		}
 		@Override
 		public void attachCurve(AnimCurve curve, String target, String actionName) {
-			// TODO: support this
-			throw new RenderException("Currently do not support animating matrices");
+			if (!target.equals("") || curve.numComponents != 16) {
+				throw new RenderException("Currently only support animating whole matrices");
+			}
+			AnimAction act = actions.get(actionName);
+			if (act != null) {
+				// TODO warn we are over-writing an action here
+			}
+
+			// We only support whole matrix animation and single curve per action currently, so the last curve
+			// bound to an action will dominate
+			act = new AnimAction();
+			act.attachedCurves = new AnimCurve[1];
+			act.attachedCurves[0] = curve;
+			actions.put(actionName, act);
 		}
 		@Override
 		protected Trans toAnimatedTransform() {
-			throw new  RenderException("Do not support animated matrices");
+			Set<String> actionNames = actions.keySet();
+			double[][] timesArray = new double[actionNames.size()][];
+			Mat4d[][] matsArray = new Mat4d[actionNames.size()][];
+			String[] names = new String[actionNames.size()];
+
+			int actionInd = 0;
+			for (Entry<String, AnimAction> eachAction : actions.entrySet()) {
+				String actionName = eachAction.getKey();
+				AnimAction act = eachAction.getValue();
+
+				double[] times = getKeyTimes(actionName);
+				Mat4d[] mats = new Mat4d[times.length];
+				// Fill in the mats
+				for (int i = 0; i < times.length; ++i) {
+					double[] matVals = act.attachedCurves[0].getValueForTime(times[i]);
+					mats[i] = new Mat4d(matVals);
+				}
+
+				names[actionInd] = actionName;
+				timesArray[actionInd] = times;
+				matsArray[actionInd] = mats;
+				actionInd++;
+			}
+
+			return new MeshData.AnimTrans(timesArray, matsArray, names, getStaticMat());
 		}
 	}
 
@@ -2268,14 +2383,18 @@ public class ColParser {
 	 * @author matt.chudleigh
 	 */
 	private static class SceneNode {
-
-		public String id;
-		public String sid;
+		public final String id;
+		public final String sid;
 		public final ArrayList<SceneTrans> transforms = new ArrayList<>();
 
 		public final ArrayList<SceneNode> subNodes = new ArrayList<>();
 		public final ArrayList<String> subInstanceNames = new ArrayList<>();
 		public final ArrayList<GeoInstInfo> subGeo = new ArrayList<>();
+
+		SceneNode(String id, String sid) {
+			this.id = id;
+			this.sid = sid;
+		}
 	}
 
 	/**

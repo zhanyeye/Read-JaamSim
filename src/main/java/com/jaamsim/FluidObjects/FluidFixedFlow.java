@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2013 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2018-2019 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,12 +17,14 @@
  */
 package com.jaamsim.FluidObjects;
 
-import com.jaamsim.Graphics.PolylineInfo;
+import com.jaamsim.DisplayModels.DisplayModel;
+import com.jaamsim.DisplayModels.PolylineModel;
+import com.jaamsim.Graphics.LineEntity;
 import com.jaamsim.input.ColourInput;
-import com.jaamsim.input.Input;
+import com.jaamsim.input.IntegerInput;
 import com.jaamsim.input.Keyword;
 import com.jaamsim.input.ValueInput;
-import com.jaamsim.units.DimensionlessUnit;
+import com.jaamsim.math.Color4d;
 import com.jaamsim.units.VolumeFlowUnit;
 
 /**
@@ -31,34 +34,40 @@ import com.jaamsim.units.VolumeFlowUnit;
  * @author Harry King
  *
  */
-public class FluidFixedFlow extends FluidFlowCalculation {
+public class FluidFixedFlow extends FluidFlowCalculation implements LineEntity {
 
-	@Keyword(description = "Volumetric flow rate.",
-	         example = "FluidFixedFlow1 FlowRate { 1.0 m3/s }")
+	@Keyword(description = "The constant volumetric flow rate from the source to the destination.",
+	         exampleList = {"1.0 m3/s"})
 	private final ValueInput flowRateInput;
 
 	@Keyword(description = "The width of the pipe segments in pixels.",
-	         example = "Pipe1 Width { 1 }")
-	private final ValueInput widthInput;
+	         exampleList = {"1"})
+	private final IntegerInput widthInput;
 
-	@Keyword(description = "The colour of the pipe, defined using a colour keyword or RGB values.",
-	         example = "Pipe1 Colour { red }")
+	@Keyword(description = "The colour of the pipe.",
+	         exampleList = {"red"})
 	private final ColourInput colourInput;
 
 	{
-		flowRateInput = new ValueInput( "FlowRate", "Key Inputs", 0.0d);
+		displayModelListInput.clearValidClasses();
+		displayModelListInput.addValidClass(PolylineModel.class);
+
+		flowRateInput = new ValueInput( "FlowRate", KEY_INPUTS, 0.0d);
 		flowRateInput.setValidRange( 0.0d, Double.POSITIVE_INFINITY);
 		flowRateInput.setUnitType( VolumeFlowUnit.class );
 		this.addInput( flowRateInput);
 
-		widthInput = new ValueInput("Width", "Key Inputs", 1.0d);
-		widthInput.setValidRange(1.0d, Double.POSITIVE_INFINITY);
-		widthInput.setUnitType( DimensionlessUnit.class );
+		widthInput = new IntegerInput("LineWidth", FORMAT, 1);
+		widthInput.setValidRange(1, Integer.MAX_VALUE);
+		widthInput.setDefaultText("PolylineModel");
 		this.addInput(widthInput);
+		this.addSynonym(widthInput, "Width");
 
-		colourInput = new ColourInput("Colour", "Key Inputs", ColourInput.BLACK);
+		colourInput = new ColourInput("LineColour", FORMAT, ColourInput.BLACK);
+		colourInput.setDefaultText("PolylineModel");
 		this.addInput(colourInput);
 		this.addSynonym(colourInput, "Color");
+		this.addSynonym(colourInput, "Colour");
 	}
 
 	@Override
@@ -68,22 +77,32 @@ public class FluidFixedFlow extends FluidFlowCalculation {
 		this.setFlowRate( flowRateInput.getValue() );
 	}
 
-	@Override
-	public void updateForInput( Input<?> in ) {
-		super.updateForInput(in);
-
-		// If Points were input, then use them to set the start and end coordinates
-		if( in == pointsInput || in == colourInput || in == widthInput ) {
-			invalidateScreenPoints();
-			return;
-		}
+	public PolylineModel getPolylineModel() {
+		DisplayModel dm = getDisplayModel();
+		if (dm instanceof PolylineModel)
+			return (PolylineModel) dm;
+		return null;
 	}
 
 	@Override
-	public PolylineInfo[] buildScreenPoints() {
-		int w = Math.max(1, widthInput.getValue().intValue());
-		PolylineInfo[] ret = new PolylineInfo[1];
-		ret[0] = new PolylineInfo(pointsInput.getValue(), colourInput.getValue(), w);
-		return ret;
+	public boolean isOutlined() {
+		return true;
 	}
+
+	@Override
+	public int getLineWidth() {
+		PolylineModel model = getPolylineModel();
+		if (widthInput.isDefault() && model != null)
+			return model.getLineWidth();
+		return widthInput.getValue();
+	}
+
+	@Override
+	public Color4d getLineColour() {
+		PolylineModel model = getPolylineModel();
+		if (colourInput.isDefault() && model != null)
+			return model.getLineColour();
+		return colourInput.getValue();
+	}
+
 }

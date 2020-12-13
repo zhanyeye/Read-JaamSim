@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2012 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2020 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +17,8 @@
  */
 package com.jaamsim.input;
 
+import com.jaamsim.basicsim.Entity;
+import com.jaamsim.basicsim.JaamSimModel;
 import com.jaamsim.datatypes.DoubleVector;
 import com.jaamsim.math.Vec3d;
 import com.jaamsim.units.DimensionlessUnit;
@@ -35,9 +38,9 @@ public class Vec3dInput extends Input<Vec3d> {
 	}
 
 	@Override
-	public void parse(KeywordIndex kw)
+	public void parse(Entity thisEnt, KeywordIndex kw)
 	throws InputErrorException {
-		DoubleVector temp = Input.parseDoubles(kw, minValue, maxValue, unitType);
+		DoubleVector temp = Input.parseDoubles(thisEnt.getJaamSimModel(), kw, minValue, maxValue, unitType);
 		Input.assertCountRange(temp, 1, 3);
 
 		// pad the vector to have 3 elements
@@ -48,17 +51,25 @@ public class Vec3dInput extends Input<Vec3d> {
 		value = new Vec3d(temp.get(0), temp.get(1), temp.get(2));
 	}
 
+	@Override
+	public String getValidInputDesc() {
+		if (unitType == DimensionlessUnit.class) {
+			return Input.VALID_VEC3D_DIMLESS;
+		}
+		return String.format(Input.VALID_VEC3D, unitType.getSimpleName());
+	}
+
 	public void setValidRange(double min, double max) {
 		minValue = min;
 		maxValue = max;
 	}
 
 	@Override
-	public String getDefaultString() {
+	public String getDefaultString(JaamSimModel simModel) {
 		if (defValue == null)
 			return "";
 
-		double factor = Unit.getDisplayedUnitFactor(unitType);
+		double factor = simModel.getDisplayedUnitFactor(unitType);
 
 		StringBuilder tmp = new StringBuilder();
 		tmp.append(defValue.x/factor);
@@ -68,7 +79,7 @@ public class Vec3dInput extends Input<Vec3d> {
 		tmp.append(defValue.z/factor);
 		if (unitType != Unit.class) {
 			tmp.append(SEPARATOR);
-			tmp.append(Unit.getDisplayedUnit(unitType));
+			tmp.append(simModel.getDisplayedUnit(unitType));
 		}
 
 		return tmp.toString();

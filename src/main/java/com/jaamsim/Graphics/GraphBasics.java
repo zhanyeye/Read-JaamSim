@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2009-2013 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2017-2019 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +19,7 @@ package com.jaamsim.Graphics;
 
 import java.util.ArrayList;
 
+import com.jaamsim.DisplayModels.GraphModel;
 import com.jaamsim.Samples.SampleProvider;
 import com.jaamsim.datatypes.DoubleVector;
 import com.jaamsim.input.ColorListInput;
@@ -29,7 +31,6 @@ import com.jaamsim.input.StringInput;
 import com.jaamsim.input.ValueInput;
 import com.jaamsim.input.ValueListInput;
 import com.jaamsim.math.Color4d;
-import com.jaamsim.ui.FrameBox;
 import com.jaamsim.units.Unit;
 import com.jaamsim.units.UserSpecifiedUnit;
 
@@ -42,6 +43,7 @@ public abstract class GraphBasics extends DisplayEntity {
 		public double[] yValues;
 		public double[] xValues;
 		public int numPoints; // number of points to be graphed
+		public int indexOfLastEntry; // index in the arrays for the last graph point in the series
 		public SampleProvider samp; // The source of the data for the series
 		public double lineWidth;
 		public Color4d lineColour;
@@ -81,55 +83,55 @@ public abstract class GraphBasics extends DisplayEntity {
 	         exampleList = {"8 h"})
 	private final ValueInput xAxisInterval;
 
-	@Keyword(description = "The Java format to be used for the tick mark values on the x-axis.\n" +
-			"For example, the format %.1fs would dispaly the value 5 as 5.0s.",
-	         exampleList = {"%.1fs"})
+	@Keyword(description = "The format to be used for the tick mark values on the x-axis.",
+	         exampleList = {"%.1f"})
 	private final FormatInput xAxisLabelFormat;
 
-	@Keyword(description = "A list of values between XAxisStart and XAxisEnd at which to insert vertical gridlines.",
+	@Keyword(description = "A list of values between XAxisStart and XAxisEnd at which to insert "
+	                     + "vertical gridlines.",
 	         exampleList = {"-48 -40 -32 -24 -16 -8 0 h"})
 	private final ValueListInput xLines;
 
-	@Keyword(description = "The color of the vertical gridlines (or a list corresponding to the colour of each " +
-	                "gridline defined in XLines), defined using a colour keyword or RGB values.",
+	@Keyword(description = "The colours for the vertical gridlines defined by input to the "
+	                     + "'XLines' keyword. "
+	                     + "If only one colour is provided, it is used for all the lines.",
 	         exampleList = {"gray76"})
 	private final ColorListInput xLinesColor;
 
 	// Y-Axis category
 
-	@Keyword(description = "Title of the y-axis.",
+	@Keyword(description = "Title of the primary y-axis.",
 	         exampleList = {"'Water Height (m)'"})
 	private final StringInput yAxisTitle;
 
-	@Keyword(description = "The unit to be used for the y-axis.\n" +
-			"The unit chosen must be consistent with the unit type for the DataSource value,\n" +
-			"i.e. if the data has units of distance, then unit must be a distance unit such as meters.",
+	@Keyword(description = "The unit to be used for the primary-axis.",
 	         exampleList = {"t/h"})
 	private final EntityInput<Unit> yAxisUnit;
 
-	@Keyword(description = "The minimum value for the y-axis.",
+	@Keyword(description = "The minimum value for the primary y-axis.",
 	         exampleList = {"0 t/h"})
 	private final ValueInput yAxisStart;
 
-	@Keyword(description = "The maximum value for the y-axis.",
+	@Keyword(description = "The maximum value for the primary y-axis.",
 	         exampleList = {"5 t/h"})
 	private final ValueInput yAxisEnd;
 
-	@Keyword(description = "The interval between y-axis labels.",
+	@Keyword(description = "The interval between primary y-axis labels.",
 	         exampleList = {"1 t/h"})
 	private final ValueInput yAxisInterval;
 
-	@Keyword(description  = "The Java format to be used for the tick mark values on the y-axis.\n" +
-			"For example, the format %.1f would dispaly the value 5 as 5.0.",
+	@Keyword(description = "The format to be used for the tick mark values on the primary y-axis.",
 	         exampleList = {"%.1f"})
 	private final FormatInput yAxisLabelFormat;
 
-	@Keyword(description = "A list of values between YAxisStart and YAxisEnd at which to insert horizontal gridlines.",
+	@Keyword(description = "A list of values between YAxisStart and YAxisEnd at which to insert "
+	                     + "horizontal gridlines.",
 	         exampleList = {"0  0.5  1  1.5  2  2.5  3  t/h"})
 	private final ValueListInput yLines;
 
-	@Keyword(description = "The colour of the horizontal gridlines (or a list corresponding to the colour of each " +
-                    "gridline defined in YLines), defined using a colour keyword or RGB values.",
+	@Keyword(description = "The colours for the vertical gridlines defined by input to the "
+	                     + "'YLines' keyword. "
+	                     + "If only one colour is provided, it is used for all the lines.",
 	         exampleList = {"gray76"})
 	private final ColorListInput yLinesColor;
 
@@ -139,9 +141,7 @@ public abstract class GraphBasics extends DisplayEntity {
 	         exampleList = {"'Water Height (m)'"})
 	private final StringInput secondaryYAxisTitle;
 
-	@Keyword(description = "The unit to be used for the secondary y-axis.\n" +
-			"The unit chosen must be consistent with the unit type for the DataSource value,\n" +
-			"i.e. if the data has units of distance, then unit must be a distance unit such as meters.",
+	@Keyword(description = "The unit to be used for the secondary y-axis.",
 	         exampleList = {"m"})
 	private final EntityInput<Unit> secondaryYAxisUnit;
 
@@ -157,78 +157,85 @@ public abstract class GraphBasics extends DisplayEntity {
 	         exampleList = {"1 m"})
 	private final ValueInput secondaryYAxisInterval;
 
-	@Keyword(description  = "The Java format to be used for the tick mark values on the secondary y-axis.\n" +
-			"For example, the format %.1f would dispaly the value 5 as 5.0.",
+	@Keyword(description = "The format to be used for the tick mark values on the secondary "
+	                     + "y-axis.",
 	         exampleList = {"%.1f"})
 	private final FormatInput secondaryYAxisLabelFormat;
 
+	public static final String X_AXIS = "X-Axis";
+	public static final String Y_AXIS = "Y-Axis";
+	public static final String SEC_Y_AXIS = "Secondary Y-Axis";
+
 	{
+		displayModelListInput.clearValidClasses();
+		displayModelListInput.addValidClass(GraphModel.class);
+
 		// Key Inputs category
 
-		title = new StringInput("Title", "Key Inputs", "Graph Title");
+		title = new StringInput("Title", KEY_INPUTS, "Graph Title");
 		this.addInput(title);
 
 		// X-Axis category
 
-		xAxisTitle = new StringInput("XAxisTitle", "X-Axis", "X-Axis Title");
+		xAxisTitle = new StringInput("XAxisTitle", X_AXIS, "X-Axis Title");
 		this.addInput(xAxisTitle);
 
-		xAxisUnit = new EntityInput<>(Unit.class, "XAxisUnit", "X-Axis", null);
+		xAxisUnit = new EntityInput<>(Unit.class, "XAxisUnit", X_AXIS, null);
 		this.addInput(xAxisUnit);
 
-		xAxisStart = new ValueInput("XAxisStart", "X-Axis", -60.0d);
+		xAxisStart = new ValueInput("XAxisStart", X_AXIS, -60.0d);
 		xAxisStart.setUnitType(UserSpecifiedUnit.class);
 		xAxisStart.setValidRange(Double.NEGATIVE_INFINITY, 1.0e-6);
 		this.addInput(xAxisStart);
 
-		xAxisEnd = new ValueInput("XAxisEnd", "X-Axis", 0.0d);
+		xAxisEnd = new ValueInput("XAxisEnd", X_AXIS, 0.0d);
 		xAxisEnd.setUnitType(UserSpecifiedUnit.class);
 		xAxisEnd.setValidRange(0.0, Double.POSITIVE_INFINITY);
 		this.addInput(xAxisEnd);
 
-		xAxisInterval = new ValueInput("XAxisInterval", "X-Axis", 10.0d);
+		xAxisInterval = new ValueInput("XAxisInterval", X_AXIS, 10.0d);
 		xAxisInterval.setUnitType(UserSpecifiedUnit.class);
 		xAxisInterval.setValidRange(1.0e-6, Double.POSITIVE_INFINITY);
 		this.addInput(xAxisInterval);
 
-		xAxisLabelFormat = new FormatInput("XAxisLabelFormat", "X-Axis", "%.0fs");
+		xAxisLabelFormat = new FormatInput("XAxisLabelFormat", X_AXIS, "%.0f");
 		this.addInput(xAxisLabelFormat);
 
 		DoubleVector defXLines = new DoubleVector();
 		defXLines.add(-20.0);
 		defXLines.add(-40.0);
-		xLines = new ValueListInput("XLines", "X-Axis", defXLines);
+		xLines = new ValueListInput("XLines", X_AXIS, defXLines);
 		xLines.setUnitType(UserSpecifiedUnit.class);
 		this.addInput(xLines);
 
 		ArrayList<Color4d> defXlinesColor = new ArrayList<>(0);
 		defXlinesColor.add(ColourInput.getColorWithName("gray50"));
-		xLinesColor = new ColorListInput("XLinesColor", "X-Axis", defXlinesColor);
+		xLinesColor = new ColorListInput("XLinesColor", X_AXIS, defXlinesColor);
 		this.addInput(xLinesColor);
 		this.addSynonym(xLinesColor, "XLinesColour");
 
 		// Y-Axis category
 
-		yAxisTitle = new StringInput("YAxisTitle", "Y-Axis", "Y-Axis Title");
+		yAxisTitle = new StringInput("YAxisTitle", Y_AXIS, "Y-Axis Title");
 		this.addInput(yAxisTitle);
 
-		yAxisUnit = new EntityInput<>(Unit.class, "YAxisUnit", "Y-Axis", null);
+		yAxisUnit = new EntityInput<>(Unit.class, "YAxisUnit", Y_AXIS, null);
 		this.addInput(yAxisUnit);
 
-		yAxisStart = new ValueInput("YAxisStart", "Y-Axis", 0.0);
+		yAxisStart = new ValueInput("YAxisStart", Y_AXIS, 0.0);
 		yAxisStart.setUnitType(UserSpecifiedUnit.class);
 		this.addInput(yAxisStart);
 
-		yAxisEnd = new ValueInput("YAxisEnd", "Y-Axis", 5.0d);
+		yAxisEnd = new ValueInput("YAxisEnd", Y_AXIS, 5.0d);
 		yAxisEnd.setUnitType(UserSpecifiedUnit.class);
 		this.addInput(yAxisEnd);
 
-		yAxisInterval = new ValueInput("YAxisInterval", "Y-Axis", 1.0d);
+		yAxisInterval = new ValueInput("YAxisInterval", Y_AXIS, 1.0d);
 		yAxisInterval.setUnitType(UserSpecifiedUnit.class);
 		yAxisInterval.setValidRange(1.0e-10, Double.POSITIVE_INFINITY);
 		this.addInput(yAxisInterval);
 
-		yAxisLabelFormat = new FormatInput("YAxisLabelFormat", "Y-Axis", "%.1f");
+		yAxisLabelFormat = new FormatInput("YAxisLabelFormat", Y_AXIS, "%.1f");
 		this.addInput(yAxisLabelFormat);
 
 		DoubleVector defYLines = new DoubleVector();
@@ -236,38 +243,38 @@ public abstract class GraphBasics extends DisplayEntity {
 		defYLines.add(2.0);
 		defYLines.add(3.0);
 		defYLines.add(4.0);
-		yLines = new ValueListInput("YLines", "Y-Axis", defYLines);
+		yLines = new ValueListInput("YLines", Y_AXIS, defYLines);
 		yLines.setUnitType(UserSpecifiedUnit.class);
 		this.addInput(yLines);
 
 		ArrayList<Color4d> defYlinesColor = new ArrayList<>(0);
 		defYlinesColor.add(ColourInput.getColorWithName("gray50"));
-		yLinesColor = new ColorListInput("YLinesColor", "Y-Axis", defYlinesColor);
+		yLinesColor = new ColorListInput("YLinesColor", Y_AXIS, defYlinesColor);
 		this.addInput(yLinesColor);
 		this.addSynonym(yLinesColor, "YLinesColour");
 
 		// Secondary Y-Axis category
 
-		secondaryYAxisTitle = new StringInput("SecondaryYAxisTitle", "Secondary Y-Axis", "Secondary Y-Axis Title");
+		secondaryYAxisTitle = new StringInput("SecondaryYAxisTitle", SEC_Y_AXIS, "Secondary Y-Axis Title");
 		this.addInput(secondaryYAxisTitle);
 
-		secondaryYAxisUnit = new EntityInput<>(Unit.class, "SecondaryYAxisUnit", "Secondary Y-Axis", null);
+		secondaryYAxisUnit = new EntityInput<>(Unit.class, "SecondaryYAxisUnit", SEC_Y_AXIS, null);
 		this.addInput(secondaryYAxisUnit);
 
-		secondaryYAxisStart = new ValueInput("SecondaryYAxisStart", "Secondary Y-Axis", 0.0);
+		secondaryYAxisStart = new ValueInput("SecondaryYAxisStart", SEC_Y_AXIS, 0.0);
 		secondaryYAxisStart.setUnitType(UserSpecifiedUnit.class);
 		this.addInput(secondaryYAxisStart);
 
-		secondaryYAxisEnd = new ValueInput("SecondaryYAxisEnd", "Secondary Y-Axis", 5.0);
+		secondaryYAxisEnd = new ValueInput("SecondaryYAxisEnd", SEC_Y_AXIS, 5.0);
 		secondaryYAxisEnd.setUnitType(UserSpecifiedUnit.class);
 		this.addInput(secondaryYAxisEnd);
 
-		secondaryYAxisInterval = new ValueInput("SecondaryYAxisInterval", "Secondary Y-Axis", 1.0);
+		secondaryYAxisInterval = new ValueInput("SecondaryYAxisInterval", SEC_Y_AXIS, 1.0);
 		secondaryYAxisInterval.setUnitType(UserSpecifiedUnit.class);
 		secondaryYAxisInterval.setValidRange(1.0e-10, Double.POSITIVE_INFINITY);
 		this.addInput(secondaryYAxisInterval);
 
-		secondaryYAxisLabelFormat = new FormatInput("SecondaryYAxisLabelFormat", "Secondary Y-Axis", "%.1f");
+		secondaryYAxisLabelFormat = new FormatInput("SecondaryYAxisLabelFormat", SEC_Y_AXIS, "%.1f");
 		this.addInput(secondaryYAxisLabelFormat);
 	}
 
@@ -286,7 +293,6 @@ public abstract class GraphBasics extends DisplayEntity {
 		xAxisEnd.setUnitType(unitType);
 		xAxisInterval.setUnitType(unitType);
 		xLines.setUnitType(unitType);
-		FrameBox.valueUpdate();  // show the new units in the Input Editor
 	}
 
 	protected void setYAxisUnit(Class<? extends Unit> unitType) {
@@ -295,7 +301,6 @@ public abstract class GraphBasics extends DisplayEntity {
 		yAxisEnd.setUnitType(unitType);
 		yAxisInterval.setUnitType(unitType);
 		yLines.setUnitType(unitType);
-		FrameBox.valueUpdate();  // show the new units in the Input Editor
 	}
 
 	protected void setSecondaryYAxisUnit(Class<? extends Unit> unitType) {
@@ -303,7 +308,6 @@ public abstract class GraphBasics extends DisplayEntity {
 		secondaryYAxisStart.setUnitType(unitType);
 		secondaryYAxisEnd.setUnitType(unitType);
 		secondaryYAxisInterval.setUnitType(unitType);
-		FrameBox.valueUpdate();  // show the new units in the Input Editor
 	}
 
 	public String getTitle() {

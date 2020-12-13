@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2012 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2019-2020 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +18,7 @@
 
 package com.jaamsim.controllers;
 
-import com.jaamsim.basicsim.Simulation;
+import com.jaamsim.Graphics.View;
 import com.jaamsim.math.Mat4d;
 import com.jaamsim.math.MathUtils;
 import com.jaamsim.math.Plane;
@@ -30,8 +31,7 @@ import com.jaamsim.render.CameraInfo;
 import com.jaamsim.render.RenderUtils;
 import com.jaamsim.render.Renderer;
 import com.jaamsim.render.WindowInteractionListener;
-import com.jaamsim.ui.FrameBox;
-import com.jaamsim.ui.View;
+import com.jaamsim.ui.GUIFrame;
 import com.jogamp.newt.event.KeyEvent;
 import com.jogamp.newt.event.MouseEvent;
 
@@ -42,33 +42,11 @@ public class CameraControl implements WindowInteractionListener {
 	private static final double ROT_SCALE_X = 0.005;
 	private static final double ROT_SCALE_Z = 0.005;
 
-	private Renderer _renderer;
+	private final Renderer _renderer;
 	private int _windowID;
-	private View _updateView;
+	private final View _updateView;
 
 	private final Vec3d POI = new Vec3d();
-
-	private static class PolarInfo {
-		double rotZ; // The spherical coordinate that rotates around Z (in radians)
-		double rotX; // Ditto for X
-		double radius; // The distance the camera is from the view center
-		final Vec3d viewCenter;
-
-		PolarInfo(Vec3d center) {
-			viewCenter = new Vec3d(center);
-		}
-
-		@Override
-		public boolean equals(Object o) {
-			if (!(o instanceof PolarInfo)) {
-				return false;
-			}
-			PolarInfo pi = (PolarInfo)o;
-
-			return pi.rotZ == rotZ && pi.rotX == rotX && pi.radius == radius &&
-			       viewCenter.equals3(pi.viewCenter);
-		}
-	}
 
 	private PolarInfo piCache; // The last polar info this view has re-drawn for
 
@@ -76,7 +54,7 @@ public class CameraControl implements WindowInteractionListener {
 		_renderer = renderer;
 		_updateView = updateView;
 
-		POI.set3(_updateView.getGlobalCenter());
+		setPOI(_updateView.getGlobalCenter());
 	}
 
 	@Override
@@ -99,7 +77,8 @@ public class CameraControl implements WindowInteractionListener {
 				handleExpPan(dragInfo.x, dragInfo.y, dragInfo.dx, dragInfo.dy);
 			}
 		}
-		else if (dragInfo.button == 3) {
+		else if (dragInfo.button == 3 && !_updateView.is2DLocked()) {
+
 			if (dragInfo.shiftDown()) {
 				handleTurnCamera(dragInfo.dx, dragInfo.dy);
 			} else {
@@ -113,11 +92,10 @@ public class CameraControl implements WindowInteractionListener {
 		Vec3d camPos = _updateView.getGlobalPosition();
 		Vec3d center = _updateView.getGlobalCenter();
 
-		PolarInfo origPi = getPolarFrom(center, camPos);
+		PolarInfo origPi = new PolarInfo(center, camPos);
 
-		Quaternion origRot = polarToRot(origPi);
 		Mat4d rot = new Mat4d();
-		rot.setRot3(origRot);
+		rot.setRot3(origPi.getRotation());
 
 		Vec3d rotXAxis = new Vec3d(1.0d, 0.0d, 0.0d);
 		rotXAxis.mult3(rot, rotXAxis);
@@ -135,7 +113,7 @@ public class CameraControl implements WindowInteractionListener {
 		center.multAndTrans3(rotTransX, center);
 		center.multAndTrans3(rotTransZ, center);
 
-		PolarInfo pi = getPolarFrom(center, camPos);
+		PolarInfo pi = new PolarInfo(center, camPos);
 		updateCamTrans(pi, true);
 
 	}
@@ -179,7 +157,7 @@ public class CameraControl implements WindowInteractionListener {
 		Vec3d center = _updateView.getGlobalCenter();
 		camPos.sub3(diff);
 		center.sub3(diff);
-		PolarInfo pi = getPolarFrom(center, camPos);
+		PolarInfo pi = new PolarInfo(center, camPos);
 		updateCamTrans(pi, true);
 
 	}
@@ -198,7 +176,7 @@ public class CameraControl implements WindowInteractionListener {
 		Vec3d center = _updateView.getGlobalCenter();
 		camPos.z -= zDiff;
 		center.z -= zDiff;
-		PolarInfo pi = getPolarFrom(center, camPos);
+		PolarInfo pi = new PolarInfo(center, camPos);
 		updateCamTrans(pi, true);
 
 	}
@@ -208,18 +186,16 @@ public class CameraControl implements WindowInteractionListener {
 		Vec3d camPos = _updateView.getGlobalPosition();
 		Vec3d center = _updateView.getGlobalCenter();
 
-		PolarInfo origPi = getPolarFrom(center, camPos);
+		PolarInfo origPi = new PolarInfo(center, camPos);
 		if ( camPos.x == center.x &&
 		     camPos.y == center.y ) {
 			// This is a degenerate camera view, tweak the polar info a bit to
 			// prevent view flipping
 			origPi.rotX = 0.00001;
-			origPi.rotZ = 0;
 		}
 
-		Quaternion origRot = polarToRot(origPi);
 		Mat4d rot = new Mat4d();
-		rot.setRot3(origRot);
+		rot.setRot3(origPi.getRotation());
 
 		Vec3d origUp = new Vec3d(0.0d, 1.0d, 0.0d);
 		origUp.mult3(rot, origUp);
@@ -242,10 +218,9 @@ public class CameraControl implements WindowInteractionListener {
 		camPos.multAndTrans3(rotTransZ, camPos);
 		center.multAndTrans3(rotTransZ, center);
 
-		PolarInfo pi = getPolarFrom(center, camPos);
+		PolarInfo pi = new PolarInfo(center, camPos);
 
-		Quaternion newRot = polarToRot(pi);
-		rot.setRot3(newRot);
+		rot.setRot3(pi.getRotation());
 
 		Vec3d newUp = new Vec3d(0.0d, 1.0d, 0.0d);
 		newUp.mult3(rot, newUp);
@@ -260,7 +235,7 @@ public class CameraControl implements WindowInteractionListener {
 			camPos.multAndTrans3(rotTransZ, camPos);
 			center.multAndTrans3(rotTransZ, center);
 
-			pi = getPolarFrom(center, camPos);
+			pi = new PolarInfo(center, camPos);
 		}
 
 		updateCamTrans(pi, true);
@@ -291,7 +266,7 @@ public class CameraControl implements WindowInteractionListener {
 		camPos.add3(diff);
 		center.add3(diff);
 
-		PolarInfo pi = getPolarFrom(center, camPos);
+		PolarInfo pi = new PolarInfo(center, camPos);
 		updateCamTrans(pi, true);
 	}
 
@@ -300,18 +275,26 @@ public class CameraControl implements WindowInteractionListener {
 		if (!RenderManager.isGood()) { return; }
 
 		RenderManager.inst().hideExistingPopups();
+
+		// Right click
 		if (button  == 3) {
+			Vec3d pos = RenderManager.inst().getMousePosition(windowID, x, y);
+			if (pos != null)
+				setPOI(pos);
 			// Hand this off to the RenderManager to deal with
 			RenderManager.inst().popupMenu(windowID);
 		}
-		if (button == 1 && (modifiers & WindowInteractionListener.MOD_CTRL) == 0) {
-			RenderManager.inst().handleMouseClicked(windowID, x, y, count);
+
+		// Left click
+		if (button == 1) {
+			RenderManager.inst().handleMouseClicked(windowID, x, y, modifiers, count);
 		}
 	}
 
 	@Override
 	public void mouseMoved(int windowID, int x, int y) {
 		if (!RenderManager.isGood()) { return; }
+		RenderManager.redraw();
 
 		RenderManager.inst().mouseMoved(windowID, x, y);
 	}
@@ -322,28 +305,21 @@ public class CameraControl implements WindowInteractionListener {
 
 	@Override
 	public void mouseEntry(int windowID, int x, int y, boolean isInWindow) {
-		if (!RenderManager.isGood()) { return; }
-
-		if (isInWindow && RenderManager.inst().isDragAndDropping()) {
-			RenderManager.inst().createDNDObject(windowID, x, y);
-		}
-	}
-
-	private Quaternion polarToRot(PolarInfo pi) {
-		Quaternion rot = new Quaternion();
-		rot.setRotZAxis(pi.rotZ);
-
-		Quaternion tmp = new Quaternion();
-		tmp.setRotXAxis(pi.rotX);
-
-		rot.mult(rot, tmp);
-		return rot;
+		if (!RenderManager.isGood())
+			return;
+		RenderManager.redraw();
+		RenderManager.inst().mouseEntry(windowID, x, y, isInWindow);
 	}
 
 	private void updateCamTrans(PolarInfo pi, boolean updateInputs) {
 
 		if (pi.rotX == 0) {
 			pi.rotZ = 0; // If we're ever looking directly down, which is degenerate, force Y up
+		}
+
+		if (_updateView.is2DLocked()) {
+			pi.rotX = 0;
+			pi.rotZ = 0;
 		}
 
 		if (piCache != null && piCache.equals(pi) && !updateInputs) {
@@ -354,11 +330,9 @@ public class CameraControl implements WindowInteractionListener {
 
 		Vec4d zOffset = new Vec4d(0, 0, pi.radius, 1.0d);
 
-		Quaternion rot = polarToRot(pi);
-
 		Transform finalTrans = new Transform(pi.viewCenter);
 
-		finalTrans.merge(finalTrans, new Transform(null, rot, 1));
+		finalTrans.merge(finalTrans, new Transform(null, pi.getRotation(), 1));
 		finalTrans.merge(finalTrans, new Transform(zOffset));
 
 
@@ -413,7 +387,7 @@ public class CameraControl implements WindowInteractionListener {
 		if (button == 1 && isDown) {
 			Vec3d clickPoint = RenderManager.inst().getNearestPick(_windowID);
 			if (clickPoint != null) {
-				POI.set3(clickPoint);
+				setPOI(clickPoint);
 				//dragPlane = new Plane(Vec4d.Z_AXIS, clickPoint.z);
 			} else {
 				// Set the drag plane to the XY_PLANE
@@ -422,11 +396,11 @@ public class CameraControl implements WindowInteractionListener {
 
 				//Cast a ray into the XY plane both for now, and for the previous mouse position
 				Ray mouseRay = RenderUtils.getPickRayForPosition(info.cameraInfo, x, y, info.width, info.height);
-				double dist = Plane.XY_PLANE.collisionDist(mouseRay);
+				double dist = RenderManager.XY_PLANE.collisionDist(mouseRay);
 				if (dist < 0) {
 					return;
 				}
-				POI.set3(mouseRay.getPointAtDist(dist));
+				setPOI(mouseRay.getPointAtDist(dist));
 				//dragPlane = Plane.XY_PLANE;
 
 			}
@@ -452,7 +426,7 @@ public class CameraControl implements WindowInteractionListener {
 
 		_updateView.updateCenterAndPos(viewCenter, viewPos);
 
-		FrameBox.valueUpdate();
+		GUIFrame.updateUI();
 	}
 
 	@Override
@@ -462,33 +436,27 @@ public class CameraControl implements WindowInteractionListener {
 		if (x < -30000 || y < - 30000)
 			return;
 
-		_updateView.setWindowPos(x, y, width, height);
+		GUIFrame.getInstance().setWindowPos(_updateView, x, y, width, height);
 	}
 
 	public View getView() {
 		return _updateView;
 	}
 
-	private PolarInfo getPolarFrom(Vec3d center, Vec3d pos) {
-		PolarInfo pi = new PolarInfo(center);
+	public void setPOI(Vec3d pt) {
+		synchronized (POI) {
+			POI.set3(pt);
+		}
+	}
 
-		Vec3d viewDiff = new Vec3d();
-		viewDiff.sub3(pos, pi.viewCenter);
-
-		pi.radius = viewDiff.mag3();
-
-		pi.rotZ = Math.atan2(viewDiff.x, -viewDiff.y);
-
-		double xyDist = Math.hypot(viewDiff.x, viewDiff.y);
-
-		pi.rotX = Math.atan2(xyDist, viewDiff.z);
-
-		return pi;
-
+	public Vec3d getPOI() {
+		synchronized (POI) {
+			return POI;
+		}
 	}
 
 	private PolarInfo getPolarCoordsFromView() {
-		return getPolarFrom(_updateView.getGlobalCenter(), _updateView.getGlobalPosition());
+		return new PolarInfo(_updateView.getGlobalCenter(), _updateView.getGlobalPosition());
 	}
 
 	public void checkForUpdate() {
@@ -500,11 +468,10 @@ public class CameraControl implements WindowInteractionListener {
 	public void keyPressed(KeyEvent e) {
 
 		// If an entity has been selected, pass the key event to it
-		if (RenderManager.inst().isEntitySelected()) {
-			RenderManager.inst().handleKeyPressed(e.getKeyCode(), e.getKeyChar(),
-					e.isShiftDown(), e.isControlDown(), e.isAltDown());
+		boolean bool = RenderManager.inst().handleKeyPressed(e.getKeyCode(), e.getKeyChar(),
+				e.isShiftDown(), e.isControlDown(), e.isAltDown());
+		if (bool)
 			return;
-		}
 
 		// If no entity has been selected, the camera will handle the key event
 		Vec3d pos = _updateView.getGlobalPosition();
@@ -519,13 +486,13 @@ public class CameraControl implements WindowInteractionListener {
 		// Trap the degenerate case where the camera look straight down on the x-y plane
 		// For this case the normalize3 method returns a unit vector in the z-direction
 		if (forward.z > 0.0)
-			forward.set3(1.0d, 0.0d, 0.0d);
+			forward.set3(0.0d, 1.0d, 0.0d);
 
 		// Construct a unit vector pointing to the left of the direction vector
 		Vec3d left = new Vec3d( -forward.y, forward.x, 0.0d);
 
 		// Scale the two vectors to the desired step size
-		double inc = Simulation.getIncrementSize();
+		double inc = GUIFrame.getJaamSimModel().getSimulation().getIncrementSize();
 		forward.scale3(inc);
 		left.scale3(inc);
 

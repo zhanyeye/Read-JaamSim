@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2014 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2019 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,19 +18,22 @@
 package com.jaamsim.basicsim;
 
 import com.jaamsim.events.ProcessTarget;
-import com.jaamsim.ui.GUIFrame;
 
 class EndModelTarget extends ProcessTarget {
-	EndModelTarget() {}
+
+	final JaamSimModel simModel;
+
+	EndModelTarget(JaamSimModel model) {
+		simModel = model;
+	}
 
 	@Override
 	public String getDescription() {
-		return "SimulationEnd";
+		return "Simulation.endRun";
 	}
 
 	@Override
 	public void process() {
-		GUIFrame.instance().setClock(Simulation.getEndTime());
-		Simulation.endRun();
+		simModel.endRun();
 	}
 }

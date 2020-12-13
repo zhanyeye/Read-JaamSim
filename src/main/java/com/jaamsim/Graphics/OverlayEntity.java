@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2013 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2018-2020 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,10 +17,15 @@
  */
 package com.jaamsim.Graphics;
 
+import com.jaamsim.Commands.KeywordCommand;
 import com.jaamsim.datatypes.IntegerVector;
 import com.jaamsim.input.BooleanInput;
+import com.jaamsim.input.InputAgent;
 import com.jaamsim.input.IntegerListInput;
 import com.jaamsim.input.Keyword;
+import com.jaamsim.input.KeywordIndex;
+import com.jaamsim.math.Vec3d;
+import com.jogamp.newt.event.KeyEvent;
 
 /**
  * OverlayEntity is the superclass for DisplayEntities that have 2D overlay graphics instead of 3D graphics.  Overlay graphics
@@ -46,15 +52,15 @@ public abstract class OverlayEntity extends DisplayEntity {
 		IntegerVector defPos = new IntegerVector(2);
 		defPos.add(10);
 		defPos.add(10);
-		screenPosition = new IntegerListInput("ScreenPosition", "Graphics", defPos);
+		screenPosition = new IntegerListInput("ScreenPosition", GRAPHICS, defPos);
 		screenPosition.setValidCount(2);
 		screenPosition.setValidRange(0, 2500);
 		this.addInput(screenPosition);
 
-		alignRight = new BooleanInput("AlignRight", "Graphics", false);
+		alignRight = new BooleanInput("AlignRight", GRAPHICS, false);
 		this.addInput(alignRight);
 
-		alignBottom = new BooleanInput("AlignBottom", "Graphics", false);
+		alignBottom = new BooleanInput("AlignBottom", GRAPHICS, false);
 		this.addInput(alignBottom);
 	}
 
@@ -68,6 +74,56 @@ public abstract class OverlayEntity extends DisplayEntity {
 
 	public IntegerVector getScreenPosition() {
 		return screenPosition.getValue();
+	}
+
+	@Override
+	public void dragged(int x, int y, Vec3d newPos) {
+		KeywordIndex kw = InputAgent.formatIntegers("ScreenPosition", x, y);
+		InputAgent.apply(this, kw);
+	}
+
+	@Override
+	public boolean handleKeyPressed(int keyCode, char keyChar, boolean shift, boolean control, boolean alt) {
+		if (!isMovable())
+			return false;
+
+		IntegerVector pos = screenPosition.getValue();
+		int x = pos.get(0);
+		int y = pos.get(1);
+
+		switch (keyCode) {
+
+			case KeyEvent.VK_LEFT:
+				x += getAlignRight() ? 1 : -1;
+				break;
+
+			case KeyEvent.VK_RIGHT:
+				x += getAlignRight() ? -1 : 1;
+				break;
+
+			case KeyEvent.VK_UP:
+				y += getAlignBottom() ? 1 : -1;
+				break;
+
+			case KeyEvent.VK_DOWN:
+				y += getAlignBottom() ? -1 : 1;
+				break;
+
+			default:
+				return false;
+		}
+
+		x = Math.max(0, x);
+		y = Math.max(0, y);
+		KeywordIndex kw = InputAgent.formatIntegers(screenPosition.getKeyword(), x, y);
+		InputAgent.storeAndExecute(new KeywordCommand(this, kw));
+		return true;
+	}
+
+	public void handleMouseClicked(short count, int x, int y, int windowWidth, int windowHeight) {}
+
+	public boolean handleDrag(int x, int y, int startX, int startY, int windowWidth, int windowHeight) {
+		return false;
 	}
 
 }

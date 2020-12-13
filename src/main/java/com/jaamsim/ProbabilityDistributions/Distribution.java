@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2013 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2016-2020 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,9 +18,10 @@
 package com.jaamsim.ProbabilityDistributions;
 
 import com.jaamsim.Graphics.DisplayEntity;
+import com.jaamsim.Samples.SampleConstant;
+import com.jaamsim.Samples.SampleInput;
 import com.jaamsim.Samples.SampleProvider;
-import com.jaamsim.basicsim.Entity;
-import com.jaamsim.basicsim.Simulation;
+import com.jaamsim.Statistics.SampleStatistics;
 import com.jaamsim.events.EventManager;
 import com.jaamsim.input.Input;
 import com.jaamsim.input.InputAgent;
@@ -28,9 +30,6 @@ import com.jaamsim.input.IntegerInput;
 import com.jaamsim.input.Keyword;
 import com.jaamsim.input.Output;
 import com.jaamsim.input.UnitTypeInput;
-import com.jaamsim.input.ValueInput;
-import com.jaamsim.ui.EditBox;
-import com.jaamsim.ui.FrameBox;
 import com.jaamsim.units.DimensionlessUnit;
 import com.jaamsim.units.Unit;
 import com.jaamsim.units.UserSpecifiedUnit;
@@ -41,51 +40,58 @@ import com.jaamsim.units.UserSpecifiedUnit;
  *
  */
 public abstract class Distribution extends DisplayEntity
-implements SampleProvider {
+implements SampleProvider, RandomStreamUser {
 
-	@Keyword(description = "The unit type that the distribution returns values in.",
+	@Keyword(description = "The unit type for the values returned by the distribution. "
+	                     + "MUST be entered before most other inputs.",
 	         exampleList = {"DistanceUnit"})
 	protected final UnitTypeInput unitType;
 
-	@Keyword(description = "Seed for the random number generator.  Must be an integer >= 0. "
-			+ "The RandomSeed keyword works together with the GlobalSubstreamSeed keyword for Simulation "
-			+ "to determine the random sequence. The GlobalSubsteamSeed keyword allows the user "
-			+ "to change all the random sequences in a model with a single input.",
+	@Keyword(description = "Seed for the random number generator. "
+	                     + "Must be an integer >= 0. \n\n"
+	                     + "The 'RandomSeed' keyword works together with the "
+	                     + "'GlobalSubstreamSeed' keyword for Simulation to determine the random "
+	                     + "sequence. "
+	                     + "The 'GlobalSubsteamSeed' keyword allows the user to change all the "
+	                     + "random sequences in a model with a single input.\n\n"
+	                     + "When an object with this input is copied and pasted, the RandomSeed "
+	                     + "input is reset to an unused value for each copy that is pasted.",
 			 exampleList = {"547"})
 	private final IntegerInput randomSeedInput;
 
-	@Keyword(description = "Minimum value that can be returned.  Smaller values are rejected and resampled.",
-	         exampleList = {"0.0"})
-	protected final ValueInput minValueInput;
+	@Keyword(description = "Minimum value that can be returned. "
+	                     + "Smaller values are rejected and resampled.",
+	         exampleList = {"0.0", "InputValue1", "'2 * [InputValue1].Value'"})
+	protected final SampleInput minValueInput;
 
-	@Keyword(description = "Maximum value that can be returned.  Larger values are rejected and resampled.",
-	         exampleList = {"200.0"})
-	protected final ValueInput maxValueInput;
+	@Keyword(description = "Maximum value that can be returned. "
+	                     + "Larger values are rejected and resampled.",
+	         exampleList = {"200.0", "InputValue1", "'2 * [InputValue1].Value'"})
+	protected final SampleInput maxValueInput;
 
-	private int sampleCount;
-	private double sampleSum;
-	private double sampleSquaredSum;
-	private double sampleMin;
-	private double sampleMax;
-
+	private final SampleStatistics stats = new SampleStatistics();
 	private double lastSample = 0;
 
+	private static int MAX_ATTEMPTS = 1000;
+
 	{
-		unitType = new UnitTypeInput("UnitType", "Key Inputs", UserSpecifiedUnit.class);
+		unitType = new UnitTypeInput("UnitType", KEY_INPUTS, UserSpecifiedUnit.class);
 		unitType.setRequired(true);
 		this.addInput(unitType);
 
-		randomSeedInput = new IntegerInput("RandomSeed", "Key Inputs", -1);
+		randomSeedInput = new IntegerInput("RandomSeed", KEY_INPUTS, -1);
 		randomSeedInput.setValidRange(0, Integer.MAX_VALUE);
 		randomSeedInput.setRequired(true);
-		randomSeedInput.setDefaultText(EditBox.NONE);
+		randomSeedInput.setDefaultText("None");
 		this.addInput(randomSeedInput);
 
-		minValueInput = new ValueInput("MinValue", "Key Inputs", Double.NEGATIVE_INFINITY);
+		SampleConstant negInf = new SampleConstant(Double.NEGATIVE_INFINITY);
+		minValueInput = new SampleInput("MinValue", KEY_INPUTS, negInf);
 		minValueInput.setUnitType(UserSpecifiedUnit.class);
 		this.addInput(minValueInput);
 
-		maxValueInput = new ValueInput("MaxValue", "Key Inputs", Double.POSITIVE_INFINITY);
+		SampleConstant posInf = new SampleConstant(Double.POSITIVE_INFINITY);
+		maxValueInput = new SampleInput("MaxValue", KEY_INPUTS, posInf);
 		maxValueInput.setUnitType(UserSpecifiedUnit.class);
 		this.addInput(maxValueInput);
 	}
@@ -96,24 +102,17 @@ implements SampleProvider {
 	public void validate() {
 		super.validate();
 
-		// The maximum value must be greater than the minimum value
-		if( maxValueInput.getValue() <= minValueInput.getValue() ) {
-			throw new InputErrorException( "The input for MaxValue must be greater than that for MinValue.");
+		// The maximum value must be greater than or equal to the minimum value
+		if( this.getMaxValue() < this.getMinValue() ) {
+			throw new InputErrorException( "The input for MaxValue must be greater than or equal to the input for MinValue.");
 		}
 	}
 
 	@Override
 	public void earlyInit() {
 		super.earlyInit();
-
-		// Initialise the sample statistics
-		sampleCount = 0;
-		sampleSum = 0.0;
-		sampleSquaredSum = 0.0;
-		sampleMin = Double.POSITIVE_INFINITY;
-		sampleMax = Double.NEGATIVE_INFINITY;
-
-		lastSample = getMeanValue(0);
+		stats.clear();
+		lastSample = getInitValue();
 	}
 
 	@Override
@@ -122,9 +121,12 @@ implements SampleProvider {
 
 		if (in == unitType) {
 			setUnitType(getUnitType());
-			FrameBox.reSelectEntity();  // Update the units in the Output Viewer
 			return;
 		}
+	}
+
+	public double getInitValue() {
+		return getMeanValue(0);
 	}
 
 	@Override
@@ -132,13 +134,10 @@ implements SampleProvider {
 		super.setInputsForDragAndDrop();
 
 		// Find the largest seed used so far
-		int seed = 0;
-		for (Distribution dist : Entity.getClonesOfIterator(Distribution.class)) {
-			seed = Math.max(seed, dist.getStreamNumber());
-		}
+		int seed = getSimulation().getLargestStreamNumber();
 
 		// Set the random number seed next unused value
-		InputAgent.applyArgs(this, "RandomSeed", String.format("%s", seed+1));
+		InputAgent.applyIntegers(this, randomSeedInput.getKeyword(), seed + 1);
 	}
 
 	@Override
@@ -149,7 +148,7 @@ implements SampleProvider {
 	/**
 	 * Select the next sample from the probability distribution.
 	 */
-	protected abstract double getNextSample();
+	protected abstract double getSample(double simTime);
 
 	@Override
 	public Class<? extends Unit> getUnitType() {
@@ -161,12 +160,18 @@ implements SampleProvider {
 		maxValueInput.setUnitType(ut);
 	}
 
-	protected int getStreamNumber() {
+	@Override
+	public int getStreamNumber() {
 		return randomSeedInput.getValue();
 	}
 
-	public static int getSubstreamNumber() {
-		return Simulation.getSubstreamNumber();
+	@Override
+	public String getStreamNumberKeyword() {
+		return randomSeedInput.getKeyword();
+	}
+
+	public int getSubstreamNumber() {
+		return getSimulation().getSubstreamNumber();
 	}
 
 	/**
@@ -183,47 +188,52 @@ implements SampleProvider {
 		// If we are not in a model context, do not perturb the distribution by sampling,
 		// instead simply return the last sampled value
 		if (!EventManager.hasCurrent()) {
+			if (simTime == 0.0d)
+				return getInitValue();
 			return lastSample;
 		}
 
 		// Loop until the select sample falls within the desired min and max values
 		double nextSample;
+		double minVal = this.minValueInput.getValue().getNextSample(simTime);
+		double maxVal = this.maxValueInput.getValue().getNextSample(simTime);
+		int n = 0;
 		do {
-			nextSample = this.getNextSample();
+			if (n > MAX_ATTEMPTS) {
+				this.error("Could not find a sample value that was within the range specified by "
+						+ "the MinValue and MaxValue inputs.%n"
+						+ "Number of samples tested = %s", MAX_ATTEMPTS);
+			}
+			nextSample = this.getSample(simTime);
+			n++;
 		}
-		while (nextSample < this.minValueInput.getValue() ||
-		       nextSample > this.maxValueInput.getValue());
+		while (nextSample < minVal ||
+		       nextSample > maxVal);
 
 		lastSample = nextSample;
-
-		// Collect statistics on the sampled values
-		sampleCount++;
-		sampleSum += nextSample;
-		sampleSquaredSum += nextSample * nextSample;
-		sampleMin = Math.min(sampleMin, nextSample);
-		sampleMax = Math.max(sampleMax, nextSample);
+		stats.addValue(nextSample);
 		return nextSample;
 	}
 
 	@Override
 	public double getMinValue() {
-		return minValueInput.getValue();
+		return minValueInput.getValue().getMinValue();
 	}
 
 	@Override
 	public double getMaxValue() {
-		return maxValueInput.getValue();
+		return maxValueInput.getValue().getMaxValue();
 	}
 
 	/**
 	 * Returns the mean value for the distribution calculated from the inputs.  It is NOT the mean of the sampled values.
 	 */
-	protected abstract double getMeanValue();
+	protected abstract double getMean(double simTime);
 
 	/**
 	 * Returns the standard deviation for the distribution calculated from the inputs.  It is NOT the standard deviation of the sampled values.
 	 */
-	protected abstract double getStandardDeviation();
+	protected abstract double getStandardDev(double simTime);
 
 	@Output(name = "CalculatedMean",
 	 description = "The mean of the probability distribution calculated directly from the inputs. "
@@ -233,7 +243,7 @@ implements SampleProvider {
 	    sequence = 1)
 	@Override
 	public double getMeanValue(double simTime) {
-		return this.getMeanValue();
+		return this.getMean(simTime);
 	}
 
 	@Output(name = "CalculatedStandardDeviation",
@@ -243,15 +253,15 @@ implements SampleProvider {
 	    unitType = UserSpecifiedUnit.class,
 	    sequence = 2)
 	public double getStandardDeviation(double simTime) {
-		return this.getStandardDeviation();
+		return this.getStandardDev(simTime);
 	}
 
 	@Output(name = "NumberOfSamples",
 	 description = "The number of times the probability distribution has been sampled.",
 	    unitType = DimensionlessUnit.class,
 	    sequence = 3)
-	public int getNumberOfSamples(double simTime) {
-		return sampleCount;
+	public long getNumberOfSamples(double simTime) {
+		return stats.getCount();
 	}
 
 	@Output(name = "SampleMean",
@@ -259,7 +269,7 @@ implements SampleProvider {
 	    unitType = UserSpecifiedUnit.class,
 	    sequence = 4)
 	public double getSampleMean(double simTime) {
-		return sampleSum / sampleCount;
+		return stats.getMean();
 	}
 
 	@Output(name = "SampleStandardDeviation",
@@ -268,8 +278,7 @@ implements SampleProvider {
 	    unitType = UserSpecifiedUnit.class,
 	    sequence = 5)
 	public double getSampleStandardDeviation(double simTime) {
-		double sampleMean = sampleSum / sampleCount;
-		return Math.sqrt( sampleSquaredSum/sampleCount - sampleMean*sampleMean );
+		return stats.getStandardDeviation();
 	}
 
 	@Output(name = "SampleMin",
@@ -277,7 +286,7 @@ implements SampleProvider {
 	    unitType = UserSpecifiedUnit.class,
 	    sequence = 6)
 	public double getSampleMin(double simTime) {
-		return sampleMin;
+		return stats.getMin();
 	}
 
 	@Output(name = "SampleMax",
@@ -285,6 +294,6 @@ implements SampleProvider {
 	    unitType = UserSpecifiedUnit.class,
 	    sequence = 7)
 	public double getSampleMax(double simTime) {
-		return sampleMax;
+		return stats.getMax();
 	}
 }

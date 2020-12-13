@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2012 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2019-2020 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,10 +27,67 @@ import com.jaamsim.render.RenderUtils;
  *
  */
 public class MathUtils {
+	final static double EPSILON = 0.000000001; // one billionth
 
+
+/**
+ * Test whether a double value is zero within a tolerance
+ * @param a - double value to be tested
+ * @return true if a == 0 within a tolerance of EPSILON
+ */
+public static final boolean isSmall(double a) {
+	return a < EPSILON;
+}
+
+/**
+ * Compares two doubles for equality within a tolerance.
+ * @param a - first double
+ * @param b - second double
+ * @return true if a == b within a tolerance of EPSILON
+ */
 public static boolean near(double a, double b) {
 	double diff = Math.abs(a - b);
-	return diff < Constants.EPSILON;
+	return isSmall(diff);
+}
+
+/**
+ * Performs a greater-than-or-equal-to comparison of two doubles within a tolerance.
+ * @param a - first double
+ * @param b - second double
+ * @return true if a >= b within a tolerance of EPSILON
+ */
+public static boolean nearGT(double a, double b) {
+	return a+EPSILON > b;
+}
+
+/**
+ * Performs a less-than-or-equal-to comparison of two doubles within a tolerance.
+ * @param a - first double
+ * @param b - second double
+ * @return true if a <= b within a tolerance of EPSILON
+ */
+public static boolean nearLT(double a, double b) {
+	return a < b+EPSILON;
+}
+
+/**
+ * Performs a greater-than comparison of two doubles within a tolerance.
+ * @param a - first double
+ * @param b - second double
+ * @return true if a > b within a tolerance of EPSILON
+ */
+public static boolean strictGT(double a, double b) {
+	return !nearLT(a,b);
+}
+
+/**
+ * Performs a less-than comparison of two doubles within a tolerance.
+ * @param a - first double
+ * @param b - second double
+ * @return true if a < b within a tolerance of EPSILON
+ */
+public static boolean strictLT(double a, double b) {
+	return !nearGT(a,b);
 }
 
 /**
@@ -70,7 +128,6 @@ public static boolean segOverlap(double a0, double a1, double b0, double b1, dou
  * @param val
  * @param min
  * @param max
- * @return
  */
 public static double bound(double val, double min, double max) {
 	//assert(min <= max);
@@ -84,7 +141,6 @@ public static double bound(double val, double min, double max) {
  * Return a matrix that rotates points and projects them onto the ray's view plane.
  * IE: the new coordinate system has the ray pointing in the +Z direction from the origin.
  * This is useful for ray-line collisions and ray-point collisions
- * @return
  */
 public static Mat4d RaySpace(Ray r) {
 
@@ -120,7 +176,6 @@ public static Mat4d RaySpace(Ray r) {
  * Returns a Transform representing a rotation around a non-origin point
  * @param rot - the rotation (in world coordinates) to apply
  * @param point - the point to rotate around
- * @return
  */
 public static Mat4d rotateAroundPoint(Quaternion rot, Vec3d point) {
 	Vec3d negPoint = new Vec3d(point);
@@ -220,7 +275,6 @@ public static double collisionDistPoly(Ray r, List<Vec3d> points) {
  * @param rayMat - the rayspace matrix
  * @param lines - pairs of vertices, each pair defining a line segment (this is not a line strip or line loop)
  * @param collisionAngle - the angle of the collision cone in radians
- * @return
  */
 public static double collisionDistLines(Mat4d rayMat, Vec4d[] lines, double collisionAngle) {
 	double shortDist = Double.POSITIVE_INFINITY;
@@ -247,6 +301,41 @@ public static double collisionDistLines(Mat4d rayMat, Vec4d[] lines, double coll
 	}
 	return shortDist;
 
+}
+
+/**
+ * Get the point where 3 planes intersect, or null if any are parallel
+ * @param p0
+ * @param p1
+ * @param p2
+ */
+public static Vec3d collidePlanes(Plane p0, Plane p1, Plane p2) {
+	Ray r = p0.collide(p1);
+	if (r == null)
+		return null;
+
+		double dist = p2.collisionDist(r);
+	if (Double.isInfinite(dist))
+		return null;
+
+	Vec3d ret = new Vec3d(r.getDirRef());
+	ret.scale3(dist);
+	ret.add3(r.getStartRef());
+	return ret;
+}
+
+public static Plane getMidpointPlane(Vec3d p0, Vec3d p1) {
+	Vec3d mid = new Vec3d(p0);
+	mid.add3(p1);
+	mid.scale3(0.5);
+
+	Vec4d normal =  new Vec4d(p1, 0);
+	normal.sub3(p0);
+	normal.normalize3();
+
+	double dist = normal.dot3(mid);
+
+	return new Plane(normal, dist);
 }
 
 } // class

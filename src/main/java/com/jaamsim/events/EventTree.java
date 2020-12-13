@@ -27,73 +27,34 @@ import java.util.Arrays;
  */
 class EventTree {
 
-	/**
-	 * 根节点
-	 */
 	private EventNode root = EventNode.nilNode;
-	/**
-	 * 最小值节点
-	 */
 	private EventNode lowest = null;
 
+	///////////////////////////////////////////
+	// Scratch space, used instead of having parent pointers
 
-
-	/**
-	 * Scratch space, used instead of having parent pointers
-	 * 暂存空间，用来暂存父指针
-	 */
 	private EventNode[] scratch = new EventNode[64];
 	private int scratchPos = 0;
 
-	/**
-	 * 将节点放到暂存空间中
-	 * @param n
-	 */
 	private void pushScratch(EventNode n) {
 		scratch[scratchPos++] = n;
 	}
-
-	/**
-	 * 从后向前删除n个暂存节点
-	 * @param n
-	 */
 	private void dropScratch(int n) {
 		scratchPos = Math.max(0, scratchPos - n);
 	}
-
-
-	/**
-	 * Get the 'nth' node from the end of the scratch (1 being the first)
-	 * 从scratch中，取出倒数第n个节点
-	 * @param n 倒数第几个节点
-	 * @return
-	 */
+	// Get the 'nth' node from the end of the scratch (1 being the first)
 	private EventNode getScratch(int n) {
 		return (scratchPos >= n) ? scratch[scratchPos - n] : null;
 	}
-
-
-	/**
-	 * 重置暂存空间（将它的索引置0）
-	 */
 	private void resetScratch() {
 		scratchPos = 0;
 	}
 
-	/**
-	 * 返回红黑树中最小值节点
-	 * @return
-	 */
 	EventNode getNextNode() {
-		if (lowest == null) {
-			updateLowest();
-		}
+		if (lowest == null) updateLowest();
 		return lowest;
 	}
 
-	/**
-	 * 重置红黑树
-	 */
 	final void reset() {
 		root = EventNode.nilNode;
 		lowest = null;
@@ -102,32 +63,20 @@ class EventTree {
 		Arrays.fill(scratch, null);
 	}
 
-	/**
-	 * 更新红黑树的最小值节点，被 getNextNode() 调用
-	 * 即遍历找到红黑树中最小节点
-	 */
 	private void updateLowest() {
 		if (root == EventNode.nilNode) {
 			lowest = null;
 			return;
 		}
 		EventNode current = root;
-		while (current.left != EventNode.nilNode) {
+		while (current.left != EventNode.nilNode)
 			current = current.left;
-		}
 
 		lowest = current;
 	}
 
-	/**
-	 * 根据调度刻度和优先级去查询节点，若没有则创建一个
-	 * @param schedTick
-	 * @param priority
-	 * @return
-	 */
 	final EventNode createOrFindNode(long schedTick, int priority) {
 
-		// 若红黑树为空，则新建一个节点作为根节点
 		if (root == EventNode.nilNode) {
 			root = getNewNode(schedTick, priority);
 			lowest = root;
@@ -138,16 +87,13 @@ class EventTree {
 		EventNode n = root;
 		EventNode newNode = null;
 
-		// 遍历整颗树，去寻找目标节点，
 		while (true) {
 			int comp = n.compare(schedTick, priority);
 			if (comp == 0) {
-				// Found existing node
-				return n;
+				return n; // Found existing node
 			}
 			EventNode next = comp > 0 ? n.left : n.right;
 			if (next != EventNode.nilNode) {
-				// 若节点n的next不为空，将n保存到Scratch中， n指向next,继续遍历
 				pushScratch(n);
 				n = next;
 				continue;
@@ -157,58 +103,36 @@ class EventTree {
 			newNode = getNewNode(schedTick, priority);
 			pushScratch(n);
 			newNode.red = true;
-			if (comp > 0) {
+			if (comp > 0)
 				n.left = newNode;
-			} else {
+			else
 				n.right = newNode;
-			}
 			break;
 		}
 
-		// 针对新节点平衡红黑树
 		insertBalance(newNode);
 		root.red = false;
 
 		if (lowest != null && newNode.compareToNode(lowest) < 0) {
-			// 更新红黑树的最小节点
 			lowest = newNode;
 		}
 		return newNode;
 
 	}
 
-	/**
-	 * 针对新插入的节点平衡红黑树
-	 * @param n
-	 */
 	private void insertBalance(EventNode n) {
 		// See the wikipedia page for red-black trees to understand the case numbers
 
-		// 获取该节点的父节点
 		EventNode parent = getScratch(1);
-		if (parent == null || !parent.red) {
-			// cases 1 and 2: 没有父节点和父节点为黑色的情况
-			return;
-		}
+		if (parent == null || !parent.red) return; // cases 1 and 2
 
-		// 获取祖父节点
-		EventNode gp = getScratch(2);
-		if (gp == null) {
-			// 没有祖父节点，父节点为根节点的情况（即父节点为黑色）
-			return;
-		}
+		final EventNode gp = getScratch(2);
+		if (gp == null) return;
 
-		// 获取叔叔节点
 		EventNode uncle = (gp.left == parent ? gp.right : gp.left);
-
-		  if (uncle.red) {
+		if (uncle.red) {
 			// Both parent and uncle are red
-			// case 3：
-			// 1. 新增当前节点，默认颜色为红色;
-			// 2. 父节点变成黑色
-			// 3. 叔叔节点U变成黑色
-			// 4. 祖父节点变成红色
-			// 5. 如果祖父节点变红不满足红黑树性质，则将祖父节点当成新增节点递归处理
+			// case 2
 			parent.red = false;
 			uncle.red = false;
 			gp.red = true;
@@ -218,14 +142,13 @@ class EventTree {
 		}
 
 		// case 4
-
-		if (n == parent.right && gp != null && parent == gp.left) {
+		if (n == parent.right && parent == gp.left) {
 			// Right child of a left parent, rotate left at parent
 			parent.rotateLeft(gp);
 			parent = n;
 			n = n.left;
 		}
-		else if (n == parent.left && gp != null && parent == gp.right) {
+		else if (n == parent.left && parent == gp.right) {
 			// left child of right parent, rotate right at parent
 			parent.rotateRight(gp);
 			parent = n;
@@ -248,13 +171,6 @@ class EventTree {
 
 	}
 
-
-	/**
-	 * 删除红黑树的指定节点
-	 * @param schedTick
-	 * @param priority
-	 * @return
-	 */
 	final boolean removeNode(long schedTick, int priority) {
 		// First find the node to remove
 		resetScratch();
@@ -277,7 +193,6 @@ class EventTree {
 		}
 
 		// Debugging
-		// 如果节点所指向的链表仍然有元素，则抛出异常
 		if (current.head != null || current.tail != null)
 			throw new RuntimeException("Removing non-empy node");
 
@@ -303,16 +218,14 @@ class EventTree {
 
 		// Drop the node
 		if (parent != null) {
-			if (parent.left == current) {
+			if (parent.left == current)
 				parent.left = child;
-			} else {
+			else
 				parent.right = child;
-			}
 		}
 
-		if (current == root) {
+		if (current == root)
 			root = child;
-		}
 
 		boolean currentIsRed = current.red;
 
@@ -332,11 +245,6 @@ class EventTree {
 		return true;
 	}
 
-	/**
-	 * 将该节点和叶子节点进行交换，删除节点时可能调用
-	 * @param node
-	 * @return
-	 */
 	private EventNode swapToLeaf(EventNode node) {
 		pushScratch(node);
 		EventNode curr = node.left;
@@ -348,10 +256,6 @@ class EventTree {
 		return curr;
 	}
 
-	/**
-	 * 删除节点后的平衡操作
-	 * @param n
-	 */
 	private void deleteBalance(EventNode n) {
 		// At all times the scratch space should contain the parent list (but not n)
 		EventNode parent = getScratch(1);
@@ -433,23 +337,13 @@ class EventTree {
 		}
 	}
 
-	/**
-	 * 运行整棵树的所有runner
-	 * @param runner
-	 */
 	final void runOnAllNodes(EventNode.Runner runner) {
 		runOnNode(root, runner);
 	}
 
-	/**
-	 * 运行某个节点所有子树的所有runner
-	 * @param node
-	 * @param runner
-	 */
 	private void runOnNode(EventNode node, EventNode.Runner runner) {
-		if (node == EventNode.nilNode) {
+		if (node == EventNode.nilNode)
 			return;
-		}
 
 		runOnNode(node.left, runner);
 
@@ -458,77 +352,9 @@ class EventTree {
 		runOnNode(node.right, runner);
 	}
 
-
-
-	/**
-	 * 可复用空闲节点链表，是一个只用到节点左子树的链表结构
-	 */
-	private EventNode freeList = null;
-
-	/**
-	 * 根据调度刻度和事件优先级创建一个新节点
-	 * 在创建是考虑复用空闲节点
-	 * @param schedTick
-	 * @param priority
-	 * @return
-	 */
-	private EventNode getNewNode(long schedTick, int priority) {
-		// 是否有可复用的空闲节点
-		if (freeList == null) {
-			return new EventNode(schedTick, priority);
-		}
-
-		// 复用空闲节点的头节点
-		EventNode ret = freeList;
-		// 重置空闲节点为头节点的下一个节点
-		freeList = freeList.left;
-
-		ret.schedTick = schedTick;
-		ret.priority = priority;
-		ret.head = null;
-		ret.tail = null;
-		ret.left = EventNode.nilNode;
-		ret.right = EventNode.nilNode;
-		ret.red = false;
-
-		return ret;
-	}
-
-	/**
-	 * 回收空闲的节点，
-	 * @param node
-	 */
-	private void reuseNode(EventNode node) {
-		// Clear the node
-		node.left = null;
-		node.right = null;
-		node.head = null;
-		node.tail = null;
-
-		node.left = freeList;
-		freeList = node;
-	}
-
-	/**
-	 * 清空空闲节点
-	 */
-	private void clearFreeList() {
-		freeList = null;
-	}
-
-
-
-	// ******************
-	// 测试验证红黑树相关代码
-	// ******************
-
-
-	
 	// Verify the sorting structure and return the number of nodes
 	final int verify() {
-		if (root == EventNode.nilNode) {
-			return 0;
-		}
+		if (root == EventNode.nilNode) return 0;
 
 		if (EventNode.nilNode.red == true)
 			throw new RuntimeException("nil node corrupted, turned red");
@@ -584,18 +410,51 @@ class EventTree {
 		if (root == EventNode.nilNode) return 0;
 		return countNodes(root);
 	}
-
-
 	private int countNodes(EventNode n) {
 		int count = 1;
-		if (n.left != EventNode.nilNode) {
+		if (n.left != EventNode.nilNode)
 			count += countNodes(n.left);
-		}
-		if (n.right != EventNode.nilNode) {
+		if (n.right != EventNode.nilNode)
 			count += countNodes(n.right);
-		}
 
 		return count;
+	}
+
+	private EventNode freeList = null;
+
+	private EventNode getNewNode(long schedTick, int priority) {
+		if (freeList == null) {
+			return new EventNode(schedTick, priority);
+		}
+
+		EventNode ret = freeList;
+		freeList = freeList.left;
+
+		ret.schedTick = schedTick;
+		ret.priority = priority;
+		ret.head = null;
+		ret.tail = null;
+
+		ret.left = EventNode.nilNode;
+		ret.right = EventNode.nilNode;
+		ret.red = false;
+
+		return ret;
+	}
+
+	private void reuseNode(EventNode node) {
+		// Clear the node
+		node.left = null;
+		node.right = null;
+		node.head = null;
+		node.tail = null;
+
+		node.left = freeList;
+		freeList = node;
+	}
+
+	private void clearFreeList() {
+		freeList = null;
 	}
 
 }

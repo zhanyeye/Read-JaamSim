@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2013 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2018-2020 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,38 +22,74 @@ import java.util.Collections;
 import java.util.Comparator;
 
 import com.jaamsim.Graphics.DisplayEntity;
+import com.jaamsim.Samples.SampleConstant;
+import com.jaamsim.Samples.SampleInput;
 import com.jaamsim.basicsim.Entity;
 import com.jaamsim.basicsim.EntityTarget;
+import com.jaamsim.basicsim.ObserverEntity;
+import com.jaamsim.basicsim.SubjectEntity;
+import com.jaamsim.basicsim.SubjectEntityDelegate;
 import com.jaamsim.events.ProcessTarget;
+import com.jaamsim.input.IntegerInput;
 import com.jaamsim.input.Keyword;
-import com.jaamsim.input.ValueInput;
+import com.jaamsim.input.Output;
+import com.jaamsim.units.DimensionlessUnit;
 import com.jaamsim.units.TimeUnit;
 
 /**
- * The Controller object simulates the operation of a Programmable Logic Controller
+ * Generates update signals that are sent to the objects managed by the Controller.
  * @author Harry King
  *
  */
-public class Controller extends DisplayEntity {
+public class Controller extends DisplayEntity implements SubjectEntity {
 
-	@Keyword(description = "The sampling time for the Controller.",
-	         example = "Controller1 SamplingTime { 100 ms }")
-	private final ValueInput samplingTime;
+	@Keyword(description = "Simulation time for the first update signal.",
+	         exampleList = {"5 s"})
+	private final SampleInput firstTime;
 
-	private final ArrayList<CalculationEntity> calculationEntityList;  // List of the CalculationEntities controller by this Controller.
-	private int count;  // Number of times that the controller has initiated its calculations.
+	@Keyword(description = "Time interval between update signals.",
+	         exampleList = {"100 ms"})
+	private final SampleInput interval;
+
+	@Keyword(description = "Maximum number of updates to perform.",
+	         exampleList = {"5"})
+	private final IntegerInput maxUpdates;
+
+	private final ArrayList<Controllable> entityList;  // Entities controlled by this Controller.
+	private int count;  // Number of update cycle completed.
 
 	private final ProcessTarget doUpdate = new DoUpdateTarget(this);
 
+	private final SubjectEntityDelegate subject = new SubjectEntityDelegate(this);
+
 	{
-		samplingTime = new ValueInput("SamplingTime", "Key Inputs", 1.0d);
-		samplingTime.setUnitType(TimeUnit.class);
-		samplingTime.setValidRange(0.0, Double.POSITIVE_INFINITY);
-		this.addInput(samplingTime);
+		firstTime = new SampleInput("FirstTime", KEY_INPUTS, new SampleConstant(0.0d));
+		firstTime.setUnitType(TimeUnit.class);
+		firstTime.setValidRange(0.0, Double.POSITIVE_INFINITY);
+		this.addInput(firstTime);
+
+		interval = new SampleInput("Interval", KEY_INPUTS, null);
+		interval.setUnitType(TimeUnit.class);
+		interval.setValidRange(0.0, Double.POSITIVE_INFINITY);
+		interval.setRequired(true);
+		this.addInput(interval);
+		this.addSynonym(interval, "SamplingTime");
+
+		maxUpdates = new IntegerInput("MaxUpdates", KEY_INPUTS, Integer.MAX_VALUE);
+		maxUpdates.setValidRange(0, Integer.MAX_VALUE);
+		this.addInput(maxUpdates);
 	}
 
 	public Controller() {
-		calculationEntityList = new ArrayList<>();
+		entityList = new ArrayList<>();
+	}
+
+	private static final EntitySequenceSort sequenceSort = new EntitySequenceSort();
+	static class EntitySequenceSort implements Comparator<Controllable> {
+		@Override
+		public int compare(Controllable c1, Controllable c2) {
+			return Double.compare(c1.getSequenceNumber(), c2.getSequenceNumber());
+		}
 	}
 
 	@Override
@@ -61,22 +98,33 @@ public class Controller extends DisplayEntity {
 		count = 0;
 
 		// Prepare a list of the calculation entities managed by this controller
-		calculationEntityList.clear();
-		for (CalculationEntity ent : Entity.getClonesOfIterator(CalculationEntity.class)) {
-			if (ent.getController() == this)
-				calculationEntityList.add(ent);
+		entityList.clear();
+		for (Entity ent : getJaamSimModel().getClonesOfIterator(Entity.class, Controllable.class)) {
+			Controllable con = (Controllable) ent;
+			if (con.getController() == this)
+				entityList.add(con);
 		}
 
 		// Sort the calculation entities into the correct sequence
-		Collections.sort(calculationEntityList, new SequenceCompare());
+		Collections.sort(entityList, sequenceSort);
+
+		// Clear the list of observers
+		subject.clear();
 	}
 
-	// Sorts by increasing sequence number
-	private static class SequenceCompare implements Comparator<CalculationEntity> {
-		@Override
-		public int compare(CalculationEntity c1, CalculationEntity c2) {
-			return Double.compare(c1.getSequenceNumber(), c2.getSequenceNumber());
-		}
+	@Override
+	public void registerObserver(ObserverEntity obs) {
+		subject.registerObserver(obs);
+	}
+
+	@Override
+	public void notifyObservers() {
+		subject.notifyObservers();
+	}
+
+	@Override
+	public ArrayList<ObserverEntity> getObserverList() {
+		return subject.getObserverList();
 	}
 
 	@Override
@@ -84,7 +132,8 @@ public class Controller extends DisplayEntity {
 		super.startUp();
 
 		// Schedule the first update
-		this.scheduleProcess(samplingTime.getValue(), 5, doUpdate);
+		if (maxUpdates.getValue() > 0)
+			this.scheduleProcess(firstTime.getValue().getNextSample(0.0d), 5, doUpdate);
 	}
 
 	private static class DoUpdateTarget extends EntityTarget<Controller> {
@@ -102,18 +151,40 @@ public class Controller extends DisplayEntity {
 
 		// Update the last value for each entity
 		double simTime = this.getSimTime();
-		for (CalculationEntity ent : calculationEntityList) {
+		for (Controllable ent : entityList) {
 			ent.update(simTime);
 		}
+
+		// Notify any observers
+		notifyObservers();
 
 		// Increment the number of cycles
 		count++;
 
 		// Schedule the next update
-		this.scheduleProcess(samplingTime.getValue(), 5, doUpdate);
+		if (count < maxUpdates.getValue())
+			this.scheduleProcess(interval.getValue().getNextSample(simTime), 5, doUpdate);
 	}
 
 	public int getCount() {
 		return count;
 	}
+
+	@Output(name = "EntityList",
+	 description = "Objects that receive update signals from this Controller, listed in the "
+	             + "sequence in which the updates are performed.",
+	    unitType = DimensionlessUnit.class,
+	    sequence = 1)
+	public ArrayList<Controllable> getEntityList(double simTime) {
+		return entityList;
+	}
+
+	@Output(name = "Count",
+	 description = "Total number of updates that have been performed.",
+	    unitType = DimensionlessUnit.class,
+	    sequence = 1)
+	public double getCount(double simTime) {
+		return count;
+	}
+
 }

@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2011 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2016-2019 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +18,7 @@
 package com.jaamsim.ui;
 
 import java.awt.BorderLayout;
+import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Point;
@@ -45,13 +47,17 @@ import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 import javax.swing.filechooser.FileNameExtensionFilter;
 
+import com.jaamsim.Commands.DefineCommand;
+import com.jaamsim.Commands.KeywordCommand;
 import com.jaamsim.DisplayModels.ColladaModel;
 import com.jaamsim.DisplayModels.DisplayModel;
 import com.jaamsim.DisplayModels.ImageModel;
 import com.jaamsim.Graphics.DisplayEntity;
-import com.jaamsim.basicsim.Entity;
+import com.jaamsim.basicsim.JaamSimModel;
 import com.jaamsim.controllers.RenderManager;
+import com.jaamsim.input.FileInput;
 import com.jaamsim.input.InputAgent;
+import com.jaamsim.input.KeywordIndex;
 import com.jaamsim.math.AABB;
 import com.jaamsim.math.Vec2d;
 import com.jaamsim.math.Vec3d;
@@ -63,9 +69,9 @@ public class GraphicBox extends JDialog {
 	private static GraphicBox myInstance;  // only one instance allowed to be open
 	private final  JLabel previewLabel; // preview DisplayModel as a picture
 	final ImageIcon previewIcon = new ImageIcon();
-	private static DisplayEntity currentEntity;
-	private final static JList<DisplayModel> displayModelList; // All defined DisplayModels
-	private File lastDir;  // last directory accessed by the file chooser
+	private DisplayEntity currentEntity;
+	private ArrayList<String> modelList;
+	private final static JList<String> displayModelList; // Names of valid DisplayModel choices
 
 	private final JCheckBox useModelSize;
 	private final JCheckBox useModelPosition;
@@ -76,8 +82,7 @@ public class GraphicBox extends JDialog {
 	private GraphicBox() {
 
 		setTitle( "Select DisplayModel" );
-		setIconImage(GUIFrame.getWindowIcon());
-
+		setType(Type.UTILITY);
 		this.setModal(true);
 
 		// Upon closing do the close method
@@ -90,14 +95,17 @@ public class GraphicBox extends JDialog {
 		};
 		this.addWindowListener( windowListener );
 
+		// Preview Area
 		previewLabel = new JLabel("", JLabel.CENTER);
+		previewLabel.setBorder(new EmptyBorder(10, 10, 20, 10));
 		getContentPane().add(previewLabel, "West");
 
+		// DisplayModel List
 		JScrollPane scrollPane = new JScrollPane(displayModelList);
-		scrollPane.setBorder(new EmptyBorder(5, 0, 44, 10));
+		scrollPane.setBorder(new EmptyBorder(10, 10, 20, 10));
 		getContentPane().add(scrollPane, "East");
 
-		// Update the previewLabel according to the selected DisplayModel
+		// Update the preview area according to the selected DisplayModel
 		displayModelList.addListSelectionListener(   new ListSelectionListener() {
 			@Override
 			public void valueChanged(ListSelectionEvent e) {
@@ -110,7 +118,10 @@ public class GraphicBox extends JDialog {
 					return;
 
 				// Selected DisplayModel
-				DisplayModel dm = (DisplayModel)((JList<?>)e.getSource()).getSelectedValue();
+				String dmName = (String)((JList<?>)e.getSource()).getSelectedValue();
+				DisplayModel dm = (DisplayModel) GUIFrame.getJaamSimModel().getNamedEntity(dmName);
+				if (dm == null)
+					return;
 
 				if (!RenderManager.isGood()) { return; }
 
@@ -132,7 +143,7 @@ public class GraphicBox extends JDialog {
 			}
 		} );
 
-		// Import and Accept buttons
+		// Import button
 		JButton importButton = new JButton("Import");
 		importButton.addActionListener( new ActionListener() {
 			@Override
@@ -143,69 +154,93 @@ public class GraphicBox extends JDialog {
 				}
 
 				// Create a file chooser
-				final JFileChooser chooser = new JFileChooser(lastDir);
+				final JFileChooser chooser = new JFileChooser(GUIFrame.get3DFolder());
 
 				// Set the file extension filters
 				chooser.setAcceptAllFileFilterUsed(false);
-				for (FileNameExtensionFilter filter : ColladaModel.getFileNameExtensionFilters()) {
-					chooser.addChoosableFileFilter(filter);
+				FileNameExtensionFilter[] colFilters = FileInput.getFileNameExtensionFilters("3D",
+						ColladaModel.VALID_FILE_EXTENSIONS, ColladaModel.VALID_FILE_DESCRIPTIONS);
+				FileNameExtensionFilter[] imgFilters = FileInput.getFileNameExtensionFilters("Image",
+						ImageModel.VALID_FILE_EXTENSIONS, ImageModel.VALID_FILE_DESCRIPTIONS);
+				chooser.addChoosableFileFilter(colFilters[0]);
+				chooser.addChoosableFileFilter(imgFilters[0]);
+				for (int i = 1; i < colFilters.length; i++) {
+					chooser.addChoosableFileFilter(colFilters[i]);
 				}
+				for (int i = 1; i < imgFilters.length; i++) {
+					chooser.addChoosableFileFilter(imgFilters[i]);
+				}
+				chooser.setFileFilter(colFilters[0]);
 
 				// Show the file chooser and wait for selection
 				int returnVal = chooser.showDialog(null, "Import");
 
 				// Create the selected graphics files
 				if (returnVal == JFileChooser.APPROVE_OPTION) {
-		            File f = chooser.getSelectedFile();
-		            lastDir = chooser.getCurrentDirectory();
+					File f = chooser.getSelectedFile();
+					GUIFrame.set3DFolder(f.getParent());
 
 					// Determine the file name and extension
 					String fileName = f.getName();
 					int i = fileName.lastIndexOf('.');
 					if (i <= 0 || i >= fileName.length() - 1) {
-						LogBox.format("File name: %s is invalid.", f.getName());
-						LogBox.getInstance().setVisible(true);
+						GUIFrame.invokeErrorDialog("Input Error",
+								String.format("File name: %s is invalid.", fileName));
 						return;
 					}
 					String extension = fileName.substring(i+1).toLowerCase();
 
+					JaamSimModel simModel = GUIFrame.getJaamSimModel();
+
 					// Set the entity name
 					String entityName = fileName.substring(0, i);
-					entityName = entityName.replaceAll(" ", ""); // Space is not allowed for Entity Name
+					entityName = entityName.replaceAll(" ", "_"); // Space is not allowed for Entity Name
+					entityName = InputAgent.getUniqueName(simModel, entityName, "");
+					String modelName = InputAgent.getUniqueName(simModel, entityName + "-model", "");
 
-					// Check for a valid extension
-					if (!ColladaModel.isValidExtension(extension)) {
-						LogBox.format("File name: %s is invalid.", f.getName());
-						LogBox.getInstance().setVisible(true);
-						return;
+					// Create the DisplayModel
+					DisplayModel dm = null;
+					if (ColladaModel.isValidExtension(extension)) {
+						InputAgent.storeAndExecute(new DefineCommand(simModel, ColladaModel.class, modelName));
+						dm = (DisplayModel) simModel.getNamedEntity(modelName);
+						InputAgent.applyArgs(dm, "ColladaFile", f.getPath());
 					}
-
-					// Create the ColladaModel
-					String modelName = entityName + "-model";
-					ColladaModel dm = InputAgent.defineEntityWithUniqueName(ColladaModel.class, modelName, "", true);
-
-					// Load the 3D content to the ColladaModel
-					InputAgent.applyArgs(dm, "ColladaFile", f.getPath());
+					else if (ImageModel.isValidExtension(extension)) {
+						InputAgent.storeAndExecute(new DefineCommand(simModel, ImageModel.class, modelName));
+						dm = (DisplayModel) simModel.getNamedEntity(modelName);
+						InputAgent.applyArgs(dm, "ImageFile", f.getPath());
+					}
+					else {
+						GUIFrame.invokeErrorDialog("Input Error",
+								String.format("The extension for file: %s is invalid for both an "
+										+ "image and a 3D asset.", fileName));
+					}
 
 					 // Add the new DisplayModel to the List
 					myInstance.refresh();
-					FrameBox.valueUpdate();
+					GUIFrame.updateUI();
 
-					// Scroll to selection and ensure it is visible
-					int index = displayModelList.getModel().getSize() - 1;
+					// Scroll to the new DisplayModel and ensure it is visible
+					int index = modelList.indexOf(dm.getName());
 					displayModelList.setSelectedIndex(index);
 					displayModelList.ensureIndexIsVisible(index);
 				}
 			}
 		} );
 
+		// Accept button
 		JButton acceptButton = new JButton("Accept");
 		acceptButton.addActionListener( new ActionListener() {
 			@Override
 			public void actionPerformed( ActionEvent e ) {
 				setEnabled(false); // Don't accept any interaction
-				DisplayModel dm = displayModelList.getSelectedValue();
-				InputAgent.applyArgs(currentEntity, "DisplayModel", dm.getName());
+				String dmName = displayModelList.getSelectedValue();
+				DisplayModel dm = (DisplayModel) GUIFrame.getJaamSimModel().getNamedEntity(dmName);
+				if (dm == null)
+					return;
+				ArrayList<KeywordIndex> kwList = new ArrayList<>(3);
+				KeywordIndex dmKw = InputAgent.formatArgs("DisplayModel", dmName);
+				kwList.add(dmKw);
 
 				if (!RenderManager.isGood()) {
 					myInstance.close();
@@ -241,10 +276,11 @@ public class GraphicBox extends JDialog {
 
 					entitySize = new Vec3d(modelSize);
 					entitySize.scale3(ratio);
-					InputAgent.applyArgs(currentEntity, "Size",
+					KeywordIndex sizeKw = InputAgent.formatArgs("Size",
 		                                 String.format(loc, "%.6f", entitySize.x),
 		                                 String.format(loc, "%.6f", entitySize.y),
 		                                 String.format(loc, "%.6f", entitySize.z), "m");
+					kwList.add(sizeKw);
 				}
 
 				if (dm instanceof ImageModel) {
@@ -253,10 +289,11 @@ public class GraphicBox extends JDialog {
 					if (imageDims != null && useModelSize.isSelected()) {
 						// Keep the y size the same, but use the image's proportions. We can't really use the model size, as it is in pixels
 						double scale = currentEntity.getSize().y / imageDims.y;
-						InputAgent.applyArgs(currentEntity, "Size",
+						KeywordIndex sizeKw = InputAgent.formatArgs("Size",
 						                     String.format(loc, "%.6f", imageDims.x * scale),
 						                     String.format(loc, "%.6f", imageDims.y * scale),
 						                     "1.0", "m");
+						kwList.add(sizeKw);
 					}
 				}
 
@@ -264,44 +301,63 @@ public class GraphicBox extends JDialog {
 
 					Vec3d entityPos = modelBounds.center;
 
-					InputAgent.applyArgs(currentEntity, "Position",
+					KeywordIndex posKw = InputAgent.formatArgs("Position",
 					                     String.format(loc, "%.6f", entityPos.x),
 					                     String.format(loc, "%.6f", entityPos.y),
 					                     String.format(loc, "%.6f", entityPos.z), "m");
-					InputAgent.applyArgs(currentEntity, "Alignment", "0", "0", "0");
+					KeywordIndex alignKw = InputAgent.formatArgs("Alignment", "0", "0", "0");
+					kwList.add(posKw);
+					kwList.add(alignKw);
 				}
-				FrameBox.valueUpdate();
+
+				KeywordIndex[] kws = new KeywordIndex[kwList.size()];
+				kwList.toArray(kws);
+				InputAgent.storeAndExecute(new KeywordCommand(currentEntity, kws));
+
+				GUIFrame.updateUI();
 				myInstance.close();
 			}
 		} );
+
+		// Cancel button
+		JButton cancelButton = new JButton("Cancel");
+		cancelButton.addActionListener( new ActionListener() {
+			@Override
+			public void actionPerformed( ActionEvent e ) {
+				myInstance.close();
+			}
+		} );
+
+		// CheckBoxes
+		JPanel checkBoxPanel = new JPanel(new BorderLayout());
 		useModelSize = new JCheckBox("Use Display Model Size");
 		useModelSize.setSelected(true);
 		useModelPosition = new JCheckBox("Keep Model Position");
 		useModelPosition.setSelected(false);
+		checkBoxPanel.add(useModelSize, BorderLayout.PAGE_START);
+		checkBoxPanel.add(useModelPosition, BorderLayout.PAGE_END);
+
+		// Button Panel
 		JPanel buttonPanel = new JPanel();
-		buttonPanel.setLayout( new FlowLayout(FlowLayout.RIGHT) );
-		buttonPanel.add(useModelSize);
-		buttonPanel.add(useModelPosition);
+		buttonPanel.setLayout( new FlowLayout(FlowLayout.CENTER) );
 		buttonPanel.add(importButton);
+		buttonPanel.add(checkBoxPanel);
 		buttonPanel.add(acceptButton);
+		buttonPanel.add(cancelButton);
 		getContentPane().add(buttonPanel, BorderLayout.SOUTH);
 		this.pack();
 	}
 
-	public static GraphicBox getInstance( DisplayEntity ent, int x, int y ) {
-		currentEntity = ent;
-
-		Point pos = new Point(x, y);
-
+	public static GraphicBox getInstance(DisplayEntity ent, Component c, int x, int y) {
 		// Has the Graphic Box been created?
 		if (myInstance == null) {
 			myInstance = new GraphicBox();
 			myInstance.setMinimumSize(new Dimension(400, 300));
 		}
-
+		myInstance.currentEntity = ent;
 		// Position of the GraphicBox
-		pos.setLocation(pos.x + myInstance.getSize().width /2 , pos.y + myInstance.getSize().height /2);
-		myInstance.setLocation(pos.x, pos.y);
+		Point pos = c.getLocationOnScreen();
+		myInstance.setLocation(pos.x + x, pos.y + y);
 		myInstance.refresh();
 		myInstance.setEnabled(true);
 		return myInstance;
@@ -319,22 +375,19 @@ public class GraphicBox extends JDialog {
 	}
 
 	private void refresh() {
-		DisplayModel entDisplayModel = currentEntity.getDisplayModelList().get(0);
-
-		ArrayList<DisplayModel> models = Entity.getClonesOf(DisplayModel.class);
-		// Populate JList with all the DisplayModels
-		DisplayModel[] displayModels = new DisplayModel[models.size()];
-		int index = 0;
-		int i = 0;
-		for (DisplayModel each : models) {
-			if(entDisplayModel == each) {
-				index = i;
-			}
-			displayModels[i++] = each;
-		}
-		displayModelList.setListData(displayModels);
+		modelList = currentEntity.getInput("DisplayModel").getValidOptions(currentEntity);
+		String[] models = new String[modelList.size()];
+		models = modelList.toArray(models);
+		displayModelList.setListData(models);
 		displayModelList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-		displayModelList.setSelectedIndex(index);
-		displayModelList.ensureIndexIsVisible(index);
+
+		// Select the present DisplayModel
+		if (!currentEntity.getDisplayModelList().isEmpty()) {
+			String presentDmName = currentEntity.getDisplayModelList().get(0).getName();
+			int index = modelList.indexOf(presentDmName);
+			displayModelList.setSelectedIndex(index);
+			displayModelList.ensureIndexIsVisible(index);
+		}
 	}
+
 }

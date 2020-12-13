@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2013 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2016-2020 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,6 +25,7 @@ import org.junit.runners.Suite.SuiteClasses;
 @SuiteClasses({
 	com.jaamsim.events.TestEventManager.class,
 	com.jaamsim.events.TestEventTree.class,
+	com.jaamsim.events.TestSchedEvent.class,
 	com.jaamsim.math.TestAABB.class,
 	com.jaamsim.math.TestQuaternion.class,
 	com.jaamsim.math.TestTransform.class,
@@ -44,6 +46,8 @@ import org.junit.runners.Suite.SuiteClasses;
 	com.jaamsim.input.TestExpParser.class,
 	com.jaamsim.input.TestParser.class,
 	com.jaamsim.input.TestOutput.class,
+	com.jaamsim.basicsim.TestSimulation.class,
+	com.jaamsim.basicsim.TestSimCalendar.class,
 	com.jaamsim.probability.TestContinuousDistribution.class,
 	com.jaamsim.probability.TestDiscreteDistribution.class,
 	com.jaamsim.probability.TestErlangDistribution.class,
@@ -60,5 +64,10 @@ import org.junit.runners.Suite.SuiteClasses;
 	com.jaamsim.probability.TestBooleanSelector.class,
 	com.jaamsim.MeshFiles.TestVertexMap.class,
 	com.jaamsim.MeshFiles.TestDataBlocks.class,
+	com.jaamsim.Graphics.TestPolylineInfo.class,
+	com.jaamsim.Statistics.TestStatistics.class,
+	com.jaamsim.BasicObjects.TestFileToVector.class,
+	com.jaamsim.BasicObjects.TestFileToMatrix.class,
+	com.jaamsim.BasicObjects.TestFileToHashMap.class,
 })
 public class AllTests {}

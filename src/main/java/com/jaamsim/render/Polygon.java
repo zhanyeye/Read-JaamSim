@@ -56,6 +56,8 @@ public class Polygon implements Renderable {
 	private static boolean _hasInitialized;
 
 	private final ArrayList<Vec3d> _points;
+	private List<Vec4d> _tessPoints;
+
 	private final VisibilityInfo _visInfo;
 
 	private final float[] colour;
@@ -82,6 +84,7 @@ public class Polygon implements Renderable {
 
 		// Points includes the scale, but not the transform
 		_points = new ArrayList<>(points.size());
+
 		ArrayList<Vec3d> boundsPoints = new ArrayList<>(points.size());
 		for (Vec4d p : points) {
 			Vec3d temp = new Vec3d(p);
@@ -100,25 +103,11 @@ public class Polygon implements Renderable {
 			for (Vec3d vert : _points) {
 				RenderUtils.putPointXYZ(fb, vert);
 			}
+			fb.flip();
 		} else {
-			// Otherwise make a triangle fan c
-			Vec3d center = new Vec3d();
-			for (Vec3d vert : _points) {
-				center.add3(vert);
-			}
-			center.scale3(1.0/_points.size());
-
-			// The vertex list is just the closed loop of points
-			int buffSize = 3 * (_points.size() + 2);
-			fb = FloatBuffer.allocate(buffSize);
-			// Put the center to start the triangle fan
-			RenderUtils.putPointXYZ(fb, center);
-			for (Vec3d vert : _points) {
-				RenderUtils.putPointXYZ(fb, vert);
-			}
-			RenderUtils.putPointXYZ(fb, _points.get(0));
+			// Filled polygons are tesselated at render time because
+			// we use the GLU tesselator which needs an active openGL context
 		}
-		fb.flip();
 	}
 
 	@Override
@@ -207,6 +196,15 @@ public class Polygon implements Renderable {
 	}
 
 	private void renderFill(GL2GL3 gl) {
+		if (_tessPoints == null) {
+			_tessPoints = SimpleTess.tesselate(_points);
+
+			fb = FloatBuffer.allocate(3 * _tessPoints.size());
+			for (Vec3d vert : _tessPoints) {
+				RenderUtils.putPointXYZ(fb, vert);
+			}
+			fb.flip();
+		}
 
 		gl.glBindBuffer(GL2GL3.GL_ARRAY_BUFFER, _vertBuffer);
 		gl.glBufferData(GL2GL3.GL_ARRAY_BUFFER, fb.limit() * 4, fb, GL2GL3.GL_STATIC_DRAW);
@@ -215,7 +213,9 @@ public class Polygon implements Renderable {
 
 		gl.glBindBuffer(GL2GL3.GL_ARRAY_BUFFER, 0);
 
-		gl.glDrawArrays(GL2GL3.GL_TRIANGLE_FAN, 0, _points.size() + 2);
+		gl.glDisable(GL2GL3.GL_CULL_FACE);
+		gl.glDrawArrays(GL2GL3.GL_TRIANGLES, 0, _tessPoints.size());
+		gl.glEnable(GL2GL3.GL_CULL_FACE);
 
 	}
 
@@ -240,7 +240,28 @@ public class Polygon implements Renderable {
 		trans.inverse(invTrans);
 		Ray localRay = r.transform(invTrans);
 
-		return MathUtils.collisionDistPoly(localRay, _points);
+		double localDist = Double.POSITIVE_INFINITY;
+		if (_tessPoints != null) {
+			for (int i = 0; i < _tessPoints.size(); i+=3) {
+				Vec3d[] tri = new Vec3d[3];
+				tri[0] = _tessPoints.get(i+0);
+				tri[1] = _tessPoints.get(i+1);
+				tri[2] = _tessPoints.get(i+2);
+				double triDist = MathUtils.collisionDistPoly(localRay, tri);
+				if (triDist > 0 && triDist < localDist) {
+					localDist = triDist;
+				}
+			}
+			if (localDist == Double.POSITIVE_INFINITY) {
+				localDist = -1; // No collision
+			}
+
+		} else {
+			localDist =  MathUtils.collisionDistPoly(localRay, _points);
+		}
+
+		// Scale the local distance back to global
+		return localDist*trans.getScale();
 	}
 
 	// This should be called from the renderer at initialization

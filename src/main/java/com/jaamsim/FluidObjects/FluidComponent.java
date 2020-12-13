@@ -35,12 +35,12 @@ import com.jaamsim.units.SpeedUnit;
 public class FluidComponent extends DisplayEntity {
 
 	@Keyword(description = "The upstream component that feeds this component.",
-	      example = "Component1 Previous { Comp1 }")
+	         exampleList = {"Comp1"})
 	private final EntityInput<FluidComponent> previousInput;
 
-	@Keyword(description = "The hydraulic diameter of the component.  " +
-	                "Equal to the inside diameter of a pipe with a circular cross-section.",
-	      example = "Comp1 Diameter { 1.0 m }")
+	@Keyword(description = "The hydraulic diameter of the component. "
+	                     + "Equal to the inside diameter of a pipe with a circular cross-section.",
+	         exampleList = {"1.0 m"})
 	private final ValueInput diameterInput;
 
 	private FluidFlow fluidFlow;  // The fluid flow object that controls the flow from one component to the next.
@@ -52,10 +52,10 @@ public class FluidComponent extends DisplayEntity {
 	private double flowArea;  // The cross-section area of the flow.
 
 	{
-		previousInput = new EntityInput<>( FluidComponent.class, "Previous", "Key Inputs", null);
+		previousInput = new EntityInput<>( FluidComponent.class, "Previous", KEY_INPUTS, null);
 		this.addInput( previousInput);
 
-		diameterInput = new ValueInput( "Diameter", "Key Inputs", Double.POSITIVE_INFINITY);
+		diameterInput = new ValueInput( "Diameter", KEY_INPUTS, Double.POSITIVE_INFINITY);
 		diameterInput.setValidRange( 0.0, Double.POSITIVE_INFINITY);
 		diameterInput.setUnitType( DistanceUnit.class );
 		this.addInput( diameterInput);

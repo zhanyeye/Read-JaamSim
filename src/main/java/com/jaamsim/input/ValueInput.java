@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2013 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2020 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,9 +17,12 @@
  */
 package com.jaamsim.input;
 
+import com.jaamsim.basicsim.Entity;
+import com.jaamsim.basicsim.JaamSimModel;
 import com.jaamsim.datatypes.DoubleVector;
 import com.jaamsim.units.DimensionlessUnit;
 import com.jaamsim.units.Unit;
+import com.jaamsim.units.UserSpecifiedUnit;
 
 public class ValueInput extends Input<Double> {
 	private Class<? extends Unit> unitType = DimensionlessUnit.class;
@@ -30,17 +34,21 @@ public class ValueInput extends Input<Double> {
 	}
 
 	public void setUnitType(Class<? extends Unit> units) {
-		if (units != unitType)
-			this.reset();
+
+		if (units == unitType)
+			return;
+
+		this.setValid(false);
 		unitType = units;
 	}
 
 	@Override
-	public void parse(KeywordIndex kw)
+	public void parse(Entity thisEnt, KeywordIndex kw)
 	throws InputErrorException {
-		DoubleVector temp = Input.parseDoubles(kw, minValue, maxValue, unitType);
+		DoubleVector temp = Input.parseDoubles(thisEnt.getJaamSimModel(), kw, minValue, maxValue, unitType);
 		Input.assertCount(temp, 1);
 		value = Double.valueOf(temp.get(0));
+		this.setValid(true);
 	}
 
 	public void setValidRange(double min, double max) {
@@ -49,7 +57,18 @@ public class ValueInput extends Input<Double> {
 	}
 
 	@Override
-	public String getDefaultString() {
+	public String getValidInputDesc() {
+		if (unitType == UserSpecifiedUnit.class) {
+			return Input.VALID_VALUE_UNIT;
+		}
+		if (unitType == DimensionlessUnit.class) {
+			return Input.VALID_VALUE_DIMLESS;
+		}
+		return String.format(Input.VALID_VALUE, unitType.getSimpleName());
+	}
+
+	@Override
+	public String getDefaultString(JaamSimModel simModel) {
 		if (defValue == null)
 			return "";
 
@@ -61,12 +80,12 @@ public class ValueInput extends Input<Double> {
 			tmp.append(NEGATIVE_INFINITY);
 		}
 		else {
-			tmp.append(defValue/Unit.getDisplayedUnitFactor(unitType));
+			tmp.append(defValue/simModel.getDisplayedUnitFactor(unitType));
 		}
 
 		if (unitType != Unit.class) {
 			tmp.append(SEPARATOR);
-			tmp.append(Unit.getDisplayedUnit(unitType));
+			tmp.append(simModel.getDisplayedUnit(unitType));
 		}
 
 		return tmp.toString();

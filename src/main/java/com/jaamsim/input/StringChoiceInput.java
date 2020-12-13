@@ -18,6 +18,8 @@ package com.jaamsim.input;
 
 import java.util.ArrayList;
 
+import com.jaamsim.basicsim.Entity;
+
 
 public class StringChoiceInput extends IntegerInput {
 	private ArrayList<String> choices;
@@ -31,7 +33,7 @@ public class StringChoiceInput extends IntegerInput {
 	}
 
 	@Override
-	public void parse(KeywordIndex kw)
+	public void parse(Entity thisEnt, KeywordIndex kw)
 	throws InputErrorException {
 		Input.assertCount(kw, 1);
 		String temp = Input.parseString(kw.getArg(0), choices);
@@ -58,7 +60,7 @@ public class StringChoiceInput extends IntegerInput {
 	}
 
 	@Override
-	public ArrayList<String> getValidOptions() {
+	public ArrayList<String> getValidOptions(Entity ent) {
 		return choices;
 	}
 

@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2004-2013 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2019-2020 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,6 +32,7 @@ import javax.swing.event.ChangeListener;
 import javax.swing.table.AbstractTableModel;
 import javax.swing.table.TableModel;
 
+import com.jaamsim.Graphics.PolylineInfo;
 import com.jaamsim.basicsim.Entity;
 
 /**
@@ -51,8 +53,7 @@ public class PropertyBox extends FrameBox {
 		jTabbedFrame.addChangeListener(new TabListener());
 		getContentPane().add(jTabbedFrame);
 
-		setLocation(GUIFrame.COL2_START, GUIFrame.LOWER_START);
-		setSize(GUIFrame.COL2_WIDTH, GUIFrame.LOWER_HEIGHT);
+		addComponentListener(FrameBox.getSizePosAdapter(this, "PropertyViewerSize", "PropertyViewerPos"));
 	}
 
 	/**
@@ -119,7 +120,7 @@ public class PropertyBox extends FrameBox {
 private static class TabListener implements ChangeListener {
 	@Override
 	public void stateChanged(ChangeEvent e) {
-		FrameBox.valueUpdate();
+		GUIFrame.updateUI();
 	}
 }
 
@@ -172,11 +173,18 @@ private static class ClassFields implements Comparator<Field> {
 		if (value instanceof double[])
 			return Arrays.toString((double[])value);
 
+		if (value instanceof double[][])
+			return Arrays.deepToString((double[][])value);
+
 		if (value instanceof int[])
 			return Arrays.toString((int[])value);
 
 		if (value instanceof long[])
 			return Arrays.toString((long[])value);
+
+		if (value instanceof PolylineInfo[]) {
+			return Arrays.toString((PolylineInfo[])value);
+		}
 
 		try {
 			// ArrayLists must be converted to a String one element at a time
@@ -187,11 +195,22 @@ private static class ClassFields implements Comparator<Field> {
 					return "[]";
 				StringBuilder sb = new StringBuilder();
 				sb.append("[");
-				sb.append(array.get(0).toString());
+				if (array.get(0) == null) {
+					sb.append("null");
+				}
+				else {
+					sb.append(array.get(0).toString());
+				}
+
 				int n = Math.min(MAX_ARRAY_ENTRIES_TO_DISPLAY, array.size());
 				for (int i=1; i<n; i++) {
 					sb.append(", ");
-					sb.append(array.get(i).toString());
+					if (array.get(i) == null) {
+						sb.append("null");
+					}
+					else {
+						sb.append(array.get(i).toString());
+					}
 				}
 				if (n < array.size())
 					sb.append(", ... ");

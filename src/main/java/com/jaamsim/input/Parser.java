@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2013 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2018 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,30 +28,18 @@ public class Parser {
  *
  * @param tokens list of String tokens to append to
  * @param rec record to tokenize and append
- */
-public static final void tokenize(ArrayList<String> tokens, String rec) {
-	tokenize(tokens, rec, false);
-}
-
-/**
- * Tokenize the given record and append to the given list of tokens
- *
- * Valid delimiter characters are space, tab and comma.
- *
- * @param tokens list of String tokens to append to
- * @param rec record to tokenize and append
  * @param stripComments if true, do not append any commented tokens
+ * @return true if in quoted context
  */
-public static final void tokenize(ArrayList<String> tokens, String rec, boolean stripComments) {
+public static final boolean tokenize(ArrayList<String> tokens, String rec, boolean stripComments) {
 	// Records can be divided into two pieces, the contents portion and possibly
 	// a commented portion, the division point is the first " character, if no
 	// quoting in a record, the entire line is contents for tokenizing
-	final int cIndex = rec.indexOf("\"");
-	final int endOfRec = cIndex == -1 ? rec.length() : cIndex;
-
 	int tokStart = -1;
 	int quoteStart = -1;
-	for (int i = 0; i < endOfRec; i++) {
+	int cIndex = -1;
+	int endOfRec = rec.length();
+	for (int i = 0; i < rec.length(); i++) {
 		char c = rec.charAt(i);
 		if (c == '\'') {
 			// end the current token
@@ -75,7 +64,7 @@ public static final void tokenize(ArrayList<String> tokens, String rec, boolean 
 			continue;
 
 		// handle delimiter chars
-		if (c == '{' || c == '}' || c == ' ' || c == '\t') {
+		if (c == '{' || c == '}' || c == ' ' || c == '\t' || c == '\n') {
 			if (tokStart != -1 && i - tokStart > 0) {
 				tokens.add(rec.substring(tokStart, i));
 				tokStart = -1;
@@ -90,6 +79,12 @@ public static final void tokenize(ArrayList<String> tokens, String rec, boolean 
 			continue;
 		}
 
+		// start a comment
+		if (c == '#') {
+			cIndex = i;
+			endOfRec = i;
+			break;
+		}
 		// start a new token
 		if (tokStart == -1) tokStart = i;
 	}
@@ -101,15 +96,17 @@ public static final void tokenize(ArrayList<String> tokens, String rec, boolean 
 	if (quoteStart != -1)
 		tokens.add(rec.substring(quoteStart + 1, endOfRec));
 
-	// add comments if they exist including the leading " to denote it as commented
+	// add comments if they exist including the leading # to denote it as commented
 	if (!stripComments && cIndex > -1)
 		tokens.add(rec.substring(cIndex, rec.length()));
+
+	return quoteStart != -1;
 }
 
 public static final boolean needsQuoting(CharSequence s) {
 	for (int i = 0; i < s.length(); ++i) {
 		char c = s.charAt(i);
-		if (c == ' ' || c == '\t' || c == '{' || c == '}')
+		if (c == ' ' || c == '\t' || c == '{' || c == '}' || c == '"' || c == '#' || c == '\n')
 			return true;
 	}
 	return false;
@@ -124,23 +121,35 @@ public static final boolean isQuoted(CharSequence s) {
 }
 
 public static final String addQuotes(String str) {
+	return addEnclosure("'", str, "'");
+}
+
+public static final String addQuotesIfNeeded(String str) {
+	if (needsQuoting(str) && !isQuoted(str))
+		return addQuotes(str);
+	return str;
+}
+
+public static final String addEnclosure(String prefix, String str, String suffix) {
 	StringBuilder sb = new StringBuilder();
-	if (!str.startsWith("'"))
-		sb.append("'");
+	if (!str.startsWith(prefix))
+		sb.append(prefix);
 	sb.append(str);
-	if (!str.endsWith("'"))
-		sb.append("'");
+	if (!str.endsWith(suffix))
+		sb.append(suffix);
 	return sb.toString();
 }
 
-/**
- * Remove all commented tokens (starting with the " character)
- * @param tokens
- */
-public static final void removeComments(ArrayList<String> tokens) {
-	for (int i = tokens.size() - 1; i >= 0; i--) {
-		if (tokens.get(i).startsWith("\""))
-			tokens.remove(i);
-	}
+public static final String removeEnclosure(String prefix, String str, String suffix) {
+	if (!str.startsWith(prefix) && !str.endsWith(suffix))
+		return str;
+	int beginIndex = 0;
+	int endIndex = str.length();
+	if (str.startsWith(prefix))
+		beginIndex = prefix.length();
+	if (str.endsWith(suffix))
+		endIndex -= suffix.length();
+	return str.substring(beginIndex, endIndex);
 }
+
 }

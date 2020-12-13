@@ -31,13 +31,13 @@ public class StringKeyInput<T extends Entity> extends Input<HashMap<String,T>> {
 	}
 
 	@Override
-	public void parse(KeywordIndex kw) throws InputErrorException {
+	public void parse(Entity thisEnt, KeywordIndex kw) throws InputErrorException {
 		HashMap<String,T> hashMap = new HashMap<>();
 		ArrayList<KeywordIndex> subArgs = kw.getSubArgs();
 		for (int i = 0; i < subArgs.size(); i++) {
 			KeywordIndex subArg = subArgs.get(i);
 			Input.assertCount(subArg, 2);
-			T ent = Input.tryParseEntity(subArg.getArg(1), entClass );
+			T ent = Input.tryParseEntity(thisEnt.getJaamSimModel(), subArg.getArg(1), entClass );
 			hashMap.put(subArg.getArg(0), ent);
 		}
 		value = hashMap;

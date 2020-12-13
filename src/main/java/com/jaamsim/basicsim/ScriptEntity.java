@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2002-2011 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2020 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,22 +29,24 @@ import com.jaamsim.units.TimeUnit;
 
 public class ScriptEntity extends Entity {
 	@Keyword(description = "The name of the script file for the script entity.",
-	         example = "ScriptEntity Script { test.scr }")
+	         exampleList = {"test.scr"})
 	private final FileInput scriptFileName;
 
-	@Keyword(description = "The Time keyword appears inside the script file. The value represents the simulation " +
-	                "time at which the next set of commands in the script are implemented.",
-	         example = "ScriptEntity Time { 24.0 h }")
+	@Keyword(description = "The Time keyword appears inside the script file. The value represents "
+	                     + "the simulation time at which the next set of commands in the script "
+	                     + "are implemented.",
+	         exampleList = {"24.0 h"})
 	private final ValueInput scriptTime; // the time that has been read in the script
 
 	private ArrayList<ArrayList<String>> tokens;
 	private int lastTokenIdx;
 
 	{
-		scriptFileName = new FileInput( "Script", "Key Inputs", null );
+		scriptFileName = new FileInput( "Script", KEY_INPUTS, null );
+		scriptFileName.setRequired(true);
 		this.addInput( scriptFileName );
 
-		scriptTime = new ValueInput("Time", "Key Inputs", 0.0d);
+		scriptTime = new ValueInput("Time", KEY_INPUTS, 0.0d);
 		scriptTime.setUnitType(TimeUnit.class);
 		scriptTime.setValidRange(0.0d, Double.POSITIVE_INFINITY);
 		this.addInput(scriptTime);
@@ -60,23 +63,20 @@ public class ScriptEntity extends Entity {
 		tokens.clear();
 		lastTokenIdx = -1;
 
-		// If there is no script file, do nothing
-		if (scriptFileName.getValue() == null)
-			return;
-
-		// If the script file exists, open it
+		// Open the script file
 		tokens = FileInput.getTokensFromURI(scriptFileName.getValue());
-		boolean record = InputAgent.recordEdits();
-		InputAgent.setRecordEdits(false);
+		JaamSimModel simModel = getJaamSimModel();
+		boolean record = simModel.isRecordEdits();
+		simModel.setRecordEdits(false);
 		// Read records until a Time record is read
 		// Restarts will work for simple scripts with a record at Time 0
 		// Restarts should work for all scripts provided the script has initial inputs before the first Time record
 		for (lastTokenIdx++; lastTokenIdx < tokens.size(); lastTokenIdx++) {
-			InputAgent.processKeywordRecord(tokens.get(lastTokenIdx), null);
+			InputAgent.processKeywordRecord(simModel, tokens.get(lastTokenIdx), null);
 			if( tokens.get(lastTokenIdx).get( 0 ).equals( this.getName() ) ) {
 				if( tokens.get( lastTokenIdx ).get( 1 ).equals( "Time" ) ) {
 					lastTokenIdx--;
-					InputAgent.setRecordEdits(record);
+					simModel.setRecordEdits(record);
 					return;
 				}
 			}
@@ -104,6 +104,7 @@ public class ScriptEntity extends Entity {
 
 	@Override
 	public void startUp() {
+		super.startUp();
 		doScript();
 	}
 
@@ -111,10 +112,11 @@ public class ScriptEntity extends Entity {
 	 * Read the script
 	 */
 	public void doScript() {
-		boolean record = InputAgent.recordEdits();
-		InputAgent.setRecordEdits(false);
+		JaamSimModel simModel = getJaamSimModel();
+		boolean record = simModel.isRecordEdits();
+		simModel.setRecordEdits(false);
 		for (lastTokenIdx++; lastTokenIdx < tokens.size(); lastTokenIdx++) {
-			InputAgent.processKeywordRecord(tokens.get(lastTokenIdx), null);
+			InputAgent.processKeywordRecord(simModel, tokens.get(lastTokenIdx), null);
 			// If a "Time" record was read, then wait until the time
 			long delayTicks = EventManager.current().secondsToNearestTick(scriptTime.getValue()) - getSimTicks();
 			if (delayTicks > 0) {
@@ -122,6 +124,6 @@ public class ScriptEntity extends Entity {
 				break;
 			}
 		}
-		InputAgent.setRecordEdits(record);
+		simModel.setRecordEdits(record);
 	}
 }

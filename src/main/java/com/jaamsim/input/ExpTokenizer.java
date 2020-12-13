@@ -24,6 +24,8 @@ public class ExpTokenizer {
 	public static final int NUM_TYPE = 1;
 	public static final int SYM_TYPE = 2;
 	public static final int SQ_TYPE = 3; // Square quoted tokens
+	public static final int STRING_TYPE = 4; // A literal string
+	public static final int NULL_TYPE = 5; // The specific null keyword
 
 	public static class Token {
 		public int type;
@@ -80,9 +82,18 @@ public class ExpTokenizer {
 				continue;
 			}
 
+			if (c == '#') {
+				pos = skipComment(pos, input);
+				continue;
+			}
 			if (c == '[') {
 				// This is the beginning of a square quoted string
 				pos = getSQToken(res, pos, input);
+				continue;
+			}
+			if (c == '"') {
+				// This is the beginning of a regular quoted string
+				pos = getQuotedToken(res, pos, input);
 				continue;
 			}
 
@@ -120,20 +131,37 @@ public class ExpTokenizer {
 		}
 
 		newTok.value = sb.toString();
+		// If the string is specifically "null" this is actually a keyword
+		if (newTok.value.equals("null")) {
+			newTok.type = NULL_TYPE;
+		}
+
 		res.add(newTok);
 		return pos;
 	}
 
+	private static int skipComment(int startPos, String input) throws ExpError {
+		int closePos = startPos + 1;
+
+		while (closePos < input.length()) {
+			char c = input.charAt(closePos);
+			if (c == '#')
+				return closePos + 1;
+
+			closePos++;
+		}
+		// Made it to the end of the input
+		throw new ExpError(input, startPos, "No closing mark for comment");
+	}
+
 	private static int getSQToken(ArrayList<Token> res, int startPos, String input) throws ExpError {
-		Token newTok = new Token();
-		newTok.type = SQ_TYPE;
-		newTok.pos = startPos;
 
 		int closePos = startPos + 1;
+
 		while (closePos < input.length()) {
 			char c = input.charAt(closePos);
 			if (c == '[')
-				throw new ExpError(input, closePos, "Nested square quotes");
+				throw new ExpError(input, closePos, "Nested square brace");
 			if (c == ']')
 				break;
 
@@ -144,6 +172,34 @@ public class ExpTokenizer {
 			throw new ExpError(input, startPos, "No closing square brace for brace");
 		}
 
+		Token newTok = new Token();
+		newTok.pos = startPos;
+		newTok.type = SQ_TYPE;
+		newTok.value = input.substring(startPos + 1, closePos);
+		res.add(newTok);
+		return closePos + 1;
+
+	}
+
+	private static int getQuotedToken(ArrayList<Token> res, int startPos, String input) throws ExpError {
+
+		int closePos = startPos + 1;
+
+		while (closePos < input.length()) {
+			char c = input.charAt(closePos);
+			if (c == '"')
+				break;
+
+			closePos++;
+		}
+
+		if (closePos == input.length()) {
+			throw new ExpError(input, startPos, "No closing quote character for string.");
+		}
+
+		Token newTok = new Token();
+		newTok.pos = startPos;
+		newTok.type = STRING_TYPE;
 		newTok.value = input.substring(startPos + 1, closePos);
 		res.add(newTok);
 		return closePos + 1;

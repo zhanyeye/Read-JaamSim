@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2013 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2018-2020 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,11 +17,17 @@
  */
 package com.jaamsim.Samples;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 
 import com.jaamsim.Graphics.DisplayEntity;
-import com.jaamsim.basicsim.Simulation;
+import com.jaamsim.basicsim.EntityTarget;
+import com.jaamsim.basicsim.ObserverEntity;
+import com.jaamsim.basicsim.SubjectEntity;
+import com.jaamsim.basicsim.SubjectEntityDelegate;
 import com.jaamsim.events.EventManager;
+import com.jaamsim.events.ProcessTarget;
+import com.jaamsim.input.BooleanInput;
 import com.jaamsim.input.Input;
 import com.jaamsim.input.InputErrorException;
 import com.jaamsim.input.Keyword;
@@ -32,60 +39,76 @@ import com.jaamsim.units.TimeUnit;
 import com.jaamsim.units.Unit;
 import com.jaamsim.units.UserSpecifiedUnit;
 
-public class TimeSeries extends DisplayEntity implements TimeSeriesProvider {
+public class TimeSeries extends DisplayEntity implements TimeSeriesProvider, SubjectEntity {
 
-	@Keyword(description = "A list of time series records with format { 'YYYY-MM-DD hh:mm:ss' value units }, where\n" +
-					"YYYY is the year\n" +
-					"MM is the month (01-12)\n" +
-					"DD is the day of the month\n" +
-					"hh is the hour of day (00-23)\n" +
-					"mm is the minutes (00-59)\n" +
-					"ss is the seconds (00-59)\n" +
-					"value is the time series value for the given date and time\n" +
-					"units is the optional units for the value\n" +
-					"The date and times must be given in increasing order.",
-	         exampleList = {"{ 0 h 0.5 m } { 3 h 1.5 m } { 6 h 1.2 m }",
-							"{ '2010-01-01 00:00:00' 0.5 m } { '2010-01-01 03:00:00' 1.5 m } { '2010-01-01 06:00:00' 1.2 m }"})
-	private final TimeSeriesDataInput value;
+	@Keyword(description = "If TRUE, the simulation times corresponding to the time stamps "
+	                     + "entered to the 'Value' keyword are calculated relative to the "
+	                     + "first time stamp. This offset sets the simulation time for the first "
+	                     + "time stamp to zero seconds.",
+	         exampleList = {"TRUE"})
+	private final BooleanInput offsetToFirst;
 
-	@Keyword(description = "The unit type for the time series (e.g. DistanceUnit, TimeUnit, MassUnit).  " +
-			"If the UnitType keyword is specified, it must be specified before the Value keyword.",
-	         exampleList = {"DistanceUnit"})
+	@Keyword(description = "The unit type for the time series. The UnitType input must be "
+	                     + "specified before the Value input.",
+	         exampleList = {"DistanceUnit", "MassUnit", "DimensionlessUnit"})
 	private final UnitTypeInput unitType;
 
-	@Keyword(description = "Defines when the time series will repeat from the start.",
+	@Keyword(description = "A list of time series records with format { time value }, where: "
+	                     + "'time' is the time stamp for the record and 'value' is the time "
+	                     + "series value. Records are entered in order of increasing simulation "
+	                     + "time. The appropriate units should be included with both the time "
+	                     + "and value inputs.",
+	         exampleList = {"{ 0 h 1 } { 3 h 0 }",
+	                        "{ 0 h 0.5 m } { 3 h 1.5 m }",
+	                        "{ '2010-01-01 00:00:00' 0.5 m } { '2010-01-01 03:00:00' 1.5 m }"} )
+	private final TimeSeriesDataInput value;
+
+	@Keyword(description = "The time at which the time series will repeat from the start.",
 	         exampleList = {"8760.0 h"})
 	private final ValueInput cycleTime;
 
-	{
-		unitType = new UnitTypeInput( "UnitType", "Key Inputs", UserSpecifiedUnit.class );
-		unitType.setRequired(true);
-		this.addInput( unitType );
+	private final SubjectEntityDelegate subject = new SubjectEntityDelegate(this);
 
-		value = new TimeSeriesDataInput("Value", "Key Inputs", null);
+	{
+		offsetToFirst = new BooleanInput("OffsetToFirst", KEY_INPUTS, true);
+		this.addInput(offsetToFirst);
+
+		unitType = new UnitTypeInput("UnitType", KEY_INPUTS, UserSpecifiedUnit.class);
+		unitType.setRequired(true);
+		this.addInput(unitType);
+
+		value = new TimeSeriesDataInput("Value", KEY_INPUTS, null);
+		value.setTickLength(getSimulation().getTickLength());
 		value.setUnitType(UserSpecifiedUnit.class);
 		value.setRequired(true);
 		this.addInput(value);
 
-		cycleTime = new ValueInput( "CycleTime", "Key Inputs", Double.POSITIVE_INFINITY );
+		cycleTime = new ValueInput("CycleTime", KEY_INPUTS, Double.POSITIVE_INFINITY);
 		cycleTime.setUnitType(TimeUnit.class);
-		this.addInput( cycleTime );
+		this.addInput(cycleTime);
 	}
 
 	public TimeSeries() { }
 
 	@Override
+	public void earlyInit() {
+		super.earlyInit();
+		subject.clear();
+	}
+
+	@Override
 	public void validate() {
 		super.validate();
 
-		if (value.getTickLength() != Simulation.getTickLength())
+		if (value.getTickLength() != getSimulation().getTickLength())
 			throw new InputErrorException("A new value was entered for the Simulation keyword TickLength " +
 					"after the TimeSeries data had been loaded.%n" +
 					"The configuration file must be saved and reloaded before the simulation can be executed.");
 
 		long[] ticksList = value.getValue().ticksList;
-		if (getTicks(cycleTime.getValue()) < ticksList[ticksList.length - 1])
-			throw new InputErrorException( "CycleTime must be larger than the last time in the series" );
+		if (getTicks(cycleTime.getValue()) < ticksList[ticksList.length - 1] - ticksList[0])
+			throw new InputErrorException( "CycleTime must be larger than the difference between "
+					+ "the first and last times in the series." );
 	}
 
 	@Override
@@ -94,10 +117,65 @@ public class TimeSeries extends DisplayEntity implements TimeSeriesProvider {
 
 		if (in == unitType) {
 			value.setUnitType( unitType.getUnitType() );
-			this.getOutputHandle("PresentValue").setUnitType( unitType.getUnitType() );
 			return;
 		}
 	}
+
+	@Override
+	public void startUp() {
+		super.startUp();
+		this.waitForNextValue();
+	}
+
+	@Override
+	public void registerObserver(ObserverEntity obs) {
+		subject.registerObserver(obs);
+	}
+
+	@Override
+	public void notifyObservers() {
+		subject.notifyObservers();
+	}
+
+	@Override
+	public ArrayList<ObserverEntity> getObserverList() {
+		return subject.getObserverList();
+	}
+
+	public boolean isOffsetToFirst() {
+		return offsetToFirst.getValue();
+	}
+
+	/**
+	 * Schedules an event when the TimeSeries' value changes.
+	 */
+	final void waitForNextValue() {
+		long ticks = this.getSimTicks();
+		long durTicks = getNextChangeAfterTicks(ticks) - ticks;
+		if (isTraceFlag())
+			trace(0, "waitForNextValue - dur=%.6f", EventManager.current().ticksToSeconds(durTicks));
+		if (durTicks == 0L)
+			return;
+		this.scheduleProcessTicks(durTicks, 0, waitForNextValueTarget);
+
+		// Notify any observers
+		notifyObservers();
+	}
+
+	/**
+	 * WaitForNextValueTarget
+	 */
+	private static class WaitForNextValueTarget extends EntityTarget<TimeSeries> {
+		WaitForNextValueTarget(TimeSeries ent) {
+			super(ent, "endStep");
+		}
+
+		@Override
+		public void process() {
+			ent.waitForNextValue();
+		}
+	}
+	private final ProcessTarget waitForNextValueTarget = new WaitForNextValueTarget(this);
 
 	@Override
 	public Class<? extends Unit> getUserUnitType() {
@@ -105,13 +183,15 @@ public class TimeSeries extends DisplayEntity implements TimeSeriesProvider {
 	}
 
 	private long getTicks(double simTime) {
-		return EventManager.secsToNearestTick(simTime);
+		EventManager evt = this.getJaamSimModel().getEventManager();
+		return evt.secondsToNearestTick(simTime);
 	}
 
 	private double getSimTime(long ticks) {
 		if (ticks == Long.MAX_VALUE)
 			return Double.POSITIVE_INFINITY;
-		return EventManager.ticksToSecs(ticks);
+		EventManager evt = this.getJaamSimModel().getEventManager();
+		return evt.ticksToSeconds(ticks);
 	}
 
 	/**
@@ -121,6 +201,17 @@ public class TimeSeries extends DisplayEntity implements TimeSeriesProvider {
 	@Override
 	public double getValueForTicks(long ticks) {
 		return getValue(getTSPointForTicks(ticks));
+	}
+
+	/**
+	 * Return the last time that the value updated, before the given
+	 * simulation time.
+	 * @param ticks - simulation time in clock ticks.
+	 * @return simulation time in clock ticks at which the time series value changed.
+	 */
+	@Override
+	public long getLastChangeBeforeTicks(long ticks) {
+		return getTicks(getTSPointBefore(getTSPointForTicks(ticks)));
 	}
 
 	/**
@@ -168,6 +259,10 @@ public class TimeSeries extends DisplayEntity implements TimeSeriesProvider {
 		return this.getNextSample(simTime);
 	}
 
+	public boolean isMonotonic(int dir) {
+		return value.getValue().isMonotonic(dir);
+	}
+
 	/**
 	 * Returns the position in the time series that corresponds to the specified
 	 * time in simulation clock ticks.
@@ -178,8 +273,8 @@ public class TimeSeries extends DisplayEntity implements TimeSeriesProvider {
 	 * @return position in the TimeSeries.
 	 */
 	private TSPoint getTSPointForTicks(long ticks) {
-
 		long[] ticksList = value.getValue().ticksList;
+
 		if (ticks == Long.MAX_VALUE) {
 			if (cycleTime.getValue() == Double.POSITIVE_INFINITY)
 				return new TSPoint(ticksList.length - 1, 0);
@@ -188,8 +283,8 @@ public class TimeSeries extends DisplayEntity implements TimeSeriesProvider {
 
 		// Find the time within the present cycle
 		final long cycleTicks = getTicks(cycleTime.getValue());
-		long numberOfCycles = ticks / cycleTicks;
-		long ticksInCycle = ticks % cycleTicks;
+		long numberOfCycles = (ticks - ticksList[0]) / cycleTicks;
+		long ticksInCycle = (ticks - ticksList[0]) % cycleTicks + ticksList[0];
 
 		// If the time in the cycle is greater than the last time, return the last value
 		if (ticksInCycle >= ticksList[ticksList.length - 1]) {
@@ -292,6 +387,29 @@ public class TimeSeries extends DisplayEntity implements TimeSeriesProvider {
 	}
 
 	/**
+	 * Returns the position in the time series that precedes the specified
+	 * position.
+	 * <p>
+	 * An index of -1 is returned if the specified position is a the start
+	 * of the time series data and a cycle time is not specified.
+	 * @param pt - specified position in the time series.
+	 * @return previous position in the time series.
+	 */
+	private TSPoint getTSPointBefore(TSPoint pt) {
+		if (pt.index == -1)
+			return new TSPoint(pt.index, pt.numberOfCycles);
+
+		if (pt.index == 0) {
+			if (cycleTime.getValue() == Double.POSITIVE_INFINITY)
+				return new TSPoint(-1, pt.numberOfCycles);
+
+			return new TSPoint(value.getValue().ticksList.length - 1, pt.numberOfCycles - 1);
+		}
+
+		return new TSPoint(pt.index - 1, pt.numberOfCycles);
+	}
+
+	/**
 	 * Returns the position in the time series that follows the specified
 	 * position.
 	 * <p>
@@ -362,16 +480,46 @@ public class TimeSeries extends DisplayEntity implements TimeSeriesProvider {
 		return valueLow + (ticks - ticksLow)*(valueHigh - valueLow)/(ticksHigh - ticksLow);
 	}
 
+	@Override
+	public final double getNextSample(double simTime) {
+		return getValue(getTSPointForTicks(getTicks(simTime)));
+	}
+
 	// ******************************************************************************************************
 	// OUTPUTS
 	// ******************************************************************************************************
 
 	@Output(name = "PresentValue",
-	        description = "The time series value for the present time.",
-	        unitType = UserSpecifiedUnit.class)
-	@Override
-	public final double getNextSample(double simTime) {
-		return getValue(getTSPointForTicks(getTicks(simTime)));
+	 description = "Value for the time series at the present time.",
+	    unitType = UserSpecifiedUnit.class,
+	    sequence = 1)
+	public final double getPresentValue(double simTime) {
+		if (value.getValue() == null)
+			return Double.NaN;
+		return this.getNextSample(simTime);
+	}
+
+	@Output(name = "NextTime",
+	 description = "Time at which the time series value is updated next.",
+	    unitType = TimeUnit.class,
+	    sequence = 2)
+	public final double getNextEventTime(double simTime) {
+		if (value.getValue() == null)
+			return 0.0d;
+		return this.getNextTimeAfter(simTime);
+	}
+
+	@Output(name = "NextValue",
+	 description = "Value for the time series when it is updated next.",
+	    unitType = UserSpecifiedUnit.class,
+	    sequence = 3)
+	public final double getNextValue(double simTime) {
+		if (value.getValue() == null)
+			return Double.NaN;
+		EventManager evt = this.getJaamSimModel().getEventManager();
+		long simTicks = evt.secondsToNearestTick(simTime);
+		long nextTicks = getNextChangeAfterTicks(simTicks);
+		return this.getValueForTicks(nextTicks);
 	}
 
 }

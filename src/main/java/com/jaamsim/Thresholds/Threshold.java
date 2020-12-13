@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2014 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2019-2020 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,10 +21,10 @@ import java.util.ArrayList;
 
 import com.jaamsim.DisplayModels.ShapeModel;
 import com.jaamsim.basicsim.Entity;
-import com.jaamsim.basicsim.EntityTarget;
-import com.jaamsim.events.EventHandle;
+import com.jaamsim.basicsim.ObserverEntity;
+import com.jaamsim.basicsim.SubjectEntity;
+import com.jaamsim.basicsim.SubjectEntityDelegate;
 import com.jaamsim.events.EventManager;
-import com.jaamsim.events.ProcessTarget;
 import com.jaamsim.input.BooleanInput;
 import com.jaamsim.input.ColourInput;
 import com.jaamsim.input.Keyword;
@@ -32,114 +33,109 @@ import com.jaamsim.math.Color4d;
 import com.jaamsim.states.StateEntity;
 import com.jaamsim.units.DimensionlessUnit;
 
-public class Threshold extends StateEntity {
+public class Threshold extends StateEntity implements SubjectEntity {
 
 	@Keyword(description = "The colour of the threshold graphic when the threshold is open.",
-	         example = "Threshold1  OpenColour { green }")
+	         exampleList = { "green" })
 	private final ColourInput openColour;
 
 	@Keyword(description = "The colour of the threshold graphic when the threshold is closed.",
-			example = "Threshold1  ClosedColour { red }")
+	         exampleList = { "red" })
 	private final ColourInput closedColour;
 
 	@Keyword(description = "A Boolean value.  If TRUE, the threshold is displayed when it is open.",
-	         example = "Threshold1 ShowWhenOpen { FALSE }")
+	         exampleList = { "FALSE" })
 	private final BooleanInput showWhenOpen;
 
 	@Keyword(description = "A Boolean value.  If TRUE, the threshold is displayed when it is closed.",
-	         example = "Threshold1 ShowWhenClosed { FALSE }")
+	         exampleList = { "FALSE" })
 	private final BooleanInput showWhenClosed;
 
 	private final ArrayList<ThresholdUser> userList;
-
 	private boolean open;
+	private boolean initialOpenValue;
+	private long openCount;
+	private long closedCount;
+
+	private final SubjectEntityDelegate subject = new SubjectEntityDelegate(this);
 
 	{
-		openColour = new ColourInput( "OpenColour", "Graphics", ColourInput.GREEN );
-		this.addInput( openColour );
-		this.addSynonym( openColour, "OpenColor" );
+		workingStateListInput.setHidden(true);
 
-		closedColour = new ColourInput( "ClosedColour", "Graphics", ColourInput.RED );
-		this.addInput( closedColour );
-		this.addSynonym( closedColour, "ClosedColor" );
+		openColour = new ColourInput("OpenColour", FORMAT, ColourInput.GREEN);
+		this.addInput(openColour);
+		this.addSynonym(openColour, "OpenColor");
 
-		showWhenOpen = new BooleanInput("ShowWhenOpen", "Graphics", true);
+		closedColour = new ColourInput("ClosedColour", FORMAT, ColourInput.RED);
+		this.addInput(closedColour);
+		this.addSynonym(closedColour, "ClosedColor");
+
+		showWhenOpen = new BooleanInput("ShowWhenOpen", FORMAT, true);
 		this.addInput(showWhenOpen);
 
-		showWhenClosed = new BooleanInput("ShowWhenClosed", "Graphics", true);
+		showWhenClosed = new BooleanInput("ShowWhenClosed", FORMAT, true);
 		this.addInput(showWhenClosed);
 	}
 
 	public Threshold() {
 		userList = new ArrayList<>();
+		initialOpenValue = true;
+		open = true;
 	}
 
 	@Override
 	public void earlyInit() {
 		super.earlyInit();
-		thresholdChangedTarget.users.clear();
-		open = true;
+		open = initialOpenValue;
+		openCount = 0L;
+		closedCount = 0L;
 
 		userList.clear();
-		for (Entity each : Entity.getAll()) {
-			if (each instanceof ThresholdUser) {
-				ThresholdUser tu = (ThresholdUser)each;
-				if (tu.getThresholds().contains(this))
-					userList.add(tu);
-			}
+		for (Entity each : getJaamSimModel().getClonesOfIterator(Entity.class, ThresholdUser.class)) {
+			ThresholdUser tu = (ThresholdUser) each;
+			if (tu.getThresholds().contains(this))
+				userList.add(tu);
 		}
+
+		// Clear the list of observers
+		subject.clear();
 	}
 
-	/**
-	 * Get the name of the initial state this Entity will be initialized with.
-	 * @return
-	 */
+	@Override
+	public void registerObserver(ObserverEntity obs) {
+		subject.registerObserver(obs);
+	}
+
+	@Override
+	public void notifyObservers() {
+		subject.notifyObservers();
+	}
+
+	@Override
+	public ArrayList<ObserverEntity> getObserverList() {
+		return subject.getObserverList();
+	}
+
+	public void setInitialOpenValue(boolean bool) {
+		initialOpenValue = bool;
+	}
+
 	@Override
 	public String getInitialState() {
-		return "Open";
+		if (initialOpenValue)
+			return "Open";
+		else
+			return "Closed";
 	}
 
-	/**
-	 * Tests the given state name to see if it is valid for this Entity.
-	 * @param state
-	 * @return
-	 */
 	@Override
 	public boolean isValidState(String state) {
 		return "Open".equals(state) || "Closed".equals(state);
 	}
 
-	/**
-	 * Tests the given state name to see if it is counted as working hours when in
-	 * that state..
-	 * @param state
-	 * @return
-	 */
 	@Override
 	public boolean isValidWorkingState(String state) {
 		return "Open".equals(state);
-	}
-
-	private static final EventHandle thresholdChangedHandle = new EventHandle();
-	private static final ThresholdChangedTarget thresholdChangedTarget = new ThresholdChangedTarget();
-
-	private static class ThresholdChangedTarget extends ProcessTarget {
-		public final ArrayList<ThresholdUser> users = new ArrayList<>();
-
-		public ThresholdChangedTarget() {}
-
-		@Override
-		public void process() {
-			for( int i = 0; i < users.size(); i++ )
-				users.get( i ).thresholdChanged();
-
-			users.clear();
-		}
-
-		@Override
-		public String getDescription() {
-			return "UpdateAllThresholdUsers";
-		}
 	}
 
 	public boolean isOpen() {
@@ -151,54 +147,28 @@ public class Threshold extends StateEntity {
 		if (open == bool)
 			return;
 
+		if (isTraceFlag()) trace(0, "setOpen(%s)", bool);
+
 		open = bool;
-		if (open)
+		if (open) {
 			setPresentState("Open");
-		else
+			openCount++;
+		}
+		else {
 			setPresentState("Closed");
-
-		for (ThresholdUser user : this.userList) {
-			if (!thresholdChangedTarget.users.contains(user))
-				thresholdChangedTarget.users.add(user);
+			closedCount++;
 		}
-		if (!thresholdChangedTarget.users.isEmpty() && !thresholdChangedHandle.isScheduled())
-			this.scheduleProcessTicks(0, 2, false, thresholdChangedTarget, thresholdChangedHandle);
+
+		getJaamSimModel().updateThresholdUsers(userList);
+
+		// Notify any observers
+		notifyObservers();
 	}
 
-	private static class DoOpenTarget extends EntityTarget<Threshold> {
-		public DoOpenTarget(Threshold ent, String method) {
-			super(ent, method);
-		}
-
-		@Override
-		public void process() {
-			ent.doOpen();
-		}
-	}
-
-	public final ProcessTarget doOpen = new DoOpenTarget(this, "doOpen");
-
-	public void doOpen() {
-		this.trace( "open" );
-		this.setOpen( true );
-	}
-
-	private static class DoCloseTarget extends EntityTarget<Threshold> {
-		public DoCloseTarget(Threshold ent, String method) {
-			super(ent, method);
-		}
-
-		@Override
-		public void process() {
-			ent.doClose();
-		}
-	}
-
-	public final ProcessTarget doClose = new DoCloseTarget(this, "doClose");
-
-	public void doClose() {
-		this.trace( "close" );
-		this.setOpen( false );
+	@Override
+	public void clearStatistics() {
+		openCount = 0L;
+		closedCount = 0L;
 	}
 
 	@Override
@@ -207,16 +177,17 @@ public class Threshold extends StateEntity {
 
 		// Determine the colour for the square
 		Color4d col;
-		if (open) {
+		if (open)
 			col = openColour.getValue();
-			setTagVisibility(ShapeModel.TAG_CONTENTS, showWhenOpen.getValue());
-			setTagVisibility(ShapeModel.TAG_OUTLINES, showWhenOpen.getValue());
-		}
-		else {
+		else
 			col = closedColour.getValue();
-			setTagVisibility(ShapeModel.TAG_CONTENTS, showWhenClosed.getValue());
-			setTagVisibility(ShapeModel.TAG_OUTLINES, showWhenClosed.getValue());
 
+		// Show or hide the threshold
+		if (!showWhenOpen.isDefault() || !showWhenClosed.isDefault()) {
+			if (open)
+				setShow(getShowInput() && showWhenOpen.getValue());
+			else
+				setShow(getShowInput() && showWhenClosed.getValue());
 		}
 
 		setTagColour( ShapeModel.TAG_CONTENTS, col );
@@ -237,7 +208,8 @@ public class Threshold extends StateEntity {
 	  reportable = true,
 	    sequence = 1)
 	public double getOpenFraction(double simTime) {
-		long simTicks = EventManager.secsToNearestTick(simTime);
+		EventManager evt = this.getJaamSimModel().getEventManager();
+		long simTicks = evt.secondsToNearestTick(simTime);
 		long openTicks = this.getTicksInState(simTicks, getState("Open"));
 		long closedTicks = this.getTicksInState(simTicks, getState("Closed"));
 		long totTicks = openTicks + closedTicks;
@@ -250,11 +222,29 @@ public class Threshold extends StateEntity {
 	    unitType = DimensionlessUnit.class,
 	    sequence = 2)
 	public double getClosedFraction(double simTime) {
-		long simTicks = EventManager.secsToNearestTick(simTime);
+		EventManager evt = this.getJaamSimModel().getEventManager();
+		long simTicks = evt.secondsToNearestTick(simTime);
 		long openTicks = this.getTicksInState(simTicks, getState("Open"));
 		long closedTicks = this.getTicksInState(simTicks, getState("Closed"));
 		long totTicks = openTicks + closedTicks;
 
 		return (double)closedTicks / totTicks;
 	}
+
+	@Output(name = "OpenCount",
+	 description = "The number of times the threshold's state has changed from closed to open.",
+	    unitType = DimensionlessUnit.class,
+	    sequence = 3)
+	public long getOpenCount(double simTime) {
+		return openCount;
+	}
+
+	@Output(name = "ClosedCount",
+	 description = "The number of times the threshold's state has changed from open to closed.",
+	    unitType = DimensionlessUnit.class,
+	    sequence = 4)
+	public long getClosedCount(double simTime) {
+		return closedCount;
+	}
+
 }

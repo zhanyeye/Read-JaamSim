@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2002-2011 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2019-2020 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,24 +24,23 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 
 import javax.swing.JButton;
+import javax.swing.JDialog;
 import javax.swing.JLabel;
 import javax.swing.JTextArea;
-
-import com.jaamsim.basicsim.Simulation;
 
 /**
  * Class to display information about model objects.
  */
-public class AboutBox extends FrameBox implements ActionListener {
-	private static AboutBox instance;
+public class AboutBox extends JDialog {
 
-	public static final String version = "2016-01";
+	public static final String version = "2020-13";
 
 	public AboutBox() {
-		super("About");
+		super((JDialog)null, "About", true);
+		setType(Type.UTILITY);
 
 		setResizable(false);
-		setDefaultCloseOperation(FrameBox.HIDE_ON_CLOSE);
+		setDefaultCloseOperation(DISPOSE_ON_CLOSE);
 
 		// setup the layout
 		int index = 0;
@@ -56,8 +56,9 @@ public class AboutBox extends FrameBox implements ActionListener {
 		constraints.insets = new Insets( 15, 15, 0, 15 );
 
 		// display the model's name
-		JLabel lab = new JLabel(Simulation.getModelName() + " Version: " + version);
-		lab.setFont(boldFont);
+		String name = GUIFrame.getJaamSimModel().getSimulation().getModelName();
+		JLabel lab = new JLabel(name + " Version: " + version);
+		lab.setFont(FrameBox.boldFont);
 		layout.setConstraints( lab, constraints );
 		getContentPane().add( lab );
 
@@ -78,13 +79,18 @@ public class AboutBox extends FrameBox implements ActionListener {
 		area.setEditable(false);
 		area.setFocusable(false);
 		area.setBackground(lab.getBackground());
-		area.setFont(boldFont);
+		area.setFont(FrameBox.boldFont);
 		constraints.gridy = index++;
 		layout.setConstraints( area, constraints );
 		getContentPane().add( area );
 
-		JButton closeButton = new JButton("OK");
-		closeButton.addActionListener(this);
+		JButton closeButton = new JButton("Close");
+		closeButton.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				dispose();
+			}
+		});
 
 		constraints.gridy = index++;
 		constraints.insets = new Insets( 10, 75, 15, 75 );
@@ -96,15 +102,4 @@ public class AboutBox extends FrameBox implements ActionListener {
 		pack();
 	}
 
-	@Override
-	public void actionPerformed(ActionEvent e) {
-		setVisible(false);
-	}
-
-	public static synchronized AboutBox instance() {
-		if (instance == null)
-			instance = new AboutBox();
-
-		return instance;
-	}
 }

@@ -1,7 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2014 Ausenco Engineering Canada Inc.
- * Copyright (C) 2015 KMA Technologies
+ * Copyright (C) 2015-2019 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,9 +20,15 @@ package com.jaamsim.input;
 import static org.junit.Assert.assertTrue;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 
 import org.junit.Test;
 
+import com.jaamsim.basicsim.Entity;
+import com.jaamsim.basicsim.JaamSimModel;
+import com.jaamsim.input.ExpParser.Assigner;
+import com.jaamsim.input.ExpParser.EvalContext;
+import com.jaamsim.input.ExpParser.OutputResolver;
 import com.jaamsim.input.ExpParser.UnitData;
 import com.jaamsim.units.AreaUnit;
 import com.jaamsim.units.DimensionlessUnit;
@@ -33,7 +39,43 @@ import com.jaamsim.units.Unit;
 
 public class TestExpParser {
 
-	private static class PC implements ExpParser.ParseContext {
+	private static void assertColSame(double[] vals, ExpResult.Collection col) throws ExpError {
+		ExpResult.Iterator colIt = col.getIter();
+		for (double val : vals) {
+			ExpResult nextKey = colIt.nextKey();
+			ExpResult nextVal = col.index(nextKey);
+			assertTrue(nextVal.type == ExpResType.NUMBER);
+			assertTrue(Math.abs(val - nextVal.value) < 0.00001);
+		}
+	}
+
+	private static class DummyResolver implements ExpParser.OutputResolver {
+
+		private final String name;
+		public DummyResolver(String name) {
+			this.name = name;
+		}
+
+		@Override
+		public ExpResult resolve(EvalContext ec, ExpResult ent)
+				throws ExpError {
+			if (name.equals("foo")) return ExpResult.makeNumResult(4, DimensionlessUnit.class);
+			if (name.equals("bar")) return ExpResult.makeNumResult(3, DimensionlessUnit.class);
+			return ExpResult.makeNumResult(1, DimensionlessUnit.class);
+		}
+
+		@Override
+		public ExpValResult validate(ExpValResult entValRes) {
+			return ExpValResult.makeValidRes(ExpResType.NUMBER, DimensionlessUnit.class);
+		}
+
+	}
+
+	private static class PC extends ExpParser.ParseContext {
+		public PC() {
+			super(new HashMap<String, ExpResult>());
+		}
+
 		@Override
 		public UnitData getUnitByName(String name) {
 			return null;
@@ -48,10 +90,156 @@ public class TestExpParser {
 				Class<? extends Unit> denom) {
 			return DimensionlessUnit.class;
 		}
+
+		@Override
+		public OutputResolver getOutputResolver(String name) throws ExpError {
+			return new DummyResolver(name);
+		}
+		@Override
+		public OutputResolver getConstOutputResolver(ExpResult constEnt,
+				String name) throws ExpError {
+			return new DummyResolver(name);
+		}
+		@Override
+		public Assigner getAssigner(String attribName) throws ExpError {
+			throw new ExpError(null, 0, "Assign not supported");
+		}
+		@Override
+		public Assigner getConstAssigner(ExpResult constEnt, String attribName)
+				throws ExpError {
+			throw new ExpError(null, 0, "Assign not supported");
+		}
+		@Override
+		public ExpResult getValFromLitName(String name, String source, int pos) throws ExpError {
+			return ExpResult.makeNumResult(1, DimensionlessUnit.class);
+		}
+	}
+
+	static class ErrorResolver implements ExpParser.OutputResolver {
+
+		private final ExpError error = new ExpError(null, 0, "Variables not supported in test");
+
+		@Override
+		public ExpResult resolve(EvalContext ec, ExpResult ent) throws ExpError {
+			throw error;
+		}
+
+		@Override
+		public ExpValResult validate(ExpValResult entValRes) {
+			return ExpValResult.makeErrorRes(error);
+		}
+	}
+
+	class UnitPC extends ExpParser.ParseContext {
+		public UnitPC() {
+			super(new HashMap<String, ExpResult>());
+		}
+
+		@Override
+		public UnitData getUnitByName(String name) {
+			UnitData ret = new UnitData();
+			if (name.equals("s")) {
+				ret.scaleFactor = 1;
+				ret.unitType = TimeUnit.class;
+				return ret;
+			}
+			if (name.equals("min")) {
+				ret.scaleFactor = 60;
+				ret.unitType = TimeUnit.class;
+				return ret;
+			}
+			if (name.equals("hr")) {
+				ret.scaleFactor = 3600;
+				ret.unitType = TimeUnit.class;
+				return ret;
+			}
+			if (name.equals("m")) {
+				ret.scaleFactor = 1;
+				ret.unitType = DistanceUnit.class;
+				return ret;
+			}
+			if (name.equals("km")) {
+				ret.scaleFactor = 1000;
+				ret.unitType = DistanceUnit.class;
+				return ret;
+			}
+			return null;
+		}
+		@Override
+		public Class<? extends Unit> multUnitTypes(Class<? extends Unit> a,
+				Class<? extends Unit> b) {
+			return Unit.getMultUnitType(a, b);
+		}
+
+		@Override
+		public Class<? extends Unit> divUnitTypes(Class<? extends Unit> num,
+				Class<? extends Unit> denom) {
+			return Unit.getDivUnitType(num, denom);
+		}
+		@Override
+		public OutputResolver getOutputResolver(String name)
+				throws ExpError {
+			return new ErrorResolver();
+		}
+		@Override
+		public Assigner getAssigner(String attribName) throws ExpError {
+			throw new ExpError(null, 0, "Assign not supported");
+		}
+		@Override
+		public Assigner getConstAssigner(ExpResult constEnt, String attribName)
+				throws ExpError {
+			throw new ExpError(null, 0, "Assign not supported");
+		}
+		@Override
+		public ExpResult getValFromLitName(String name, String source, int pos) throws ExpError {
+			return null;
+		}
+		@Override
+		public OutputResolver getConstOutputResolver(ExpResult constEnt,
+				String name) throws ExpError {
+			return new ErrorResolver();
+		}
+
+	}
+
+	static JaamSimModel sim = new JaamSimModel();
+	static Entity mapEnt = sim.createInstance(Entity.class);
+	static Entity arrayEnt = sim.createInstance(Entity.class);
+	static Entity dummyEnt = sim.createInstance(Entity.class);
+	static HashMap<Double, Double> map0 = new HashMap<>();
+	static HashMap<String, Double> map1 = new HashMap<>();
+	static HashMap<String, Double> distanceMap = new HashMap<>();
+	static HashMap<Entity, Entity> entMap = new HashMap<>();
+
+	static Entity[] entArray = { dummyEnt };
+	static double[] doubleArray = { 1.0, 2.0, 3.0, 42.0 };
+	static int[] intArray = { 1, 2, 3, 42 };
+
+	static String[] stringArray = { "foo", "bar" };
+
+	{
+		map0.put(1.0, 1.0);
+		map0.put(2.0, 42.0);
+
+		map1.put("one", 1.0);
+		map1.put("two", 2.0);
+		map1.put("everything", 42.0);
+
+		distanceMap.put("near", 1.0);
+		distanceMap.put("far", 42000.0);
+		distanceMap.put("middling", 4.0);
+
+		entMap.put(dummyEnt, dummyEnt);
+
 	}
 
 	static PC pc = new PC();
 
+	private static class EC extends ExpParser.EvalContext {
+
+
+	}
+	static EC ec = new EC();
 
 	private static void testToken(ExpTokenizer.Token tok, int type, String val) {
 		assertTrue(tok.type == type);
@@ -124,21 +312,18 @@ public class TestExpParser {
 		testToken(tokens.get(5), ExpTokenizer.SYM_TYPE, "&");
 		testToken(tokens.get(6), ExpTokenizer.SYM_TYPE, "|");
 
+		tokens = ExpTokenizer.tokenize("\"blarg\"[foo]\"bar\" 42 \"giggity\"");
+		assertTrue(tokens.size() == 5);
+		testToken(tokens.get(0), ExpTokenizer.STRING_TYPE, "blarg");
+		testToken(tokens.get(1), ExpTokenizer.SQ_TYPE, "foo");
+		testToken(tokens.get(2), ExpTokenizer.STRING_TYPE, "bar");
+		testToken(tokens.get(3), ExpTokenizer.NUM_TYPE, "42");
+		testToken(tokens.get(4), ExpTokenizer.STRING_TYPE, "giggity");
+
 	}
 
 	@Test
 	public void testParser() throws ExpError {
-		class EC implements ExpParser.EvalContext {
-			@Override
-			public ExpResult getVariableValue(String[] name, ExpResult[] indices) {
-				if (name[0].equals("foo")) return new ExpResult(4, DimensionlessUnit.class);
-				if (name[0].equals("bar")) return new ExpResult(3, DimensionlessUnit.class);
-				return new ExpResult(1, DimensionlessUnit.class);
-			}
-			@Override
-			public boolean eagerEval() { return true; }
-		}
-		EC ec = new EC();
 
 		ExpParser.Expression exp = ExpParser.parseExpression(pc, "2*5 + 3*5*(3-1)+2");
 		double val = exp.evaluate(ec).value;
@@ -151,6 +336,11 @@ public class TestExpParser {
 		exp = ExpParser.parseExpression(pc, "min(3, 42, -5, 602)");
 		val = exp.evaluate(ec).value;
 		assertTrue(val == -5);
+
+		exp = ExpParser.parseExpression(pc, "null");
+		ExpResult res = exp.evaluate(ec);
+		assertTrue(res.type == ExpResType.ENTITY);
+		assertTrue(res.entVal == null);
 
 		exp = ExpParser.parseExpression(pc, "max(3, 42, -5, 602)");
 		val = exp.evaluate(ec).value;
@@ -172,7 +362,7 @@ public class TestExpParser {
 		val = exp.evaluate(ec).value;
 		assertTrue(val == 42);
 
-		exp = ExpParser.parseExpression(pc, "[foo]*[bar]");
+		exp = ExpParser.parseExpression(pc, "[foo].foo*[bar].bar");
 		val = exp.evaluate(ec).value;
 		assertTrue(val == 12);
 
@@ -184,7 +374,7 @@ public class TestExpParser {
 		val = exp.evaluate(ec).value;
 		assertTrue(val == 256);
 
-		exp = ExpParser.parseExpression(pc, "1 + 2^2*4 + 2*[foo]");
+		exp = ExpParser.parseExpression(pc, "1 + 2^2*4 + 2*[foo].foo");
 		val = exp.evaluate(ec).value;
 		assertTrue(val == 25);
 
@@ -312,134 +502,392 @@ public class TestExpParser {
 
 	}
 
+	private static class TestVariableResolver implements ExpParser.OutputResolver {
+
+		private final String name;
+		public TestVariableResolver(String n) {
+			this.name = n;
+		}
+
+		@Override
+		public ExpResult resolve(EvalContext ec, ExpResult ent)
+				throws ExpError {
+			if (ent.type == ExpResType.ENTITY && ent.entVal == mapEnt) {
+				if (name.equals("map0")) {
+					return ExpCollections.wrapCollection(map0, DimensionlessUnit.class);
+				}
+				if (name.equals("map1")) {
+					return ExpCollections.wrapCollection(map1, DimensionlessUnit.class);
+				}
+				if (name.equals("entMap")) {
+					return ExpCollections.wrapCollection(entMap, DimensionlessUnit.class);
+				}
+				if (name.equals("distances")) {
+					return ExpCollections.wrapCollection(distanceMap, DistanceUnit.class);
+				}
+			}
+
+			if (ent.type == ExpResType.ENTITY && ent.entVal == arrayEnt) {
+				if (name.equals("intArray")) {
+					return ExpCollections.wrapCollection(intArray, DimensionlessUnit.class);
+				}
+				if (name.equals("doubleArray")) {
+					return ExpCollections.wrapCollection(doubleArray, DimensionlessUnit.class);
+				}
+				if (name.equals("entArray")) {
+					return ExpCollections.wrapCollection(entArray, DimensionlessUnit.class);
+				}
+				if (name.equals("stringArray")) {
+					return ExpCollections.wrapCollection(stringArray, DimensionlessUnit.class);
+				}
+			}
+
+			return ExpResult.makeNumResult(1, DimensionlessUnit.class);
+		}
+
+		@Override
+		public ExpValResult validate(ExpValResult entValRes) {
+			return ExpValResult.makeUndecidableRes();
+		}
+}
+
+	private static class VariableTestPC extends PC {
+
+		@Override
+		public OutputResolver getOutputResolver(String name) throws ExpError {
+			return new TestVariableResolver(name);
+		}
+		@Override
+		public OutputResolver getConstOutputResolver(ExpResult constEnt,
+				String name) throws ExpError {
+			return new TestVariableResolver(name);
+		}
+
+		@Override
+		public ExpResult getValFromLitName(String name, String source, int pos) throws ExpError {
+			if (name.equals("Maps")) {
+				return ExpResult.makeEntityResult(mapEnt);
+			}
+			if (name.equals("Arrays")) {
+				return ExpResult.makeEntityResult(arrayEnt);
+			}
+			if (name.equals("Dummy")) {
+				return ExpResult.makeEntityResult(dummyEnt);
+			}
+			return ExpResult.makeNumResult(0, DimensionlessUnit.class);
+		}
+
+	}
+
 	@Test
 	public void testVariables() throws ExpError {
-		class EC implements ExpParser.EvalContext {
-			@Override
-			public ExpResult getVariableValue(String[] name, ExpResult[] indices) {
-				if (name.length > 0 && name[0].equals("ind")) {
-					double ret = 0;
-					for (int i = 0; i < indices.length; ++i) {
-						if (indices[i] != null)
-						ret += i * indices[i].value;
-					}
-					return new ExpResult(ret, DimensionlessUnit.class);
-				}
+		VariableTestPC vtpc = new VariableTestPC();
 
-				if (name.length < 1 || !name[0].equals("foo")) return new ExpResult(0, DimensionlessUnit.class);
-
-				if (name.length >= 3 && name[1].equals("bar") && name[2].equals("baz")) return new ExpResult(4, DimensionlessUnit.class);
-				if (name.length >= 2 && name[1].equals("bonk")) return new ExpResult(5, DimensionlessUnit.class);
-
-				return new ExpResult(-1, DimensionlessUnit.class);
-			}
-			@Override
-			public boolean eagerEval() { return true; }
-		}
-		EC ec = new EC();
-
-		ExpParser.Expression exp = ExpParser.parseExpression(pc, "[foo].bar.baz");
+		ExpParser.Expression exp = ExpParser.parseExpression(vtpc, "[Maps].map0(1)");
 		double val = exp.evaluate(ec).value;
+		assertTrue(val == 1);
+
+		exp = ExpParser.parseExpression(vtpc, "[Maps].map0(2)");
+		val = exp.evaluate(ec).value;
+		assertTrue(val == 42);
+
+		exp = ExpParser.parseExpression(vtpc, "[Maps].map1(\"two\")");
+		val = exp.evaluate(ec).value;
+		assertTrue(val == 2);
+
+		exp = ExpParser.parseExpression(vtpc, "[Maps].map1(\"everything\")");
+		val = exp.evaluate(ec).value;
+		assertTrue(val == 42);
+
+		exp = ExpParser.parseExpression(vtpc, "[Maps].entMap([Dummy])");
+		ExpResult res = exp.evaluate(ec);
+		assertTrue(res.type == ExpResType.ENTITY && res.entVal == dummyEnt);
+
+		exp = ExpParser.parseExpression(vtpc, "[Arrays].doubleArray(4)");
+		val = exp.evaluate(ec).value;
+		assertTrue(val == 42);
+
+		exp = ExpParser.parseExpression(vtpc, "maxCol([Arrays].doubleArray)");
+		val = exp.evaluate(ec).value;
+		assertTrue(val == 42);
+
+		exp = ExpParser.parseExpression(vtpc, "indexOfMaxCol([Arrays].doubleArray)");
+		val = exp.evaluate(ec).value;
 		assertTrue(val == 4);
 
-		exp = ExpParser.parseExpression(pc, "[foo].bar.baz*4");
+		exp = ExpParser.parseExpression(vtpc, "minCol([Arrays].intArray)");
 		val = exp.evaluate(ec).value;
-		assertTrue(val == 16);
+		assertTrue(val == 1);
 
-		exp = ExpParser.parseExpression(pc, "[foo].bonk");
+		exp = ExpParser.parseExpression(vtpc, "indexOfMinCol([Arrays].intArray)");
 		val = exp.evaluate(ec).value;
-		assertTrue(val == 5);
+		assertTrue(val == 1);
 
-		exp = ExpParser.parseExpression(pc, "[bob].is.your.uncle");
+		exp = ExpParser.parseExpression(vtpc, "indexOf([Arrays].intArray, 42)");
 		val = exp.evaluate(ec).value;
-		assertTrue(val == 0);
+		assertTrue(val == 4);
 
-		exp = ExpParser.parseExpression(pc, "[ind].stuff(1+4)");
+		exp = ExpParser.parseExpression(vtpc, "indexOf([Maps].map1, 42)");
+		res = exp.evaluate(ec);
+		assertTrue(res.type == ExpResType.STRING);
+		assertTrue(res.stringVal.equals("everything"));
+
+		exp = ExpParser.parseExpression(vtpc, "[Arrays].intArray(4)");
 		val = exp.evaluate(ec).value;
-		assertTrue(val == 5);
-
-		exp = ExpParser.parseExpression(pc, "[ind].stuff(5).things(42).nothing");
-		val = exp.evaluate(ec).value;
-		assertTrue(val == 89);
-
-		exp = ExpParser.parseExpression(pc, "[foo]");
-		val = exp.evaluate(ec).value;
-		assertTrue(val == -1);
-
-		class ThisEC implements ExpParser.EvalContext {
-			@Override
-			public ExpResult getVariableValue(String[] name, ExpResult[] indices) {
-				if (name[0].equals("this")) return new ExpResult(42, DimensionlessUnit.class);
-
-				return new ExpResult(-1, DimensionlessUnit.class);
-			}
-			@Override
-			public boolean eagerEval() { return true; }
-		}
-		ThisEC tec = new ThisEC();
-
-		exp = ExpParser.parseExpression(pc, "this.stuff");
-		val = exp.evaluate(tec).value;
 		assertTrue(val == 42);
+
+		exp = ExpParser.parseExpression(vtpc, "[Arrays].entArray(1)");
+		res = exp.evaluate(ec);
+		assertTrue(res.type == ExpResType.ENTITY && res.entVal == dummyEnt);
+
+		exp = ExpParser.parseExpression(vtpc, "[Arrays].stringArray(2)");
+		res = exp.evaluate(ec);
+		assertTrue(res.type == ExpResType.STRING && res.stringVal.equals("bar"));
+
+		exp = ExpParser.parseExpression(vtpc, "maxCol([Maps].distances)");
+		res = exp.evaluate(ec);
+		assertTrue(res.type == ExpResType.NUMBER);
+		assertTrue(res.unitType == DistanceUnit.class);
+		assertTrue(res.value == 42000.0);
+
+		exp = ExpParser.parseExpression(vtpc, "indexOfMaxCol([Maps].distances)");
+		res = exp.evaluate(ec);
+		assertTrue(res.type == ExpResType.STRING);
+		assertTrue(res.stringVal.equals("far"));
+
+		exp = ExpParser.parseExpression(vtpc, "size([Arrays].doubleArray)");
+		val = exp.evaluate(ec).value;
+		assertTrue(val == 4);
+
+	}
+	@Test
+	public void testArray() throws ExpError {
+		ExpParser.Expression exp = ExpParser.parseExpression(pc, "{1, 2, 3, 4}(2)");
+		ExpResult res = exp.evaluate(ec);
+		assertTrue(res.type == ExpResType.NUMBER);
+		assertTrue(res.value == 2);
+
+		exp = ExpParser.parseExpression(pc, "{\"foo\" = 10, \"bar\" = 42}(\"bar\")");
+		res = exp.evaluate(ec);
+		assertTrue(res.type == ExpResType.NUMBER);
+		assertTrue(res.value == 42);
+
+		exp = ExpParser.parseExpression(pc, "{\"foo\", \"bar\", \"baz\"}(3)");
+		res = exp.evaluate(ec);
+		assertTrue(res.type == ExpResType.STRING);
+		assertTrue(res.stringVal.equals("baz"));
+
+		exp = ExpParser.parseExpression(pc, "{1, 2, 3} + {4, 5, 42}");
+		res = exp.evaluate(ec);
+		assertTrue(res.type == ExpResType.COLLECTION);
+		double[] addVals = {1, 2, 3, 4, 5, 42};
+		assertColSame(addVals, res.colVal);
+
+		exp = ExpParser.parseExpression(pc, "{1, 2, 3, 4, 5} + 42");
+		res = exp.evaluate(ec);
+		assertTrue(res.type == ExpResType.COLLECTION);
+		assertColSame(addVals, res.colVal);
+
+	}
+
+	@Test
+	public void testString() throws ExpError {
+		// This is needed since we do not initialize the rest of the unit system
+		JaamSimModel mod = new JaamSimModel();
+		mod.createInstance(DimensionlessUnit.class);
+
+		ExpParser.Expression exp = ExpParser.parseExpression(pc, "\"stringly\"");
+		ExpResult res = exp.evaluate(ec);
+		assertTrue(res.type == ExpResType.STRING);
+		assertTrue(res.stringVal.equals("stringly"));
+
+		exp = ExpParser.parseExpression(pc, "\"stri\" + \"ngly\"");
+		res = exp.evaluate(ec);
+		assertTrue(res.type == ExpResType.STRING);
+		assertTrue(res.stringVal.equals("stringly"));
+
+		exp = ExpParser.parseExpression(pc, "\"str\" + \"ing\" +  \"ly\"");
+		res = exp.evaluate(ec);
+		assertTrue(res.type == ExpResType.STRING);
+		assertTrue(res.stringVal.equals("stringly"));
+
+		exp = ExpParser.parseExpression(pc, "format(\"stri%s%s\", \"ng\",\"ly\")");
+		res = exp.evaluate(ec);
+		assertTrue(res.type == ExpResType.STRING);
+		assertTrue(res.stringVal.equals("stringly"));
+
+		exp = ExpParser.parseExpression(pc, "\"str\" + 5");
+		res = exp.evaluate(ec);
+		assertTrue(res.type == ExpResType.STRING);
+		assertTrue(res.stringVal.equals("str5.0"));
+
+		UnitPC upc = new UnitPC();
+
+		exp = ExpParser.parseExpression(upc, "format(\"%.0f\",42[km]/1[m])");
+		res = exp.evaluate(ec);
+		assertTrue(res.type == ExpResType.STRING);
+		assertTrue(res.stringVal.equals("42000"));
+
+	}
+
+	@Test
+	public void testLambda() throws ExpError {
+
+		ExpParser.Expression exp = ExpParser.parseExpression(pc, "|x|(2*x)");
+		ExpResult val = exp.evaluate(ec);
+		assertTrue(val.type == ExpResType.LAMBDA);
+
+		exp = ExpParser.parseExpression(pc, "|x|(2*x)(21)");
+		val = exp.evaluate(ec);
+		assertTrue(val.type == ExpResType.NUMBER);
+		assertTrue(val.value == 42);
+
+		exp = ExpParser.parseExpression(pc, "|x,y|(|z|(x*y*z)(2))(3,7)");
+		val = exp.evaluate(ec);
+		assertTrue(val.type == ExpResType.NUMBER);
+		assertTrue(val.value == 42);
+
+		exp = ExpParser.parseExpression(pc, "|x,y|(x*y)(2,21)");
+		val = exp.evaluate(ec);
+		assertTrue(val.type == ExpResType.NUMBER);
+		assertTrue(val.value == 42);
+
+		exp = ExpParser.parseExpression(pc, "map(|x|(x*2), {1, 2, 3, 21})");
+		val = exp.evaluate(ec);
+		assertTrue(val.type == ExpResType.COLLECTION);
+		double[] mapVals = {2, 4, 6, 42};
+		assertColSame(mapVals, val.colVal);
+
+		exp = ExpParser.parseExpression(pc, "map(|x, key|(key*2), {1, 2, 3, 21})");
+		val = exp.evaluate(ec);
+		assertTrue(val.type == ExpResType.COLLECTION);
+		double[] mapVals2 = {2, 4, 6, 8};
+		assertColSame(mapVals2, val.colVal);
+
+		exp = ExpParser.parseExpression(pc, "filter(|x|(x>20), {1, 2, 3, 21, 5, 42})");
+		val = exp.evaluate(ec);
+		assertTrue(val.type == ExpResType.COLLECTION);
+		double[] filterVals = {21, 42};
+		assertColSame(filterVals, val.colVal);
+
+		exp = ExpParser.parseExpression(pc, "filter(|x, key|(key > 3), {1, 2, 3, 21, 5, 42})");
+		val = exp.evaluate(ec);
+		assertTrue(val.type == ExpResType.COLLECTION);
+		double[] filterVals2 = {21, 5, 42};
+		assertColSame(filterVals2, val.colVal);
+
+		exp = ExpParser.parseExpression(pc, "filter(|x|(x>20), map(|x|(x*2), {1, 2, 3, 11, 5, 21}))");
+		val = exp.evaluate(ec);
+		assertTrue(val.type == ExpResType.COLLECTION);
+		double[] mapFilterVals = {22, 42};
+		assertColSame(mapFilterVals, val.colVal);
+
+		exp = ExpParser.parseExpression(pc, "reduce(|val, accum|(val + accum), 0, {1,2,3,4,32})");
+		val = exp.evaluate(ec);
+		assertTrue(val.type == ExpResType.NUMBER);
+		assertTrue(val.value == 42);
+
+		exp = ExpParser.parseExpression(pc, "reduce(|val, accum|(val * accum), 1, {1,2,3,4,5})");
+		val = exp.evaluate(ec);
+		assertTrue(val.type == ExpResType.NUMBER);
+		assertTrue(val.value == 120);
+
+		exp = ExpParser.parseExpression(pc, "sort( |x, y|(x<y), {5,2,3,42,4,1} )");
+		val = exp.evaluate(ec);
+		assertTrue(val.type == ExpResType.COLLECTION);
+		double[] sortVals = {1, 2, 3, 4, 5, 42};
+		assertColSame(sortVals, val.colVal);
+
+	}
+
+	@Test
+	public void testLocalVars() throws ExpError {
+		ExpParser.Expression exp = ExpParser.parseExpression(pc, "x = 2; y = x*3; z = 7; y*z");
+		ExpResult val = exp.evaluate(ec);
+		assertTrue(val.type == ExpResType.NUMBER);
+		assertTrue(val.value == 42);
+
+		exp = ExpParser.parseExpression(pc, "array = {1,2,4,21}; mapped = map(|x|(x*2), array); filter(|x|(x>20), mapped)");
+		val = exp.evaluate(ec);
+		assertTrue(val.type == ExpResType.COLLECTION);
+		double[] vals = {42};
+		assertColSame(vals, val.colVal);
+	}
+
+	@Test
+	public void testRecursion() throws ExpError {
+		String expStr = "" ;
+		expStr += "recFact = |val, rec| ( (val < 1) ? 1 : val * rec(val-1, rec) );";
+		expStr += "fact = |val|( recFact(val, recFact) );";
+		expStr += "fact(6)";
+		ExpParser.Expression exp = ExpParser.parseExpression(pc, expStr);
+		ExpResult val = exp.evaluate(ec);
+		assertTrue(val.type == ExpResType.NUMBER);
+		assertTrue(val.value == 720);
+
+		expStr = "" ;
+		expStr += "thresh = 3;";
+		expStr += "num = 12;";
+		expStr += "recFib = |val, rf| ( (val < thresh) ? 1 : (rf(val-2, rf) + rf(val-1, rf)) );";
+		expStr += "fib = |val| (recFib(val, recFib) );";
+		expStr += "fib(num)";
+		exp = ExpParser.parseExpression(pc, expStr);
+		val = exp.evaluate(ec);
+		assertTrue(val.type == ExpResType.NUMBER);
+		assertTrue(val.value == 144);
+
+		boolean threw = false;
+		try {
+			expStr = "";
+			expStr += "recFunc = |val, rec| ( rec(val, rec) );";
+			expStr += "recFunc(2, recFunc)";
+			exp = ExpParser.parseExpression(pc, expStr);
+			val = exp.evaluate(ec);
+		} catch (ExpError e) {
+			threw = true;
+		}
+		assertTrue(threw);
+
+
+	}
+
+	@Test
+	public void testRange() throws ExpError {
+
+		ExpParser.Expression exp = ExpParser.parseExpression(pc, "range(5)");
+		ExpResult val = exp.evaluate(ec);
+		assertTrue(val.type == ExpResType.COLLECTION);
+
+		double[] vals0 = {1, 2, 3, 4, 5};
+		assertColSame(vals0, val.colVal);
+
+		exp = ExpParser.parseExpression(pc, "range(10, 15)");
+		val = exp.evaluate(ec);
+		assertTrue(val.type == ExpResType.COLLECTION);
+
+		double[] vals1 = {10, 11, 12, 13, 14, 15};
+		assertColSame(vals1, val.colVal);
+
+		exp = ExpParser.parseExpression(pc, "range(1, 2, 0.2)");
+		val = exp.evaluate(ec);
+		assertTrue(val.type == ExpResType.COLLECTION);
+
+		double[] vals2 = {1.0, 1.2, 1.4, 1.6, 1.8, 2.0};
+		assertColSame(vals2, val.colVal);
+
+		exp = ExpParser.parseExpression(pc, "range(2, 1)");
+		val = exp.evaluate(ec);
+		assertTrue(val.type == ExpResType.COLLECTION);
+
+		double[] vals3 = { };
+		assertColSame(vals3, val.colVal);
+
 	}
 
 	@Test
 	public void testUnits() throws ExpError {
-		class UnitPC implements ExpParser.ParseContext {
-			@Override
-			public UnitData getUnitByName(String name) {
-				UnitData ret = new UnitData();
-				if (name.equals("s")) {
-					ret.scaleFactor = 1;
-					ret.unitType = TimeUnit.class;
-					return ret;
-				}
-				if (name.equals("min")) {
-					ret.scaleFactor = 60;
-					ret.unitType = TimeUnit.class;
-					return ret;
-				}
-				if (name.equals("hr")) {
-					ret.scaleFactor = 3600;
-					ret.unitType = TimeUnit.class;
-					return ret;
-				}
-				if (name.equals("m")) {
-					ret.scaleFactor = 1;
-					ret.unitType = DistanceUnit.class;
-					return ret;
-				}
-				if (name.equals("km")) {
-					ret.scaleFactor = 1000;
-					ret.unitType = DistanceUnit.class;
-					return ret;
-				}
-				return null;
-			}
-			@Override
-			public Class<? extends Unit> multUnitTypes(Class<? extends Unit> a,
-					Class<? extends Unit> b) {
-				return Unit.getMultUnitType(a, b);
-			}
 
-			@Override
-			public Class<? extends Unit> divUnitTypes(Class<? extends Unit> num,
-					Class<? extends Unit> denom) {
-				return Unit.getDivUnitType(num, denom);
-			}
-
-		}
 		UnitPC upc = new UnitPC();
-
-		class EC implements ExpParser.EvalContext {
-			@Override
-			public ExpResult getVariableValue(String[] name, ExpResult[] indices) throws ExpError {
-				throw new ExpError(null, 0, "Variables not supported in test");
-			}
-			@Override
-			public boolean eagerEval() { return true; }
-		}
-		EC ec = new EC();
 
 		ExpParser.Expression exp = ExpParser.parseExpression(upc, "1[km] + 1[m]");
 		ExpResult res = exp.evaluate(ec);
@@ -496,31 +944,94 @@ public class TestExpParser {
 
 	}
 
+	private static class AssignContainer {
+		public ExpResult res;
+		public ExpResult.Collection col;
+		public String lastAttribName;
+	}
+
+	private static class TestAssigner implements ExpParser.Assigner {
+
+		AssignContainer cont;
+		String attribName;
+
+		TestAssigner(AssignContainer cont, String attribName) {
+			this.cont = cont;
+			this.attribName = attribName;
+		}
+		@Override
+		public void assign(ExpResult ent, ExpResult[] indices, ExpResult val)
+				throws ExpError {
+			if (indices == null) {
+				cont.res = val;
+			} else {
+				cont.col = cont.col.assign(indices[0], val);
+				if (indices.length > 1) {
+					assertTrue(indices[1].type == ExpResType.NUMBER);
+					assertTrue(indices[1].value == 42.0);
+				}
+			}
+			cont.lastAttribName = attribName;
+		}
+	}
+
+	private static class AssignPC extends PC {
+		AssignContainer cont;
+
+		AssignPC(AssignContainer cont) {
+			this.cont = cont;
+		}
+
+		@Override
+		public Assigner getAssigner(String attribName) throws ExpError {
+			return new TestAssigner(cont, attribName);
+		}
+		@Override
+		public Assigner getConstAssigner(ExpResult constEnt, String attribName)
+				throws ExpError {
+			return new TestAssigner(cont, attribName);
+		}
+
+	}
+
 	@Test
 	public void testAssignment() throws ExpError {
+		AssignContainer cont = new AssignContainer();
 
-		class EC implements ExpParser.EvalContext {
-			@Override
-			public ExpResult getVariableValue(String[] name, ExpResult[] indices) {
-				return new ExpResult(-1, DimensionlessUnit.class);
-			}
-			@Override
-			public boolean eagerEval() { return true; }
-		}
-		EC ec = new EC();
+		ArrayList<ExpResult> initialRes = new ArrayList<>();
+		initialRes.add(ExpResult.makeNumResult(42, DimensionlessUnit.class));
+		cont.col = ExpCollections.makeAssignableArrrayCollection(initialRes, false).colVal;
+		AssignPC apc = new AssignPC(cont);
 
-		ExpParser.Assignment assign = ExpParser.parseAssignment(pc, "[foo].bar = 40 + 2");
+		ExpParser.Assignment assign = ExpParser.parseAssignment(apc, "[foo].arg = 40 + 2");
+		ExpResult res = assign.evaluate(ec);
+		assertTrue(res.value == 42.0);
+		assertTrue(cont.res.type == ExpResType.NUMBER);
+		assertTrue(cont.res.value == 42.0);
+		assertTrue(cont.lastAttribName.equals("arg"));
 
-		assertTrue(assign.destination.length == 2);
-		assertTrue(assign.destination[0].equals("foo"));
-		assertTrue(assign.destination[1].equals("bar"));
-		assertTrue(assign.value.evaluate(ec).value == 42);
+		assign = ExpParser.parseAssignment(apc, "[foo].blarg(4)(23+19) = 40 + 5");
+		res = assign.evaluate(ec);
+		ExpResult contained = cont.col.index(ExpResult.makeNumResult(4, DimensionlessUnit.class));
+		assertTrue(res.value == 45.0);
+		assertTrue(contained.type == ExpResType.NUMBER);
+		assertTrue(contained.value == 45.0);
+		assertTrue(cont.lastAttribName.equals("blarg"));
 
-		assign = ExpParser.parseAssignment(pc, "this.bar = 40 + 2");
-		assertTrue(assign.destination.length == 2);
-		assertTrue(assign.destination[0].equals("this"));
-		assertTrue(assign.destination[1].equals("bar"));
-		assertTrue(assign.value.evaluate(ec).value == 42);
+
+		// Test assigning to maps
+		HashMap<String, ExpResult> initialMap = new HashMap<>();
+		initialMap.put("bar", ExpResult.makeNumResult(2, DimensionlessUnit.class));
+		cont.col = ExpCollections.makeAssignableMapCollection(initialMap, false).colVal;
+
+		assign = ExpParser.parseAssignment(apc, "[foo].map(\"bar\") = 42");
+		res = assign.evaluate(ec);
+
+		contained = cont.col.index(ExpResult.makeStringResult("bar"));
+		assertTrue(res.value == 42.0);
+		assertTrue(contained.type == ExpResType.NUMBER);
+		assertTrue(contained.value == 42.0);
+		assertTrue(cont.lastAttribName.equals("map"));
 
 	}
 }
