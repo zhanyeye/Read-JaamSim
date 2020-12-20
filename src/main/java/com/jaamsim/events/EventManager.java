@@ -77,7 +77,6 @@ public final class EventManager {
 	 * Allocates a new EventManager with the given parent and name
 	 *
 	 * @param name the name this EventManager should use
-     * 被JaaSimModel的 JaamSimModel(String) 调用
 	 */
 	public EventManager(String name) {
 		// Basic initialization
@@ -105,7 +104,6 @@ public final class EventManager {
 		setTimeListener(null);
 	}
 
-	// ~ 被 EventManager构造函数，和JaamSimModel 的 setTimeListener调用
 	public final void setTimeListener(EventTimeListener l) {
 		synchronized (lockObject) {
 			if (l != null)
@@ -115,14 +113,12 @@ public final class EventManager {
 		}
 	}
 
-	// ~ called by JaamSimModel clear()  start() , EventViewer itself and dispose()
 	public final void setTraceListener(EventTraceListener l) {
 		synchronized (lockObject) {
 			trcListener = l;
 		}
 	}
 
-	// ~ called by JaamSimModel clear(), start(), reset(), endRun()
 	public void clear() {
 		synchronized (lockObject) {
 			currentTick.set(0);
@@ -144,7 +140,6 @@ public final class EventManager {
 		}
 	}
 
-	// ~ called by this.clear()
 	private static class KillAllEvents implements EventNode.Runner {
 		@Override
 		public void runOnNode(EventNode node) {
@@ -161,7 +156,6 @@ public final class EventManager {
 		}
 	}
 
-	// ~ called by this.execute(Process, ProcessTarget)
 	private boolean executeTarget(Process cur, ProcessTarget t) {
 		try {
 			// If the event has a captured process, pass control to it
@@ -208,7 +202,6 @@ public final class EventManager {
 		}
 	}
 
-	// ~ called by Process run()
 	/**
 	 * Main event execution method the eventManager, this is the only entrypoint
 	 * for Process objects taken out of the pool.
@@ -317,33 +310,24 @@ public final class EventManager {
 		}
 	}
 
-	// ~ called by EventViewer constructor nextEventButton.addActionListener()
-	// ~ Event Viewer Next Event button to Execute a single event from the event
 	public void nextOneEvent(double simTime) {
 		oneEvent = true;
 		resume(this.secondsToNearestTick(simTime));
 	}
 
-	// ~ called by EventViewer Constructor nextTimeButton.addActionListener()
-	// ~ Event Viewer NextTime button to Execute all the events from the future
-	// event list that are scheduled for the next event time. the conditional events
-	// are then executed along with any new events that have been scheduled for this time
 	public void nextEventTime(double simTime) {
 		oneSimTime = true;
 		resume(this.secondsToNearestTick(simTime));
 	}
 
-	// ~ called by JaamSimModel getTicks(), getSimTicks(), trace()
 	public final long getTicks() {
 		return currentTick.get();
 	}
 
-	// ~ called by JaamSimModel isRunning(), GUIFrame timeRunning()
 	public final boolean isRunning() {
 		return isRunning.get();
 	}
 
-	// ~ called by this.execute()
 	private void evaluateConditions() {
 		// Protecting the conditional evaluate() callbacks and the traceWaitUntilEnded callback
 		disableSchedule();
@@ -383,7 +367,6 @@ public final class EventManager {
 		enableSchedule();
 	}
 
-	// ~ called by this.execute()
 	/**
 	 * Return the simulation time corresponding the given wall clock time
 	 * @param simTime = the current simulation time used when setting a real-time basis
@@ -402,8 +385,6 @@ public final class EventManager {
 		return realTimeTick + simElapsedTicks;
 	}
 
-
-	// ~ call by this.waitTicks() and this.waitUntil()
 	/**
 	// Pause the current active thread and restart the next thread on the
 	// active thread list. For this case, a future event or conditional event
@@ -419,7 +400,8 @@ public final class EventManager {
 		if (next == null) {
 			processRunning = false;
 			Process.processEvents(this);
-		} else {
+		}
+		else {
 			next.wake();
 		}
 
@@ -427,7 +409,6 @@ public final class EventManager {
 		cur.postCapture();
 	}
 
-	// ~ called by this.waitTickes(), this.sheduleProcessExternal(), this.scheduleTicks()
 	/**
 	 * Calculate the time for an event taking into account numeric overflow.
 	 * Must hold the lockObject when calling this method
@@ -445,7 +426,6 @@ public final class EventManager {
 		return nextEventTime;
 	}
 
-	// ~ called by Entity simWaitTicks(), but no caller
 	/**
 	 * Pause the execution of the current Process and schedule it to wake up at a future
 	 * time in the controlling EventManager,
@@ -460,7 +440,6 @@ public final class EventManager {
 		cur.evt().waitTicks(cur, ticks, priority, fifo, handle);
 	}
 
-	// ~ called by Entity simWait(), caller is VideoRecorderEntity and EntityTracer
 	/**
 	 * Pause the execution of the current Process and schedule it to wake up at a future
 	 * time in the controlling EventManager,
@@ -476,8 +455,6 @@ public final class EventManager {
 		cur.evt().waitTicks(cur, ticks, priority, fifo, handle);
 	}
 
-
-	// ~ called by this.waitTicks(long,int,boolean,EventHandle) and waitSeconds()
 	/**
 	 * Schedules a future event to occur with a given priority.  Lower priority
 	 * events will be executed preferentially over higher priority.  This is
@@ -509,9 +486,6 @@ public final class EventManager {
 		captureProcess(cur);
 	}
 
-	// ~ called by evaluateConditions(),  waitTicks(Process,long,int,boolean,EventHandle)
-	// scheduleProcessExternal(long, int, boolean, ProcessTarget,EventHandle)
-	// scheduleTicks(Process,long,int,boolean,ProcessTarget,EventHandle)
 	/**
 	 * Find an eventNode in the list, if a node is not found, create one and
 	 * insert it.
@@ -521,11 +495,6 @@ public final class EventManager {
 	}
 
 	private Event freeEvents = null;
-
-	/**
-	 * 获取一个空闲事件
-	 * @return
-	 */
 	private Event getEvent() {
 		if (freeEvents != null) {
 			Event evt = freeEvents;
@@ -540,13 +509,11 @@ public final class EventManager {
 		freeEvents = null;
 	}
 
-	// ~ called by Entity waitUntil, no caller
 	public static final void waitUntil(Conditional cond, EventHandle handle) {
 		Process cur = Process.current();
 		cur.evt().waitUntil(cur, cond, handle);
 	}
 
-	// ~ called by this.waitUntil, no caller
 	/**
 	 * Used to achieve conditional waits in the simulation.  Adds the calling
 	 * thread to the conditional stack, then wakes the next waiting thread on
@@ -570,15 +537,11 @@ public final class EventManager {
 		captureProcess(cur);
 	}
 
-	// ~ called by ExpressionLogger.doValueTrace(), EntityProcessor waitForCapacityChange()
-	// ExpressionThreshold doOpenClose(), JaamSimModel doPauseCondition()
-	// Resource waitForCapacityChange()
 	public static final void scheduleUntil(ProcessTarget t, Conditional cond, EventHandle handle) {
 		Process cur = Process.current();
 		cur.evt().schedUntil(cur, t, cond, handle);
 	}
 
-	// called by this.scheduleUntil
 	private void schedUntil(Process cur, ProcessTarget t, Conditional cond, EventHandle handle) {
 		assertCanSchedule();
 		ConditionalEvent evt = new ConditionalEvent(cond, t, handle);
@@ -595,13 +558,11 @@ public final class EventManager {
 		}
 	}
 
-	// called by Entity startProcess()
 	public static final void startProcess(ProcessTarget t) {
 		Process cur = Process.current();
 		cur.evt().start(cur, t);
 	}
 
-	// called by this.startProcess()
 	private void start(Process cur, ProcessTarget t) {
 		Process newProcess = Process.allocate(this, cur, t);
 		// Notify the eventManager that a new process has been started
@@ -616,7 +577,6 @@ public final class EventManager {
 		threadWait(cur);
 	}
 
-	// called by this.execute() and this.rem()
 	/**
 	 * Remove an event from the eventList, must hold the lockObject.
 	 * @param idx
@@ -641,7 +601,6 @@ public final class EventManager {
 		freeEvents = evt;
 	}
 
-	// ~ called by killEvent() and interruptEvent()
 	private ProcessTarget rem(EventHandle handle) {
 		BaseEvent base = handle.event;
 		ProcessTarget t = base.target;
@@ -656,7 +615,6 @@ public final class EventManager {
 		return t;
 	}
 
-	// ~ called by Queue remove()  Device resetPrcocess(), unsheduledUpdate()  DowntimeEntity checkProcessNetwork
 	/**
 	 * Removes the event held in the EventHandle and disposes of it, the ProcessTarget is not run.
 	 * If the handle does not currently hold a scheduled event, this method simply returns.
@@ -667,9 +625,8 @@ public final class EventManager {
 		cur.evt().killEvent(cur, handle);
 	}
 
-	// ~ called by this.killEvent()
 	/**
-	 * Removes an event from the pending list without executing it.
+	 *	Removes an event from the pending list without executing it.
 	 */
 	private void killEvent(Process cur, EventHandle handle) {
 		assertCanSchedule();
@@ -688,11 +645,6 @@ public final class EventManager {
 		t.kill();
 	}
 
-	// ~ called by this.killEvent()
-	/**
-	 *
-	 * @param event
-	 */
 	private void trcKill(BaseEvent event) {
 		if (event instanceof Event) {
 			EventNode node = ((Event)event).node;
@@ -703,7 +655,6 @@ public final class EventManager {
 		}
 	}
 
-	// ~ no caller
 	/**
 	 * Interrupts the event held in the EventHandle and immediately runs the ProcessTarget.
 	 * If the handle does not currently hold a scheduled event, this method simply returns.
@@ -714,7 +665,6 @@ public final class EventManager {
 		cur.evt().interruptEvent(cur, handle);
 	}
 
-	// ~ called by this.interruptEvent()
 	/**
 	 *	Removes an event from the pending list and executes it.
 	 */
@@ -740,7 +690,6 @@ public final class EventManager {
 		threadWait(cur);
 	}
 
-	// called by this.interruptEvent()
 	private void trcInterrupt(BaseEvent event) {
 		if (event instanceof Event) {
 			EventNode node = ((Event)event).node;
@@ -751,7 +700,6 @@ public final class EventManager {
 		}
 	}
 
-	// called by GUIFrame updateForRealTime()
 	public void setExecuteRealTime(boolean useRealTime, double factor) {
 		if (useRealTime == executeRealTime && factor == realTimeFactor)
 			return;
@@ -761,7 +709,6 @@ public final class EventManager {
 			rebaseRealTime = true;
 	}
 
-	// called by this.execute(), this.captureProcess(), start(), interruptEvent()
 	/**
 	 * Locks the calling thread in an inactive state to the global lock.
 	 * When a new thread is created, and the current thread has been pushed
@@ -793,7 +740,6 @@ public final class EventManager {
 			throw new ThreadKilledException("Thread killed");
 	}
 
-	// ~ called by JaamSimModel initRun()
 	public void scheduleProcessExternal(long waitLength, int eventPriority, boolean fifo, ProcessTarget t, EventHandle handle) {
 		synchronized (lockObject) {
 			long schedTick = calculateEventTime(waitLength);
@@ -820,7 +766,6 @@ public final class EventManager {
 		}
 	}
 
-	// ~ called by
 	/**
 	 * Schedule a future event in the controlling EventManager for the current Process.
 	 *

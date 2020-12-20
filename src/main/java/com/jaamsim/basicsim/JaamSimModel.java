@@ -120,7 +120,6 @@ public class JaamSimModel {
 		this("");
 	}
 
-	// 被 GUIFrame 中的 getNextJaamSimModel(), load()调用
 	public JaamSimModel(String name) {
 		eventManager = new EventManager("DefaultEventManager");
 		simulation = null;
