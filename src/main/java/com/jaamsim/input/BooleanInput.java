@@ -21,50 +21,42 @@ import java.util.ArrayList;
 
 public class BooleanInput extends Input<Boolean> {
 
-    private static final ArrayList<String> validOptions;
+	private static final ArrayList<String> validOptions;
 
-    static {
-        validOptions = new ArrayList<>();
-        validOptions.add("TRUE");
-        validOptions.add("FALSE");
-    }
+	static {
+		validOptions = new ArrayList<>();
+		validOptions.add("TRUE");
+		validOptions.add("FALSE");
+	}
 
-    /**
-     * Creates a new Boolean Input with the given keyword, category, units, and
-     * default value.
-     */
-    public BooleanInput(String key, String cat, boolean def) {
-        super(key, cat, Boolean.valueOf(def));
-    }
+	/**
+	 * Creates a new Boolean Input with the given keyword, category, units, and
+	 * default value.
+	 */
+	public BooleanInput(String key, String cat, boolean def) {
+		super(key, cat, Boolean.valueOf(def));
+	}
 
-    /**
-     *
-     * @param kw
-     * @throws InputErrorException
-     */
-    @Override
-    public void parse(KeywordIndex kw) throws InputErrorException {
-        Input.assertCount(kw, 1);
-        value = Boolean.valueOf(Input.parseBoolean(kw.getArg(0)));
-    }
+	@Override
+	public void parse(KeywordIndex kw)
+	throws InputErrorException {
+		Input.assertCount(kw, 1);
+		value = Boolean.valueOf(Input.parseBoolean(kw.getArg(0)));
+	}
 
-    /**
-     * 返回合法的选项
-     * @return
-     */
-    @Override
-    public ArrayList<String> getValidOptions() {
-        return validOptions;
-    }
+	@Override
+	public ArrayList<String> getValidOptions() {
+		return validOptions;
+	}
 
-    @Override
-    public String getDefaultString() {
-        if (defValue == null)
-            return "";
+	@Override
+	public String getDefaultString() {
+		if (defValue == null)
+			return "";
 
-        if (defValue)
-            return "TRUE";
+		if (defValue)
+			return "TRUE";
 
-        return "FALSE";
-    }
+		return "FALSE";
+	}
 }

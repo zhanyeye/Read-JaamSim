@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2013 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2016 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,9 +17,10 @@
  */
 package com.jaamsim.ProbabilityDistributions;
 
+import com.jaamsim.Samples.SampleConstant;
+import com.jaamsim.Samples.SampleInput;
 import com.jaamsim.input.InputErrorException;
 import com.jaamsim.input.Keyword;
-import com.jaamsim.input.ValueInput;
 import com.jaamsim.rng.MRG1999a;
 import com.jaamsim.units.Unit;
 import com.jaamsim.units.UserSpecifiedUnit;
@@ -30,17 +32,18 @@ import com.jaamsim.units.UserSpecifiedUnit;
 public class TriangularDistribution extends Distribution {
 
 	@Keyword(description = "The mode of the triangular distribution, i.e. the value with the highest probability.",
-	         exampleList = {"5.0"})
-	private final ValueInput modeInput;
+	         exampleList = {"5.0", "InputValue1", "'2 * [InputValue1].Value'"})
+	private final SampleInput modeInput;
 
 	private final MRG1999a rng = new MRG1999a();
 
 	{
-		minValueInput.setDefaultValue(0.0d);
-		maxValueInput.setDefaultValue(2.0d);
+		minValueInput.setDefaultValue(new SampleConstant(0.0d));
+		maxValueInput.setDefaultValue(new SampleConstant(2.0d));
 
-		modeInput = new ValueInput("Mode", "Key Inputs", 1.0d);
+		modeInput = new SampleInput("Mode", "Key Inputs", new SampleConstant(1.0d));
 		modeInput.setUnitType(UserSpecifiedUnit.class);
+		modeInput.setEntity(this);
 		this.addInput(modeInput);
 	}
 
@@ -51,11 +54,11 @@ public class TriangularDistribution extends Distribution {
 		super.validate();
 
 		// The mode must be between the minimum and maximum values
-		if( this.getMinValue() > modeInput.getValue() ) {
-			throw new InputErrorException( "The input for Mode must be >= than that for MinValue.");
+		if (this.getMinValue() > modeInput.getValue().getMaxValue()) {
+			throw new InputErrorException("The input for Mode must be >= than that for MinValue.");
 		}
-		if( this.getMaxValue() < modeInput.getValue() ) {
-			throw new InputErrorException( "The input for Mode must be <= than that for MaxValue.");
+		if (this.getMaxValue() < modeInput.getValue().getMinValue()) {
+			throw new InputErrorException("The input for Mode must be <= than that for MaxValue.");
 		}
 	}
 
@@ -72,21 +75,22 @@ public class TriangularDistribution extends Distribution {
 	}
 
 	@Override
-	protected double getNextSample() {
+	protected double getSample(double simTime) {
 
 		double sample;
-		double min = this.getMinValue();
-		double max = this.getMaxValue();
+		double minVal = minValueInput.getValue().getNextSample(simTime);
+		double maxVal = maxValueInput.getValue().getNextSample(simTime);
+		double mode = modeInput.getValue().getNextSample(simTime);
 
 		// Select the random value
 		double rand = rng.nextUniform();
 
 		// Calculate the normalised mode
-		double m = ( modeInput.getValue() - min )/ ( max - min );
+		double m = (mode - minVal)/(maxVal - minVal);
 
 		// Use the inverse transform method to calculate the normalised random sample
 		// (triangular distribution with min = 0, max = 1, and mode = m)
-		if( rand <= m ) {
+		if (rand <= m) {
 			sample = Math.sqrt( m * rand );
 		}
 		else {
@@ -94,19 +98,23 @@ public class TriangularDistribution extends Distribution {
 		}
 
 		// Adjust for the desired min and max values
-		return  min + sample * ( max - min );
+		return  minVal + sample*(maxVal - minVal);
 	}
 
 	@Override
-	protected double getMeanValue() {
-		return ( ( this.getMinValue() + modeInput.getValue() + this.getMaxValue() ) / 3.0 );
+	protected double getMean(double simTime) {
+		double minVal = minValueInput.getValue().getNextSample(simTime);
+		double maxVal = maxValueInput.getValue().getNextSample(simTime);
+		double mode = modeInput.getValue().getNextSample(simTime);
+		return (minVal + mode + maxVal)/3.0;
 	}
 
 	@Override
-	protected double getStandardDeviation() {
-		double a = this.getMinValue();
-		double b = this.getMaxValue();
-		double m = modeInput.getValue();
+	protected double getStandardDev(double simTime) {
+		double a = minValueInput.getValue().getNextSample(simTime);
+		double b = maxValueInput.getValue().getNextSample(simTime);
+		double m = modeInput.getValue().getNextSample(simTime);
 		return  Math.sqrt( ( a*a + b*b + m*m - a*b - a*m - b*m ) / 18.0 );
 	}
+
 }

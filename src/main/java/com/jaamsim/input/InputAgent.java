@@ -18,10 +18,12 @@ package com.jaamsim.input;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.PrintStream;
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -32,6 +34,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 
+import com.jaamsim.StringProviders.StringProvider;
 import com.jaamsim.basicsim.Entity;
 import com.jaamsim.basicsim.ErrorException;
 import com.jaamsim.basicsim.FileEntity;
@@ -43,6 +46,7 @@ import com.jaamsim.math.Vec3d;
 import com.jaamsim.ui.FrameBox;
 import com.jaamsim.ui.GUIFrame;
 import com.jaamsim.ui.LogBox;
+import com.jaamsim.units.Unit;
 
 public class InputAgent {
 	private static final String recordEditsMarker = "RecordEdits";
@@ -55,15 +59,17 @@ public class InputAgent {
 
 	private static File configFile;           // present configuration file
 	private static boolean batchRun;
+	private static boolean scriptMode;        // TRUE if script mode (command line) is specified
 	private static boolean sessionEdited;     // TRUE if any inputs have been changed after loading a configuration file
 	private static boolean recordEditsFound;  // TRUE if the "RecordEdits" marker is found in the configuration file
 	private static boolean recordEdits;       // TRUE if input changes are to be marked as edited.
 
 	private static final String INP_ERR_DEFINEUSED = "The name: %s has already been used and is a %s";
-	private static final String[] EARLY_KEYWORDS = {"AttributeDefinitionList", "UnitType", "UnitTypeList", "TickLength"};
+	private static final String[] EARLY_KEYWORDS = {"AttributeDefinitionList", "UnitType", "UnitTypeList", "TickLength", "CustomOutputList"};
 
 	private static File reportDir;
 	private static FileEntity reportFile;     // file to which the output report will be written
+	private static PrintStream outStream;  // location where the selected outputs will be written
 
 	static {
 		recordEditsFound = false;
@@ -72,9 +78,13 @@ public class InputAgent {
 		configFile = null;
 		reportDir = null;
 		reportFile = null;
+		outStream = null;
 		lastTickForTrace = -1l;
 	}
 
+	/**
+	 * Clears the InputAgent prior to loading a new model.
+	 */
 	public static void clear() {
 		logFile = null;
 		numErrors = 0;
@@ -85,6 +95,22 @@ public class InputAgent {
 		reportDir = null;
 		lastTickForTrace = -1l;
 		setReportDirectory(null);
+		stop();
+	}
+
+	/**
+	 * Resets the InputAgent when a run is stopped and reset to zero simulation time.
+	 */
+	public static void stop() {
+
+		if (reportFile != null) {
+			reportFile.close();
+			reportFile = null;
+		}
+		if (outStream != null) {
+			outStream.close();
+			outStream = null;
+		}
 	}
 
 	private static String getReportDirectory() {
@@ -147,7 +173,7 @@ public class InputAgent {
 			return "";
 
 		String name = InputAgent.getConfigFile().getName();
-		int index = name.lastIndexOf( "." );
+		int index = name.lastIndexOf('.');
 		if( index == -1 )
 			return name;
 
@@ -220,6 +246,14 @@ public class InputAgent {
 
 	public static boolean getBatch() {
 		return batchRun;
+	}
+
+	public static void setScriptMode(boolean bool) {
+		scriptMode = bool;
+	}
+
+	public static boolean isScriptMode() {
+		return scriptMode;
 	}
 
 	private static int getBraceDepth(ArrayList<String> tokens, int startingBraceDepth, int startingIndex) {
@@ -307,6 +341,12 @@ public class InputAgent {
 			return false;
 		}
 
+		InputAgent.readBufferedStream(buf, resolved, root);
+		return true;
+	}
+
+	public static final void readBufferedStream(BufferedReader buf, URI resolved, String root) {
+
 		try {
 			ArrayList<String> record = new ArrayList<>();
 			int braceDepth = 0;
@@ -368,8 +408,6 @@ public class InputAgent {
 			// Make best effort to ensure it closes
 			try { buf.close(); } catch (IOException e2) {}
 		}
-
-		return true;
 	}
 
 	private static void processIncludeRecord(ParseContext pc, ArrayList<String> record) throws URISyntaxException {
@@ -519,6 +557,10 @@ public class InputAgent {
 	 */
 	public static void renameEntity(Entity ent, String newName) {
 
+		// If the name has not changed, do nothing
+		if (ent.getName().equals(newName))
+			return;
+
 		// Check that the entity was defined AFTER the RecordEdits command
 		if (!ent.testFlag(Entity.FLAG_ADDED))
 			throw new ErrorException("Cannot rename an entity that was defined before the RecordEdits command.");
@@ -597,11 +639,12 @@ public class InputAgent {
 
 		String inputTraceFileName = InputAgent.getRunName() + ".log";
 		// Initializing the tracing for the model
+		URI logURI = null;
 		try {
-			System.out.println( "Creating trace file" );
+			LogBox.logLine( "Creating trace file" );
 
 			URI confURI = file.toURI();
-			URI logURI = confURI.resolve(new URI(null, inputTraceFileName, null)); // The new URI here effectively escapes the file name
+			logURI = confURI.resolve(new URI(null, inputTraceFileName, null)); // The new URI here effectively escapes the file name
 
 			// Set and open the input trace file name
 			logFile = new FileEntity( logURI.getPath());
@@ -621,7 +664,8 @@ public class InputAgent {
 			if (InputAgent.numWarnings == 0 && InputAgent.numErrors == 0) {
 				logFile.close();
 				logFile.delete();
-				logFile = new FileEntity( inputTraceFileName);
+				if (logURI != null)
+					logFile = new FileEntity( logURI.getPath() );
 			}
 		}
 
@@ -779,7 +823,10 @@ public class InputAgent {
 
 			// Get the list of instances for this entity class
 			// sort the list alphabetically
-			ArrayList<? extends Entity> cloneList = Entity.getInstancesOf(each);
+			ArrayList<Entity> cloneList = new ArrayList<>();
+			for (Entity ent : Entity.getInstanceIterator(each)) {
+				cloneList.add(ent);
+			}
 
 			// Print the entity class name to the report (in the form of a comment)
 			if (cloneList.size() > 0) {
@@ -819,14 +866,14 @@ public class InputAgent {
 								inputReportFile.write("\t");
 								inputReportFile.write(in.getKeyword());
 								inputReportFile.write("\t");
-								if (in.getValueString().lastIndexOf("{") > 10) {
+								if (in.getValueString().lastIndexOf('{') > 10) {
 									String[] item1Array;
 									item1Array = in.getValueString().trim().split(" }");
 
 									inputReportFile.write("{ " + item1Array[0] + " }");
 									for (int l = 1; l < (item1Array.length); l++) {
 										inputReportFile.newLine();
-										inputReportFile.write("\t\t\t\t\t");;
+										inputReportFile.write("\t\t\t\t\t");
 										inputReportFile.write(item1Array[l] + " } ");
 									}
 									inputReportFile.write("	}");
@@ -884,7 +931,7 @@ public class InputAgent {
 		boolean beginLine = true;
 		for (int i = 0; i < tokens.size(); i++) {
 			if (!beginLine)
-				logFile.write("  ");
+				logFile.write(Input.SEPARATOR);
 			String tok = tokens.get(i);
 			logFile.write(tok);
 			beginLine = false;
@@ -905,9 +952,15 @@ public class InputAgent {
 		InputAgent.logError("%s", msg);
 	}
 
+	/**
+	 * Writes an error or warning message to standard error, the Log Viewer, and the Log File.
+	 * @param fmt - format for the message
+	 * @param args - objects to be printed in the message
+	 */
 	public static void logMessage(String fmt, Object... args) {
 		String msg = String.format(fmt, args);
 		LogBox.logLine(msg);
+		System.err.println(msg);
 
 		if (logFile == null)
 			return;
@@ -915,6 +968,16 @@ public class InputAgent {
 		logFile.write(msg);
 		logFile.newLine();
 		logFile.flush();
+	}
+
+	/**
+	 * Writes a stack trace to standard error, the Log Viewer, and the Log File.
+	 * @param e - exception to be traced
+	 */
+	public static void logStackTrace(Throwable t) {
+		for (StackTraceElement each : t.getStackTrace()) {
+			InputAgent.logMessage(each.toString());
+		}
 	}
 
 	public static void trace(int indent, Entity ent, String meth, String... text) {
@@ -940,18 +1003,33 @@ public class InputAgent {
 		System.out.flush();
 	}
 
+	/**
+	 * Writes a warning message to standard error, the Log Viewer, and the Log File.
+	 * @param fmt - format string for the warning message
+	 * @param args - objects used by the format string
+	 */
 	public static void logWarning(String fmt, Object... args) {
 		numWarnings++;
 		String msg = String.format(fmt, args);
 		InputAgent.logMessage(wrnPrefix, msg);
 	}
 
+	/**
+	 * Writes an error message to standard error, the Log Viewer, and the Log File.
+	 * @param fmt - format string for the error message
+	 * @param args - objects used by the format string
+	 */
 	public static void logError(String fmt, Object... args) {
 		numErrors++;
 		String msg = String.format(fmt, args);
 		InputAgent.logMessage(errPrefix, msg);
 	}
 
+	/**
+	 * Writes a input error message to standard error, the Log Viewer, and the Log File.
+	 * @param fmt - format string for the error message
+	 * @param args - objects used by the format string
+	 */
 	public static void logInpError(String fmt, Object... args) {
 		numErrors++;
 		String msg = String.format(fmt, args);
@@ -1003,7 +1081,7 @@ public class InputAgent {
 
 		// Determine all the new classes that were created
 		ArrayList<Class<? extends Entity>> newClasses = new ArrayList<>();
-		for (Entity ent : Entity.getAll()) {
+		for (Entity ent : Entity.getClonesOfIterator(Entity.class)) {
 			if (!ent.testFlag(Entity.FLAG_ADDED) || ent.testFlag(Entity.FLAG_GENERATED))
 				continue;
 
@@ -1023,7 +1101,7 @@ public class InputAgent {
 			file.format("Define %s {", o.getName());
 
 			// Print the new instances that were defined
-			for (Entity ent : Entity.getAll()) {
+			for (Entity ent : Entity.getClonesOfIterator(Entity.class)) {
 				if (!ent.testFlag(Entity.FLAG_ADDED) || ent.testFlag(Entity.FLAG_GENERATED))
 					continue;
 
@@ -1036,7 +1114,7 @@ public class InputAgent {
 		}
 
 		// 3) WRITE THE INPUTS FOR SPECIAL KEYWORDS THAT MUST COME BEFORE THE OTHERS
-		for (Entity ent : Entity.getAll()) {
+		for (Entity ent : Entity.getClonesOfIterator(Entity.class)) {
 			if (!ent.testFlag(Entity.FLAG_EDITED))
 				continue;
 			if (ent.testFlag(Entity.FLAG_GENERATED))
@@ -1058,7 +1136,7 @@ public class InputAgent {
 		// 4) WRITE THE INPUTS FOR KEYWORDS THAT WERE EDITED
 
 		// Identify the entities whose inputs were edited
-		for (Entity ent : Entity.getAll()) {
+		for (Entity ent : Entity.getClonesOfIterator(Entity.class)) {
 			if (!ent.testFlag(Entity.FLAG_EDITED))
 				continue;
 			if (ent.testFlag(Entity.FLAG_GENERATED))
@@ -1109,6 +1187,87 @@ public class InputAgent {
 	}
 
 	/**
+	 * Prints selected outputs for the simulation run to stdout or a file.
+	 * @param simTime - simulation time at which the outputs are printed.
+	 */
+	public static void printRunOutputs(double simTime) {
+
+		// Set up the custom outputs
+		if (outStream == null) {
+
+			// Select either standard out or a file for the outputs
+			outStream = System.out;
+			if (!InputAgent.isScriptMode()) {
+				StringBuilder sb = new StringBuilder();
+				sb.append(InputAgent.getReportFileName(InputAgent.getRunName()));
+				sb.append(".dat");
+				try {
+					outStream = new PrintStream(sb.toString());
+				}
+				catch (FileNotFoundException e) {
+					throw new InputErrorException(
+							"FileNotFoundException thrown trying to open PrintStream: " + e );
+				}
+				catch (SecurityException e) {
+					throw new InputErrorException(
+							"SecurityException thrown trying to open PrintStream: " + e );
+				}
+			}
+
+			// Write the header line for the expressions
+			StringBuilder sb = new StringBuilder();
+			ArrayList<String> toks = new ArrayList<>();
+			Simulation.getRunOutputList().getValueTokens(toks);
+			boolean first = true;
+			for (String str : toks) {
+				if (str.equals("{") || str.equals("}"))
+					continue;
+				if (first)
+					first = false;
+				else
+					sb.append("\t");
+				sb.append(str);
+			}
+			outStream.println(sb.toString());
+
+			// Write the header line for the units
+			sb = new StringBuilder();
+			for (int i=0; i<Simulation.getRunOutputList().getListSize(); i++) {
+				Class<? extends Unit> ut = Simulation.getRunOutputList().getUnitType(i);
+				String unit = Unit.getDisplayedUnit(ut);
+				if (i > 0)
+					sb.append("\t");
+				sb.append(unit);
+			}
+			outStream.println(sb.toString());
+		}
+
+		// Write the selected outputs
+		StringBuilder sb = new StringBuilder();
+		for (int i=0; i<Simulation.getRunOutputList().getListSize(); i++) {
+			StringProvider samp = Simulation.getRunOutputList().getValue().get(i);
+			Class<? extends Unit> ut = Simulation.getRunOutputList().getUnitType(i);
+			double factor = Unit.getDisplayedUnitFactor(ut);
+			String str;
+			try {
+				str = samp.getNextString(simTime, "%s", factor);
+			} catch (Exception e) {
+				str = e.getMessage();
+			}
+			if (i > 0)
+				sb.append("\t");
+			sb.append(str);
+		}
+		outStream.println(sb.toString());
+
+		// Terminate the outputs
+		if (Simulation.isLastRun()) {
+			outStream.close();
+			outStream = null;
+		}
+	}
+
+	/**
 	 * Prints the output report for the simulation run.
 	 * @param simTime - simulation time at which the report is printed.
 	 */
@@ -1128,7 +1287,7 @@ public class InputAgent {
 
 		// Identify the classes that were used in the model
 		ArrayList<Class<? extends Entity>> newClasses = new ArrayList<>();
-		for (Entity ent : Entity.getAll()) {
+		for (Entity ent : Entity.getClonesOfIterator(Entity.class)) {
 
 			if (ent.testFlag(Entity.FLAG_GENERATED))
 				continue;
@@ -1146,7 +1305,7 @@ public class InputAgent {
 		// Loop through the classes and identify the instances
 		for (Class<? extends Entity> newClass : newClasses) {
 			ArrayList<Entity> entList = new ArrayList<>();
-			for (Entity ent : Entity.getAll()) {
+			for (Entity ent : Entity.getClonesOfIterator(Entity.class)) {
 
 				if (ent.testFlag(Entity.FLAG_GENERATED))
 					continue;
@@ -1375,11 +1534,10 @@ public class InputAgent {
 
 		// Check that the file path includes the jail folder
 		if (jailPrefix != null && ret.toString().indexOf(jailPrefix) != 0) {
-			LogBox.format("Failed jail test: %s\n"
+			InputAgent.logMessage("Failed jail test: %s\n"
 					+ "jail: %s\n"
 					+ "context: %s\n",
 					ret.toString(), jailPrefix, context.toString());
-			LogBox.getInstance().setVisible(true);
 			return null; // This resolved URI is not in our jail
 		}
 

@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2014 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2016 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +21,7 @@ import java.util.ArrayList;
 
 import com.jaamsim.Graphics.DisplayEntity;
 import com.jaamsim.Samples.SampleConstant;
-import com.jaamsim.Samples.SampleExpInput;
+import com.jaamsim.Samples.SampleInput;
 import com.jaamsim.input.EntityListInput;
 import com.jaamsim.input.Keyword;
 import com.jaamsim.units.TimeUnit;
@@ -29,7 +30,7 @@ public class Combine extends LinkedService {
 
 	@Keyword(description = "The service time required to perform the assembly process.",
 	         exampleList = { "3.0 h", "NormalDistribution1", "'1[s] + 0.5*[TimeSeries1].PresentValue'" })
-	private final SampleExpInput serviceTime;
+	private final SampleInput serviceTime;
 
 	@Keyword(description = "A list of Queue objects in which to place the arriving sub-component entities.",
 	         exampleList = {"Queue1 Queue2 Queue3"})
@@ -41,7 +42,7 @@ public class Combine extends LinkedService {
 		waitQueue.setHidden(true);
 		match.setHidden(true);
 
-		serviceTime = new SampleExpInput("ServiceTime", "Key Inputs", new SampleConstant(TimeUnit.class, 0.0));
+		serviceTime = new SampleInput("ServiceTime", "Key Inputs", new SampleConstant(TimeUnit.class, 0.0));
 		serviceTime.setUnitType(TimeUnit.class);
 		serviceTime.setEntity(this);
 		serviceTime.setValidRange(0, Double.POSITIVE_INFINITY);
@@ -71,22 +72,13 @@ public class Combine extends LinkedService {
 	}
 
 	@Override
-	public void startAction() {
-
-		// Do any of the thresholds stop the generator?
-		if (!this.isOpen()) {
-			this.setBusy(false);
-			this.setPresentState();
-			return;
-		}
+	protected boolean startProcessing(double simTime) {
 
 		// Do the queues have enough entities?
 		ArrayList<Queue> queueList = waitQueueList.getValue();
 		Integer m = Queue.selectMatchValue(queueList, null);
 		if (m == null) {
-			this.setBusy(false);
-			this.setPresentState();
-			return;
+			return false;
 		}
 		this.setMatchValue(m);
 
@@ -108,21 +100,20 @@ public class Combine extends LinkedService {
 		// Position the processed entity relative to the Assemble object
 		this.moveToProcessPosition(processedEntity);
 
-		// Schedule the completion of processing
-		double dt = serviceTime.getValue().getNextSample(getSimTime());
-		this.scheduleProcess(dt, 5, endActionTarget);
-
+		return true;
 	}
 
 	@Override
-	public void endAction() {
+	protected void endProcessing(double simTime) {
 
 		// Send the first entity to the next element in the chain
 		this.sendToNextComponent(processedEntity);
 		processedEntity = null;
+	}
 
-		// Try to combine another set of entities
-		this.startAction();
+	@Override
+	protected double getProcessingTime(double simTime) {
+		return serviceTime.getValue().getNextSample(simTime);
 	}
 
 }

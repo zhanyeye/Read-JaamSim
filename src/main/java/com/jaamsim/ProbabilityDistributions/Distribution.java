@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2013 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2016 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +18,8 @@
 package com.jaamsim.ProbabilityDistributions;
 
 import com.jaamsim.Graphics.DisplayEntity;
+import com.jaamsim.Samples.SampleConstant;
+import com.jaamsim.Samples.SampleInput;
 import com.jaamsim.Samples.SampleProvider;
 import com.jaamsim.basicsim.Entity;
 import com.jaamsim.basicsim.Simulation;
@@ -28,7 +31,6 @@ import com.jaamsim.input.IntegerInput;
 import com.jaamsim.input.Keyword;
 import com.jaamsim.input.Output;
 import com.jaamsim.input.UnitTypeInput;
-import com.jaamsim.input.ValueInput;
 import com.jaamsim.ui.EditBox;
 import com.jaamsim.ui.FrameBox;
 import com.jaamsim.units.DimensionlessUnit;
@@ -55,12 +57,12 @@ implements SampleProvider {
 	private final IntegerInput randomSeedInput;
 
 	@Keyword(description = "Minimum value that can be returned.  Smaller values are rejected and resampled.",
-	         exampleList = {"0.0"})
-	protected final ValueInput minValueInput;
+	         exampleList = {"0.0", "InputValue1", "'2 * [InputValue1].Value'"})
+	protected final SampleInput minValueInput;
 
 	@Keyword(description = "Maximum value that can be returned.  Larger values are rejected and resampled.",
-	         exampleList = {"200.0"})
-	protected final ValueInput maxValueInput;
+	         exampleList = {"200.0", "InputValue1", "'2 * [InputValue1].Value'"})
+	protected final SampleInput maxValueInput;
 
 	private int sampleCount;
 	private double sampleSum;
@@ -81,12 +83,16 @@ implements SampleProvider {
 		randomSeedInput.setDefaultText(EditBox.NONE);
 		this.addInput(randomSeedInput);
 
-		minValueInput = new ValueInput("MinValue", "Key Inputs", Double.NEGATIVE_INFINITY);
+		SampleConstant negInf = new SampleConstant(Double.NEGATIVE_INFINITY);
+		minValueInput = new SampleInput("MinValue", "Key Inputs", negInf);
 		minValueInput.setUnitType(UserSpecifiedUnit.class);
+		minValueInput.setEntity(this);
 		this.addInput(minValueInput);
 
-		maxValueInput = new ValueInput("MaxValue", "Key Inputs", Double.POSITIVE_INFINITY);
+		SampleConstant posInf = new SampleConstant(Double.POSITIVE_INFINITY);
+		maxValueInput = new SampleInput("MaxValue", "Key Inputs", posInf);
 		maxValueInput.setUnitType(UserSpecifiedUnit.class);
+		maxValueInput.setEntity(this);
 		this.addInput(maxValueInput);
 	}
 
@@ -96,9 +102,9 @@ implements SampleProvider {
 	public void validate() {
 		super.validate();
 
-		// The maximum value must be greater than the minimum value
-		if( maxValueInput.getValue() <= minValueInput.getValue() ) {
-			throw new InputErrorException( "The input for MaxValue must be greater than that for MinValue.");
+		// The maximum value must be greater than or equal to the minimum value
+		if( this.getMaxValue() < this.getMinValue() ) {
+			throw new InputErrorException( "The input for MaxValue must be greater than or equal to the input for MinValue.");
 		}
 	}
 
@@ -136,6 +142,9 @@ implements SampleProvider {
 		for (Distribution dist : Entity.getClonesOfIterator(Distribution.class)) {
 			seed = Math.max(seed, dist.getStreamNumber());
 		}
+		for (BooleanSelector bs : Entity.getClonesOfIterator(BooleanSelector.class)) {
+			seed = Math.max(seed, bs.getStreamNumber());
+		}
 
 		// Set the random number seed next unused value
 		InputAgent.applyArgs(this, "RandomSeed", String.format("%s", seed+1));
@@ -149,7 +158,7 @@ implements SampleProvider {
 	/**
 	 * Select the next sample from the probability distribution.
 	 */
-	protected abstract double getNextSample();
+	protected abstract double getSample(double simTime);
 
 	@Override
 	public Class<? extends Unit> getUnitType() {
@@ -188,11 +197,13 @@ implements SampleProvider {
 
 		// Loop until the select sample falls within the desired min and max values
 		double nextSample;
+		double minVal = this.minValueInput.getValue().getNextSample(simTime);
+		double maxVal = this.maxValueInput.getValue().getNextSample(simTime);
 		do {
-			nextSample = this.getNextSample();
+			nextSample = this.getSample(simTime);
 		}
-		while (nextSample < this.minValueInput.getValue() ||
-		       nextSample > this.maxValueInput.getValue());
+		while (nextSample < minVal ||
+		       nextSample > maxVal);
 
 		lastSample = nextSample;
 
@@ -207,23 +218,23 @@ implements SampleProvider {
 
 	@Override
 	public double getMinValue() {
-		return minValueInput.getValue();
+		return minValueInput.getValue().getMinValue();
 	}
 
 	@Override
 	public double getMaxValue() {
-		return maxValueInput.getValue();
+		return maxValueInput.getValue().getMaxValue();
 	}
 
 	/**
 	 * Returns the mean value for the distribution calculated from the inputs.  It is NOT the mean of the sampled values.
 	 */
-	protected abstract double getMeanValue();
+	protected abstract double getMean(double simTime);
 
 	/**
 	 * Returns the standard deviation for the distribution calculated from the inputs.  It is NOT the standard deviation of the sampled values.
 	 */
-	protected abstract double getStandardDeviation();
+	protected abstract double getStandardDev(double simTime);
 
 	@Output(name = "CalculatedMean",
 	 description = "The mean of the probability distribution calculated directly from the inputs. "
@@ -233,7 +244,7 @@ implements SampleProvider {
 	    sequence = 1)
 	@Override
 	public double getMeanValue(double simTime) {
-		return this.getMeanValue();
+		return this.getMean(simTime);
 	}
 
 	@Output(name = "CalculatedStandardDeviation",
@@ -243,7 +254,7 @@ implements SampleProvider {
 	    unitType = UserSpecifiedUnit.class,
 	    sequence = 2)
 	public double getStandardDeviation(double simTime) {
-		return this.getStandardDeviation();
+		return this.getStandardDev(simTime);
 	}
 
 	@Output(name = "NumberOfSamples",

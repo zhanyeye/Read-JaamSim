@@ -38,7 +38,12 @@ public class StringProvListInput extends ListInput<ArrayList<StringProvider>> {
 	}
 
 	public void setUnitTypeList(ArrayList<Class<? extends Unit>> utList) {
+
+		if (utList.equals(unitTypeList))
+			return;
+
 		unitTypeList = new ArrayList<>(utList);
+		this.setValid(false);
 	}
 
 	public void setUnitType(Class<? extends Unit> u) {
@@ -88,10 +93,11 @@ public class StringProvListInput extends ListInput<ArrayList<StringProvider>> {
 				if (subArgs.size() == 1)
 					throw new InputErrorException(e.getMessage());
 				else
-					throw new InputErrorException(INP_ERR_ELEMENT, i, e.getMessage());
+					throw new InputErrorException(INP_ERR_ELEMENT, i+1, e.getMessage());
 			}
 		}
 		value = temp;
+		this.setValid(true);
 	}
 
 	@Override
@@ -102,8 +108,19 @@ public class StringProvListInput extends ListInput<ArrayList<StringProvider>> {
 			if (unitTypeList.contains(samp.getUnitType()))
 				list.add(each.getName());
 		}
-		Collections.sort(list);
+		Collections.sort(list, Input.uiSortOrder);
 		return list;
+	}
+
+	@Override
+	public void getValueTokens(ArrayList<String> toks) {
+		if (value == null) return;
+
+		for (int i = 0; i < value.size(); i++) {
+			toks.add("{");
+			toks.add(value.get(i).toString());
+			toks.add("}");
+		}
 	}
 
 }

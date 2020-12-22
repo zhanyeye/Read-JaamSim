@@ -31,6 +31,7 @@ import com.jaamsim.input.InputAgent;
 import com.jaamsim.input.Keyword;
 import com.jaamsim.input.Output;
 import com.jaamsim.input.StringKeyInput;
+import com.jaamsim.input.StringListInput;
 import com.jaamsim.units.DimensionlessUnit;
 import com.jaamsim.units.TimeUnit;
 
@@ -44,6 +45,10 @@ public class StateEntity extends DisplayEntity {
 	@Keyword(description = "If TRUE, a log file (.trc) will be printed with the time of every state change during the run.",
 	         example = "Object1  TraceState { TRUE }")
 	private final BooleanInput traceState;
+
+	@Keyword(description = "A list of states for which the entity is considered working.",
+		     exampleList = "'Transit - Seg1L' 'Transit - Seg1B'")
+	protected final StringListInput workingStateListInput;
 
 	private StateRecord presentState; // The present state of the entity
 	private final HashMap<String, StateRecord> states;
@@ -62,6 +67,9 @@ public class StateEntity extends DisplayEntity {
 		traceState = new BooleanInput("TraceState", "Key Inputs", false);
 		traceState.setHidden(true);
 		this.addInput(traceState);
+
+		workingStateListInput = new StringListInput("WorkingStateList", "Maintenance", new ArrayList<String>(0));
+		this.addInput(workingStateListInput);
 	}
 
 	public StateEntity() {
@@ -90,14 +98,10 @@ public class StateEntity extends DisplayEntity {
 		super.lateInit();
 
 		stateListeners.clear();
-		/**
-		 * 过滤实现了StateEntityListener接口的Entity类
-		 */
 		for (Entity ent : Entity.getClonesOfIterator(Entity.class, StateEntityListener.class)) {
 			StateEntityListener sel = (StateEntityListener)ent;
-			if (sel.isWatching(this)) {
+			if (sel.isWatching(this))
 				stateListeners.add(sel);
-			}
 		}
 	}
 
@@ -145,6 +149,10 @@ public class StateEntity extends DisplayEntity {
 	 * @return
 	 */
 	public boolean isValidWorkingState(String state) {
+
+		if( workingStateListInput.getValue().size() > 0 )
+			return workingStateListInput.getValue().contains( state );
+
 		return "Working".equals(state);
 	}
 
@@ -372,6 +380,12 @@ public class StateEntity extends DisplayEntity {
 
 		return state.completedCycleTicks;
 	}
+	public long getInitTicks(StateRecord state) {
+		if (state == null)
+			return 0;
+
+		return state.initTicks;
+	}
 
 	private long getWorkingTicks(long simTicks) {
 		long ticks = workingTicks;
@@ -390,6 +404,22 @@ public class StateEntity extends DisplayEntity {
 	}
 
 	public void setPresentState() {}
+
+	/**
+	 * Returns the elapsed time in seconds after the completion of the initialisation period
+	 * that the entity has been in the specified state.
+	 * @param simTime - present simulation time
+	 * @param state - string representing the state
+	 * @return
+	 */
+	public double getTimeInState(double simTime, String state) {
+		long simTicks = EventManager.secsToNearestTick(simTime);
+		StateRecord rec = states.get(state.intern());
+		if (rec == null)
+			return 0.0;
+		long ticks = getTicksInState(simTicks, rec);
+		return EventManager.ticksToSecs(ticks);
+	}
 
 	@Output(name = "State",
 	 description = "The present state for the object.",

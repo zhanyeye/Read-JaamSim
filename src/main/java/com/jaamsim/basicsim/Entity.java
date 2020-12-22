@@ -19,6 +19,7 @@ package com.jaamsim.basicsim;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.Map.Entry;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.jaamsim.datatypes.DoubleVector;
@@ -29,11 +30,14 @@ import com.jaamsim.events.ProcessTarget;
 import com.jaamsim.input.AttributeDefinitionListInput;
 import com.jaamsim.input.AttributeHandle;
 import com.jaamsim.input.BooleanInput;
+import com.jaamsim.input.ExpressionHandle;
 import com.jaamsim.input.Input;
 import com.jaamsim.input.InputAgent;
 import com.jaamsim.input.InputErrorException;
 import com.jaamsim.input.Keyword;
 import com.jaamsim.input.KeywordIndex;
+import com.jaamsim.input.NamedExpression;
+import com.jaamsim.input.NamedExpressionListInput;
 import com.jaamsim.input.Output;
 import com.jaamsim.input.OutputHandle;
 import com.jaamsim.input.StringInput;
@@ -50,15 +54,11 @@ import com.jaamsim.units.UserSpecifiedUnit;
  * event execution.
  */
 public class Entity {
-
 	private static AtomicLong entityCount = new AtomicLong(0);
-
 	private static final ArrayList<Entity> allInstances;
-
 	private static final HashMap<String, Entity> namedEntities;
 
 	private String entityName;
-
 	private final long entityNumber;
 
 	//public static final int FLAG_TRACE = 0x01; // reserved in case we want to treat tracing like the other flags
@@ -70,14 +70,13 @@ public class Entity {
 	public static final int FLAG_EDITED = 0x40;
 	public static final int FLAG_GENERATED = 0x80;
 	public static final int FLAG_DEAD = 0x0100;
-
 	private int flags;
-
 	protected boolean traceFlag = false;
 
 	private final ArrayList<Input<?>> inpList = new ArrayList<>();
 
-	private final HashMap<String, AttributeHandle> attributeMap = new HashMap<>();
+	private final HashMap<String, AttributeHandle> attributeMap = new LinkedHashMap<>();
+	private final HashMap<String, ExpressionHandle> customOutputMap = new LinkedHashMap<>();
 
 	private final BooleanInput trace;
 
@@ -90,6 +89,12 @@ public class Entity {
 			"this value will determine the attribute's unit type.",
 	         exampleList = {"{ A 20.0 s } { alpha 42 }"})
 	public final AttributeDefinitionListInput attributeDefinitionList;
+
+
+	@Keyword(description = "The list of user defined custom outputs for this entity.\n" +
+			" The output name is followed by an expression to be evaluated as the output and the unit type of the expression.",
+	         exampleList = {"{ TwiceSimTime '2*this.SimTime' TimeUnit } { CargoVolume 'this.Cargo/this.CargoDensity' VolumeUnit }"})
+	public final NamedExpressionListInput namedExpressionInput;
 
 	static {
 		allInstances = new ArrayList<>(100);
@@ -109,6 +114,12 @@ public class Entity {
 				"Key Inputs", new ArrayList<AttributeHandle>());
 		attributeDefinitionList.setHidden(false);
 		this.addInput(attributeDefinitionList);
+
+		namedExpressionInput = new NamedExpressionListInput(this, "CustomOutputList",
+				"Key Inputs", new ArrayList<NamedExpression>());
+		namedExpressionInput.setHidden(false);
+		this.addInput(namedExpressionInput);
+
 	}
 
 	/**
@@ -133,18 +144,6 @@ public class Entity {
 		}
 	}
 
-	public static <T extends Entity> ArrayList<T> getInstancesOf(Class<T> proto) {
-		ArrayList<T> instanceList = new ArrayList<>();
-
-		for (Entity each : allInstances) {
-			if (proto == each.getClass()) {
-				instanceList.add(proto.cast(each));
-			}
-		}
-
-		return instanceList;
-	}
-
 	public static <T extends Entity> InstanceIterable<T> getInstanceIterator(Class<T> proto){
 		return new InstanceIterable<>(proto);
 	}
@@ -160,18 +159,6 @@ public class Entity {
 	 */
 	public static <T extends Entity> ClonesOfIterableInterface<T> getClonesOfIterator(Class<T> proto, Class<?> iface){
 		return new ClonesOfIterableInterface<>(proto, iface);
-	}
-
-	public static <T extends Entity> ArrayList<T> getClonesOf(Class<T> proto) {
-		ArrayList<T> cloneList = new ArrayList<>();
-
-		for (Entity each : allInstances) {
-			if (proto.isAssignableFrom(each.getClass())) {
-				cloneList.add(proto.cast(each));
-			}
-		}
-
-		return cloneList;
 	}
 
 	public static Entity idToEntity(long id) {
@@ -440,6 +427,19 @@ public class Entity {
 			FrameBox.reSelectEntity();
 			return;
 		}
+		if (in == namedExpressionInput) {
+			customOutputMap.clear();
+			for (NamedExpression ne : namedExpressionInput.getValue()) {
+				ExpressionHandle eh = new ExpressionHandle(this, ne.getExpression(), ne.getName());
+				eh.setUnitType(ne.getUnitType());
+				customOutputMap.put(ne.getName(), eh);
+			}
+
+			// Update the OutputBox
+			FrameBox.reSelectEntity();
+			return;
+		}
+
 	}
 
 	public final void startProcess(String methodName, Object... args) {
@@ -573,40 +573,18 @@ public class Entity {
 		this.trace( 1, text );
 	}
 
+	/**
+	 * Throws an ErrorException for this entity with the specified message.
+	 * @param fmt - format string for the error message
+	 * @param args - objects used by the format string
+	 * @throws ErrorException
+	 */
 	public void error(String fmt, Object... args)
 	throws ErrorException {
 		final StringBuilder sb = new StringBuilder(this.getName());
 		sb.append(": ");
 		sb.append(String.format(fmt, args));
 		throw new ErrorException(sb.toString());
-	}
-
-	/**
-	 * Print an error message.
-	 */
-	public void error( String meth, String text1, String text2 ) {
-		double time = 0.0d;
-		if (EventManager.hasCurrent())
-			time = EventManager.simSeconds();
-		InputAgent.logError("Time:%.5f Entity:%s%n%s%n%s%n%s%n",
-		                    time, getName(),
-							meth, text1, text2);
-
-		// We don't want the model to keep executing, throw an exception and let
-		// the higher layers figure out if we should terminate the run or not.
-		throw new ErrorException("ERROR: %s", getName());
-	}
-
-	/**
-	 * Print a warning message.
-	 */
-	public void warning( String meth, String text1, String text2 ) {
-		double time = 0.0d;
-		if (EventManager.hasCurrent())
-			time = EventManager.simSeconds();
-		InputAgent.logWarning("Time:%.5f Entity:%s%n%s%n%s%n%s%n",
-				time, getName(),
-				meth, text1, text2);
 	}
 
 	/**
@@ -622,6 +600,9 @@ public class Entity {
 	public final OutputHandle getOutputHandle(String outputName) {
 		if (hasAttribute(outputName))
 			return attributeMap.get(outputName);
+
+		if (customOutputMap.containsKey(outputName))
+			return customOutputMap.get(outputName);
 
 		if (hasOutput(outputName)) {
 			OutputHandle ret = new OutputHandle(this, outputName);
@@ -643,6 +624,9 @@ public class Entity {
 		if (hasAttribute(outputName))
 			return attributeMap.get(outputName);
 
+		if (customOutputMap.containsKey(outputName))
+			return customOutputMap.get(outputName);
+
 		if (OutputHandle.hasOutputInterned(this.getClass(), outputName)) {
 			OutputHandle ret = new OutputHandle(this, outputName);
 			if (ret.getUnitType() == UserSpecifiedUnit.class)
@@ -658,6 +642,8 @@ public class Entity {
 		if (OutputHandle.hasOutput(this.getClass(), outputName))
 			return true;
 		if (attributeMap.containsKey(outputName))
+			return true;
+		if (customOutputMap.containsKey(outputName))
 			return true;
 
 		return false;
@@ -725,16 +711,16 @@ public class Entity {
 			// Keyed output
 			else if (out.getReturnType() == LinkedHashMap.class) {
 				LinkedHashMap<?, ?> map = out.getValue(simTime, LinkedHashMap.class);
-				for (Object key : map.keySet()) {
-					Object obj = map.get(key);
+				for (Entry<?, ?> mapEntry : map.entrySet()) {
+					Object obj = mapEntry.getValue();
 					if (obj instanceof Double) {
 						double val = (Double)obj;
 						file.format(LIST_OUTPUT_FORMAT,
-								this.getName(), out.getName(), key, val/factor, unitString);
+								this.getName(), out.getName(), mapEntry.getKey(), val/factor, unitString);
 					}
 					else {
 						file.format(LIST_OUTPUT_FORMAT,
-								this.getName(), out.getName(), key, obj, unitString);
+								this.getName(), out.getName(), mapEntry.getKey(), obj, unitString);
 					}
 				}
 			}
@@ -795,6 +781,15 @@ public class Entity {
 		}
 		return ret;
 	}
+
+	public ArrayList<String> getCustomOutputNames(){
+		ArrayList<String> ret = new ArrayList<>();
+		for (String name : customOutputMap.keySet()) {
+			ret.add(name);
+		}
+		return ret;
+	}
+
 
 	public ObjectType getObjectType() {
 		return ObjectType.getObjectTypeForClass(this.getClass());

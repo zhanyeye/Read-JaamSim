@@ -16,9 +16,6 @@
  */
 package com.jaamsim.events;
 
-/**
- * todo 好像比较重要
- */
 class WaitTarget extends ProcessTarget {
 	private Process proc;
 

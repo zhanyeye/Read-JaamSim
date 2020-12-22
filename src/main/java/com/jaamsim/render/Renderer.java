@@ -114,6 +114,8 @@ public class Renderer implements GLAnimatorControl {
 
 	private GLCapabilities caps = null;
 
+	private boolean gl3Supported;
+
 	private final TexCache texCache = new TexCache(this);
 
 	// An initalization time flag specifying if the 'safest' graphical techniques should be used
@@ -208,6 +210,13 @@ public class Renderer implements GLAnimatorControl {
 
 			sharedContext = dummyDrawable.getContext();
 			assert (sharedContext != null);
+
+			try {
+				GL3 gl3 = sharedContext.getGL().getGL3();
+				gl3Supported = gl3 != null;
+			} catch (GLException ex) {
+				gl3Supported = false;
+			}
 
 //			long endNanos = System.nanoTime();
 //			long ms = (endNanos - startNanos) /1000000L;
@@ -688,6 +697,26 @@ private void initShaders(GL2GL3 gl) throws RenderException {
 }
 
 /**
+ * Common code to setup basic openGL state, including depth test, blending etc.
+ * @param gl
+ */
+private void initSurfaceState(GL2GL3 gl) {
+	// Some of this is probably redundant, but here goes
+	gl.glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+	gl.glEnable(GL.GL_DEPTH_TEST);
+	gl.glClearDepth(1.0);
+
+	gl.glDepthFunc(GL2GL3.GL_LEQUAL);
+
+	gl.glEnable(GL2GL3.GL_CULL_FACE);
+	gl.glCullFace(GL2GL3.GL_BACK);
+
+	gl.glBlendEquationSeparate(GL2GL3.GL_FUNC_ADD, GL2GL3.GL_MAX);
+	gl.glBlendFuncSeparate(GL2GL3.GL_SRC_ALPHA, GL2GL3.GL_ONE_MINUS_SRC_ALPHA, GL2GL3.GL_ONE, GL2GL3.GL_ONE);
+
+}
+
+/**
  * Create and compile all the shaders
  */
 private void initCoreShaders(GL2GL3 gl, String version) throws RenderException {
@@ -1122,20 +1151,10 @@ private void initCoreShaders(GL2GL3 gl, String version) throws RenderException {
 
 				GL2GL3 gl = drawable.getGL().getGL2GL3();
 
-				// Some of this is probably redundant, but here goes
-				gl.glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
-				gl.glEnable(GL.GL_DEPTH_TEST);
-				gl.glClearDepth(1.0);
-
-				gl.glDepthFunc(GL2GL3.GL_LEQUAL);
-
-				gl.glEnable(GL2GL3.GL_CULL_FACE);
-				gl.glCullFace(GL2GL3.GL_BACK);
+				initSurfaceState(gl);
 
 				gl.glEnable(GL.GL_MULTISAMPLE);
 
-				gl.glBlendEquationSeparate(GL2GL3.GL_FUNC_ADD, GL2GL3.GL_MAX);
-				gl.glBlendFuncSeparate(GL2GL3.GL_SRC_ALPHA, GL2GL3.GL_ONE_MINUS_SRC_ALPHA, GL2GL3.GL_ONE, GL2GL3.GL_ONE);
 
 			}
 		}
@@ -1328,6 +1347,10 @@ private void initCoreShaders(GL2GL3 gl, String version) throws RenderException {
 		 return initialized.get() && !fatalError.get();
 	}
 
+	public boolean isGL3Supported() {
+		return gl3Supported;
+	}
+
 	public boolean hasFatalError() {
 		return fatalError.get();
 	}
@@ -1514,7 +1537,7 @@ private void initCoreShaders(GL2GL3 gl, String version) throws RenderException {
 			int height = message.height;
 
 			if (!target.isLoaded()) {
-				message.result.setFailed("Contexted not loaded. Is OpenGL 3 supported?");
+				message.result.setFailed("Context not loaded. Is OpenGL 3 supported?");
 				return;
 			}
 			assert(target.isLoaded());
@@ -1543,10 +1566,9 @@ private void initCoreShaders(GL2GL3 gl, String version) throws RenderException {
 
 			gl.glBindFramebuffer(GL2GL3.GL_DRAW_FRAMEBUFFER, target.getDrawFBO());
 
-			gl.glClearColor(0, 0, 0, 0);
 			gl.glViewport(0, 0, width, height);
-			gl.glEnable(GL2GL3.GL_DEPTH_TEST);
-			gl.glDepthFunc(GL2GL3.GL_LEQUAL);
+
+			initSurfaceState(gl);
 
 			allowDelayedTextures = false;
 

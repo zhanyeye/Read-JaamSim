@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2014 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2016 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,11 +19,12 @@ package com.jaamsim.BasicObjects;
 
 import com.jaamsim.Graphics.DisplayEntity;
 import com.jaamsim.Samples.SampleConstant;
-import com.jaamsim.Samples.SampleExpInput;
+import com.jaamsim.Samples.SampleInput;
 import com.jaamsim.basicsim.Entity;
 import com.jaamsim.input.EntityInput;
 import com.jaamsim.input.Keyword;
 import com.jaamsim.input.Output;
+import com.jaamsim.states.StateEntity;
 import com.jaamsim.units.DimensionlessUnit;
 import com.jaamsim.units.TimeUnit;
 
@@ -35,11 +37,11 @@ public class Pack extends LinkedService {
 
 	@Keyword(description = "The number of entities to pack into the container.",
 	         exampleList = {"2", "DiscreteDistribution1", "'1 + [TimeSeries1].PresentValue'"})
-	private final SampleExpInput numberOfEntities;
+	private final SampleInput numberOfEntities;
 
 	@Keyword(description = "The service time required to pack each entity in the container.",
 	         exampleList = { "3.0 h", "ExponentialDistribution1", "'1[s] + 0.5*[TimeSeries1].PresentValue'" })
-	private final SampleExpInput serviceTime;
+	private final SampleInput serviceTime;
 
 	protected EntityContainer container;	// the generated EntityContainer
 	private int numberGenerated;  // Number of EntityContainers generated so far
@@ -53,13 +55,13 @@ public class Pack extends LinkedService {
 		prototypeEntityContainer.setRequired(true);
 		this.addInput(prototypeEntityContainer);
 
-		numberOfEntities = new SampleExpInput("NumberOfEntities", "Key Inputs", new SampleConstant(1.0));
+		numberOfEntities = new SampleInput("NumberOfEntities", "Key Inputs", new SampleConstant(1.0));
 		numberOfEntities.setUnitType(DimensionlessUnit.class);
 		numberOfEntities.setEntity(this);
 		numberOfEntities.setValidRange(1, Double.POSITIVE_INFINITY);
 		this.addInput(numberOfEntities);
 
-		serviceTime = new SampleExpInput("ServiceTime", "Key Inputs", new SampleConstant(TimeUnit.class, 0.0));
+		serviceTime = new SampleInput("ServiceTime", "Key Inputs", new SampleConstant(TimeUnit.class, 0.0));
 		serviceTime.setUnitType(TimeUnit.class);
 		serviceTime.setEntity(this);
 		serviceTime.setValidRange(0, Double.POSITIVE_INFINITY);
@@ -80,26 +82,23 @@ public class Pack extends LinkedService {
 		numberGenerated++;
 		EntityContainer proto = prototypeEntityContainer.getValue();
 		StringBuilder sb = new StringBuilder();
-		sb.append(proto.getName()).append("_Copy").append(numberGenerated);
+		sb.append(this.getName()).append("_").append(numberGenerated);
 		EntityContainer ret = Entity.fastCopy(proto, sb.toString());
 		ret.earlyInit();
 		return ret;
 	}
 
 	@Override
-	public void startAction() {
-
-		// Do any of the thresholds stop the generator?
-		if (!this.isOpen()) {
-			this.setBusy(false);
-			this.setPresentState();
-			return;
-		}
+	protected boolean startProcessing(double simTime) {
 
 		// If necessary, get a new container
 		if (container == null) {
 			container = this.getNextContainer();
 			numberInserted = 0;
+
+			// Set the state for the container and its contents
+			if (!stateAssignment.getValue().isEmpty())
+				container.setPresentState(stateAssignment.getValue());
 
 			// Position the container over the pack object
 			this.moveToProcessPosition(container);
@@ -109,23 +108,27 @@ public class Pack extends LinkedService {
 		if (!startedPacking) {
 			Integer m = this.getNextMatchValue(getSimTime());
 			numberToInsert = (int) numberOfEntities.getValue().getNextSample(this.getSimTime());
+			if (numberToInsert < 1)
+				error("The NumberOfEntities input must be greater than zero. Received: %s", numberToInsert);
 			if (waitQueue.getValue().getMatchCount(m) < numberToInsert) {
-				this.setBusy(false);
-				this.setPresentState();
-				return;
+				return false;
 			}
 			startedPacking = true;
 			this.setMatchValue(m);
 		}
 
-		// Schedule the insertion of the next entity
+		// Select the next entity to pack and set its state
 		packedEntity = this.getNextEntityForMatch(getMatchValue());
-		double dt = serviceTime.getValue().getNextSample(getSimTime());
-		this.scheduleProcess(dt, 5, endActionTarget);
+		if (!stateAssignment.getValue().isEmpty() && packedEntity instanceof StateEntity)
+			((StateEntity)packedEntity).setPresentState(stateAssignment.getValue());
+
+		// Move the entity into position for processing
+		this.moveToProcessPosition(packedEntity);
+		return true;
 	}
 
 	@Override
-	public void endAction() {
+	protected void endProcessing(double simTime) {
 
 		// Remove the next entity from the queue and pack the container
 		container.addEntity(packedEntity);
@@ -139,9 +142,11 @@ public class Pack extends LinkedService {
 			numberInserted = 0;
 			startedPacking = false;
 		}
+	}
 
-		// Insert the next entity
-		this.startAction();
+	@Override
+	protected double getProcessingTime(double simTime) {
+		return serviceTime.getValue().getNextSample(simTime);
 	}
 
 	@Output(name = "Container",

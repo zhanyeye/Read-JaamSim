@@ -24,6 +24,7 @@ import com.jaamsim.basicsim.Entity;
 public class AssignmentListInput extends ListInput<ArrayList<ExpParser.Assignment>> {
 
 	private Entity thisEnt;
+	private ArrayList<ExpEvaluator.EntityParseContext> parseContextList;
 
 	public AssignmentListInput(String key, String cat, ArrayList<ExpParser.Assignment> def){
 		super(key, cat, def);
@@ -39,6 +40,7 @@ public class AssignmentListInput extends ListInput<ArrayList<ExpParser.Assignmen
 		// Divide up the inputs by the inner braces
 		ArrayList<KeywordIndex> subArgs = kw.getSubArgs();
 		ArrayList<ExpParser.Assignment> temp = new ArrayList<>(subArgs.size());
+		ArrayList<ExpEvaluator.EntityParseContext> pcList = new ArrayList<>(subArgs.size());
 
 		// Parse the inputs within each inner brace
 		for (int i = 0; i < subArgs.size(); i++) {
@@ -46,19 +48,33 @@ public class AssignmentListInput extends ListInput<ArrayList<ExpParser.Assignmen
 			Input.assertCount(subArg, 1);
 			try {
 				// Parse the assignment expression
-				ExpParser.Assignment ass = ExpParser.parseAssignment(ExpEvaluator.getParseContext(), subArg.getArg(0));
-				ExpValidator.validateAssignment(ass, thisEnt);
+				String assignmentString = subArg.getArg(0);
+				ExpEvaluator.EntityParseContext pc = ExpEvaluator.getParseContext(thisEnt, assignmentString);
+				ExpParser.Assignment ass = ExpParser.parseAssignment(pc, assignmentString);
 
 				// Save the data for this assignment
+				pcList.add(pc);
 				temp.add(ass);
 
 			} catch (ExpError e) {
-				throw new InputErrorException(INP_ERR_ELEMENT, i, e.getMessage());
+				throw new InputErrorException(INP_ERR_ELEMENT, i+1, e.getMessage());
 			}
 		}
 
 		// Save the data for each assignment
+		parseContextList = pcList;
 		value = temp;
+	}
+
+	@Override
+	public void getValueTokens(ArrayList<String> toks) {
+		if (value == null) return;
+
+		for (int i = 0; i < value.size(); i++) {
+			toks.add("{");
+			toks.add(parseContextList.get(i).getUpdatedSource());
+			toks.add("}");
+		}
 	}
 
 	@Override

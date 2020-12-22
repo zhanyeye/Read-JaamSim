@@ -1,7 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2013 Ausenco Engineering Canada Inc.
- * Copyright (C) 2015 KMA Technologies
+ * Copyright (C) 2015 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ import java.io.OutputStreamWriter;
 import java.net.URI;
 import java.nio.charset.Charset;
 
+import com.jaamsim.input.Input;
 import com.jaamsim.math.Vec2d;
 import com.jaamsim.math.Vec3d;
 import com.jaamsim.ui.LogBox;
@@ -52,7 +53,7 @@ public class MeshWriter {
 
 	private void indent() throws IOException {
 		for (int i = 0; i < indentLength; ++i) {
-			out.write("  ");
+			out.write(Input.SEPARATOR);
 		}
 	}
 

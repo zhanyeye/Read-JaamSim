@@ -153,6 +153,11 @@ public class OutputHandle {
 			ret.add( e.getOutputHandle(p.name) );  // required to get the correct unit type for the output
 		}
 
+		// Add the custom outputs
+		for (String outputName : e.getCustomOutputNames()) {
+			ret.add(e.getOutputHandle(outputName));
+		}
+
 		// And the attributes
 		for (String attribName : e.getAttributeNames()) {
 			ret.add(e.getOutputHandle(attribName));
@@ -220,6 +225,9 @@ public class OutputHandle {
 
 	public boolean isNumericValue() {
 		return isNumericType(this.getReturnType());
+	}
+	public boolean canCache() {
+		return true;
 	}
 
 	public static boolean isNumericType(Class<?> rtype) {

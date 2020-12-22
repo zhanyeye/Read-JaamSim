@@ -20,9 +20,10 @@ import java.util.ArrayList;
 
 import com.jaamsim.Graphics.DisplayEntity;
 import com.jaamsim.Samples.SampleConstant;
-import com.jaamsim.Samples.SampleExpListInput;
+import com.jaamsim.Samples.SampleListInput;
 import com.jaamsim.Samples.SampleProvider;
 import com.jaamsim.input.EntityListInput;
+import com.jaamsim.input.Input;
 import com.jaamsim.input.Keyword;
 import com.jaamsim.units.DimensionlessUnit;
 
@@ -34,10 +35,17 @@ public class Seize extends LinkedService {
 
 	@Keyword(description = "The number of units to seize from the Resource(s).",
 	         exampleList = {"{ 2 } { 1 }", "{ DiscreteDistribution1 } { 'this.obj.attrib1 + 1' }"})
-	private final SampleExpListInput numberOfUnitsList;
+	private final SampleListInput numberOfUnitsList;
 
 	{
 		processPosition.setHidden(true);
+		workingStateListInput.setHidden(true);
+		immediateMaintenanceList.setHidden(true);
+		forcedMaintenanceList.setHidden(true);
+		opportunisticMaintenanceList.setHidden(true);
+		immediateBreakdownList.setHidden(true);
+		forcedBreakdownList.setHidden(true);
+		opportunisticBreakdownList.setHidden(true);
 
 		resourceList = new EntityListInput<>(Resource.class, "Resource", "Key Inputs", null);
 		resourceList.setRequired(true);
@@ -45,23 +53,29 @@ public class Seize extends LinkedService {
 
 		ArrayList<SampleProvider> def = new ArrayList<>();
 		def.add(new SampleConstant(1));
-		numberOfUnitsList = new SampleExpListInput("NumberOfUnits", "Key Inputs", def);
+		numberOfUnitsList = new SampleListInput("NumberOfUnits", "Key Inputs", def);
 		numberOfUnitsList.setEntity(this);
-		numberOfUnitsList.setValidRange(0, Double.POSITIVE_INFINITY);
+		numberOfUnitsList.setValidRange(1, Double.POSITIVE_INFINITY);
 		numberOfUnitsList.setUnitType(DimensionlessUnit.class);
 		this.addInput(numberOfUnitsList);
 	}
 
 	@Override
-	public void queueChanged() {
-		this.startAction();
+	public void validate() {
+		super.validate();
+		Input.validateInputSize(resourceList, numberOfUnitsList);
 	}
 
 	@Override
-	public void startAction() {
+	public void queueChanged() {
+		this.startProcessing(getSimTime());
+	}
+
+	@Override
+	protected boolean startProcessing(double simTime) {
 
 		// Determine the match value
-		Integer m = this.getNextMatchValue(getSimTime());
+		Integer m = this.getNextMatchValue(simTime);
 
 		// Stop if the queue is empty, there are insufficient resources, or a threshold is closed
 		while (this.isReadyToStart()) {
@@ -71,12 +85,7 @@ public class Seize extends LinkedService {
 			DisplayEntity ent = this.getNextEntityForMatch(m);
 			this.sendToNextComponent(ent);
 		}
-		this.setBusy(false);
-	}
-
-	@Override
-	public void endAction() {
-		// not required
+		return false;
 	}
 
 	public boolean isReadyToStart() {

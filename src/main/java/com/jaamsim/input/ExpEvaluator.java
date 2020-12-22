@@ -1,7 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2014 Ausenco Engineering Canada Inc.
- * Copyright (C) 2015 KMA Technologies
+ * Copyright (C) 2015 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,10 +18,15 @@
 package com.jaamsim.input;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 
 import com.jaamsim.basicsim.Entity;
 import com.jaamsim.datatypes.DoubleVector;
 import com.jaamsim.datatypes.IntegerVector;
+import com.jaamsim.input.ExpParser.EvalContext;
+import com.jaamsim.input.ExpParser.VarResolver;
+import com.jaamsim.units.DimensionlessUnit;
 import com.jaamsim.units.Unit;
 
 /**
@@ -31,17 +36,10 @@ import com.jaamsim.units.Unit;
  */
 public class ExpEvaluator {
 
-	private static Entity getEntity(String[] names, ExpResult[] indices, double simTime, Entity thisEnt) throws ExpError {
+	private static Entity getEntity(Entity rootEnt, String[] names, ExpResult[] indices, double simTime) throws ExpError {
 
-		Entity ent;
-		if (names[0] == "this")
-			ent = thisEnt;
-		else
-			ent = Entity.getNamedEntity(names[0]);
+		Entity ent = rootEnt;
 
-		if (ent == null) {
-			throw new ExpError(null, 0, "Could not find entity: %s", names[0]);
-		}
 		// Run the output chain up to the second last name
 		for(int i = 1; i < names.length-1; ++i) {
 			String outputName = names[i];
@@ -96,7 +94,42 @@ public class ExpEvaluator {
 		return ent;
 	}
 
-	private static class EntityParseContext implements ExpParser.ParseContext {
+	public static class EntityParseContext implements ExpParser.ParseContext {
+
+		private final String source;
+		private final Entity thisEnt;
+
+		private final HashMap<Entity, String> entityReferences = new HashMap<>();
+
+		private void addEntityReference(Entity ent) {
+			entityReferences.put(ent, ent.getName());
+		}
+
+		// Return a version of the expression string updated for an entities that have changed their names
+		// since the expression was parsed
+		public String getUpdatedSource() {
+			String ret = source;
+			for (Map.Entry<Entity, String> entEntry : entityReferences.entrySet()) {
+				Entity ent = entEntry.getKey();
+				String oldName = entEntry.getValue();
+				if (ent.getName() != null && ent.getName().equals(oldName)) {
+					// This name did not change
+					continue;
+				}
+				String newName = ent.getName();
+				if (ent.getName() == null) {
+					// An entity with a null name means the entity has been deleted
+					newName = "**DeletedEntity**";
+				}
+				ret = ret.replace("["+oldName+"]", "["+newName+"]");
+			}
+			return ret;
+		}
+
+		public EntityParseContext(Entity thisEnt, String source) {
+			this.thisEnt = thisEnt;
+			this.source = source;
+		}
 
 		@Override
 		public ExpParser.UnitData getUnitByName(String name) {
@@ -109,6 +142,7 @@ public class ExpEvaluator {
 			ret.scaleFactor = unit.getConversionFactorToSI();
 			ret.unitType = unit.getClass();
 
+			addEntityReference(unit);
 			return ret;
 		}
 
@@ -123,24 +157,101 @@ public class ExpEvaluator {
 				Class<? extends Unit> denom) {
 			return Unit.getDivUnitType(num, denom);
 		}
-	}
 
-	private static EntityParseContext EC = new EntityParseContext();
 
-	private static class EntityEvalContext implements ExpParser.EvalContext {
+		@Override
+		public VarResolver getVarResolver(String[] names, boolean[] hasIndices) throws ExpError {
 
-		// These are updated in updateContext() which must be called before any expression are evaluated
-		private final double simTime;
-		private final Entity thisEnt;
+			if (names.length == 1) {
+				throw new ExpError(null, 0, "You must specify an output or attribute for entity: %s", names[0]);
+			}
 
-		public EntityEvalContext(double simTime, Entity thisEnt) {
-			this.simTime = simTime;
-			this.thisEnt = thisEnt;
+			Entity rootEnt;
+			if (names[0] == "this")
+				rootEnt = thisEnt;
+			else {
+				rootEnt = Entity.getNamedEntity(names[0]);
+				if (rootEnt != null) {
+					addEntityReference(rootEnt);
+				}
+			}
+
+			if (rootEnt == null) {
+				throw new ExpError(null, 0, "Could not find entity: %s", names[0]);
+			}
+
+			// Special case, if this is a simple output and we can cache the output handle, use an optimized resolver
+			if (names.length == 2) {
+				OutputHandle oh = rootEnt.getOutputHandleInterned(names[1]);
+				if (oh == null) {
+					throw new ExpError(null, 0, "Could not find output '%s' on entity '%s'", names[1], names[0]);
+				}
+				if (oh.canCache() && !hasIndices[1]) {
+					return new CachedResolver(oh);
+				}
+			}
+
+			return new EntityResolver(rootEnt, names);
 		}
 
 		@Override
-		public ExpResult getVariableValue(String[] names, ExpResult[] indices) throws ExpError {
-			Entity ent = getEntity(names, indices, simTime, thisEnt);
+		public void validateAssignmentDest(String[] destination) throws ExpError {
+			Entity rootEnt;
+			if (destination[0] == "this")
+				rootEnt = thisEnt;
+			else {
+				rootEnt = Entity.getNamedEntity(destination[0]);
+				if (rootEnt != null)
+					addEntityReference(rootEnt);
+			}
+
+			if (rootEnt == null) {
+				throw new ExpError(null, 0, "Could not find entity: %s", destination[0]);
+			}
+		}
+
+	}
+
+	private static class CachedResolver implements ExpParser.VarResolver {
+
+		private final OutputHandle handle;
+
+		public CachedResolver(OutputHandle oh) {
+			handle = oh;
+		}
+
+		@Override
+		public ExpResult resolve(EvalContext ec, ExpResult[] indices)
+				throws ExpError {
+			EntityEvalContext eec = (EntityEvalContext)ec;
+			double val = handle.getValueAsDouble(eec.simTime, 0);
+			return new ExpResult(val, handle.getUnitType());
+		}
+
+		@Override
+		public ExpValResult validate(boolean[] hasIndices) {
+			return new ExpValResult(ExpValResult.State.VALID, handle.getUnitType(), (ExpError)null);
+		}
+	}
+
+	private static class EntityResolver implements ExpParser.VarResolver {
+
+		private final Entity rootEnt;
+		private final String[] names;
+
+		public EntityResolver(Entity rootEnt, String[] names) {
+			this.rootEnt = rootEnt;
+			this.names = names;
+		}
+
+		@Override
+		public ExpResult resolve(ExpParser.EvalContext ec, ExpResult[] indices) throws ExpError {
+
+			EntityEvalContext eec = (EntityEvalContext)ec;
+
+			double simTime = eec.simTime;
+
+			Entity ent = getEntity(rootEnt, names, indices, simTime);
 
 			String outputName = names[names.length-1];
 			OutputHandle oh = ent.getOutputHandleInterned(outputName);
@@ -179,27 +290,112 @@ public class ExpEvaluator {
 					return new ExpResult(value, oh.unitType);
 				} else {
 					throw new ExpError(null, 0, "Output '%s' has an index and is not an array type output", names[names.length-1]);
-
 				}
-
 			} else {
 				return new ExpResult(oh.getValueAsDouble(simTime, 0), oh.unitType);
 			}
+
 		}
 
 		@Override
-		public boolean eagerEval() {
-			return false;
+		public ExpValResult validate(boolean[] hasIndices) {
+
+			if (names.length == 2) {
+				String outputName = names[1];
+				OutputHandle oh = rootEnt.getOutputHandleInterned(outputName);
+				if (oh == null) {
+					ExpError error = new ExpError(null, 0, String.format("Could not find output '%s' on entity '%s'",
+							outputName, rootEnt.getName()));
+					return new ExpValResult(ExpValResult.State.ERROR, DimensionlessUnit.class, error);
+				}
+				if (!hasIndices[1]) {
+					Class<?> retType = oh.getReturnType();
+					if (    !OutputHandle.isNumericType(retType) &&
+					        retType != boolean.class &&
+					        retType != Boolean.class) {
+						ExpError error = new ExpError(null, 0, "Output: %s does not return a numeric type", names[1]);
+						return new ExpValResult(ExpValResult.State.ERROR, DimensionlessUnit.class, error);
+					}
+					return new ExpValResult(ExpValResult.State.VALID, oh.unitType, (ExpError)null);
+				} else {
+					// Indexed final output
+					if (oh.getReturnType() == DoubleVector.class ||
+						oh.getReturnType() == IntegerVector.class) {
+						return new ExpValResult(ExpValResult.State.VALID, oh.unitType, (ExpError)null);
+					}
+					if (oh.getReturnType() == ArrayList.class) {
+						//TODO: find out if we can determine the contained class without an instance or if type erasure prevents that
+						return new ExpValResult(ExpValResult.State.VALID, oh.unitType, (ExpError)null);
+					}
+					ExpError error = new ExpError(null, 0, "Output: %s is not a known array type");
+					return new ExpValResult(ExpValResult.State.ERROR, DimensionlessUnit.class, error);
+				}
+			}
+
+			// We have a 'chained' output, so now we must do best effort evaluation
+			// The only failures we can detect from here out are unit errors and using an existing output in an invalid
+			// way. Typos are not detectable because entities may have outputs from descendant classes or attributes
+
+			Class<?> klass = rootEnt.getClass();
+			for (int i = 1; i < names.length; ++i) {
+				Class<? extends Unit> unitType = OutputHandle.getStaticOutputUnitType(klass, names[i]);
+				klass = OutputHandle.getStaticOutputType(klass, names[i]);
+				if (klass == null) {
+					// Undecidable
+					return new ExpValResult(ExpValResult.State.UNDECIDABLE, DimensionlessUnit.class, (ExpError)null);
+				}
+
+				if (i == names.length - 1) {
+					// Last name in the chain, check that the type is numeric
+					if (!OutputHandle.isNumericType(klass)) {
+						ExpError error = new ExpError(null, 0, "Output: '%s' does not return a numeric type", names[i]);
+						return new ExpValResult(ExpValResult.State.ERROR, DimensionlessUnit.class, error);
+					}
+					//return new ExpResult(0, unitType);
+					return new ExpValResult(ExpValResult.State.VALID, unitType, (ExpError)null);
+				} else {
+					if (!Entity.class.isAssignableFrom(klass)) {
+						ExpError error = new ExpError(null, 0, "Output: '%s' must output an entity type", names[i]);
+						return new ExpValResult(ExpValResult.State.ERROR, DimensionlessUnit.class, error);
+					}
+				}
+			}
+			// We should never get here
+			ExpError error = new ExpError(null, 0, "Validator logic error");
+			return new ExpValResult(ExpValResult.State.ERROR, DimensionlessUnit.class, error);
+		}
+
+	}
+
+	private static class EntityEvalContext implements ExpParser.EvalContext {
+
+		private final double simTime;
+
+		public EntityEvalContext(double simTime) {
+			this.simTime = simTime;
 		}
 	}
-	public static ExpParser.ParseContext getParseContext() {
-		return EC;
+
+	public static EntityParseContext getParseContext(Entity thisEnt, String source) {
+		return new EntityParseContext(thisEnt, source);
 	}
 
 	public static void runAssignment(ExpParser.Assignment assign, double simTime, Entity thisEnt) throws ExpError {
-		Entity assignmentEnt = getEntity(assign.destination, null, simTime, thisEnt);
 
-		ExpResult result = evaluateExpression(assign.value, simTime, thisEnt);
+		Entity rootEnt;
+		if (assign.destination[0] == "this")
+			rootEnt = thisEnt;
+		else {
+			rootEnt = Entity.getNamedEntity(assign.destination[0]);
+		}
+
+		if (rootEnt == null) {
+			throw new ExpError(null, 0, "Could not find entity: %s", assign.destination[0]);
+		}
+
+		Entity assignmentEnt = getEntity(rootEnt, assign.destination, null, simTime);
+
+		ExpResult result = evaluateExpression(assign.value, simTime);
 
 		String attribName = assign.destination[assign.destination.length-1];
 		if (!assignmentEnt.hasAttribute(attribName)) {
@@ -208,9 +404,9 @@ public class ExpEvaluator {
 		assignmentEnt.setAttribute(attribName, result.value, result.unitType);
 	}
 
-	public static ExpResult evaluateExpression(ExpParser.Expression exp, double simTime, Entity thisEnt) throws ExpError
+	public static ExpResult evaluateExpression(ExpParser.Expression exp, double simTime) throws ExpError
 	{
-		EntityEvalContext evalContext = new EntityEvalContext(simTime, thisEnt);
+		EntityEvalContext evalContext = new EntityEvalContext(simTime);
 		return exp.evaluate(evalContext);
 	}
 }

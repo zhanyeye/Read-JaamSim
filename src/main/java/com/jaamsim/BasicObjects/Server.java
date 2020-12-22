@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2013 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2016 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +19,7 @@ package com.jaamsim.BasicObjects;
 
 import com.jaamsim.Graphics.DisplayEntity;
 import com.jaamsim.Samples.SampleConstant;
-import com.jaamsim.Samples.SampleExpInput;
+import com.jaamsim.Samples.SampleInput;
 import com.jaamsim.input.Keyword;
 import com.jaamsim.units.TimeUnit;
 
@@ -28,21 +29,15 @@ import com.jaamsim.units.TimeUnit;
  */
 public class Server extends LinkedService {
 
-	/**
-	 * 处理一个实体所需要的服务时间
-	 */
 	@Keyword(description = "The service time required to process an entity.\n" +
 			"A constant value, a distribution to be sampled, or a time series can be entered.",
 	         exampleList = { "3.0 h", "NormalDistribution1", "'1[s] + 0.5*[TimeSeries1].PresentValue'" })
-	private final SampleExpInput serviceTime;
+	private final SampleInput serviceTime;
 
-	/**
-	 * the DisplayEntity being server
-	 */
-	private DisplayEntity servedEntity;
+	private DisplayEntity servedEntity;	// the DisplayEntity being server
 
 	{
-		serviceTime = new SampleExpInput("ServiceTime", "Key Inputs", new SampleConstant(TimeUnit.class, 0.0));
+		serviceTime = new SampleInput("ServiceTime", "Key Inputs", new SampleConstant(TimeUnit.class, 0.0));
 		serviceTime.setUnitType(TimeUnit.class);
 		serviceTime.setEntity(this);
 		serviceTime.setValidRange(0, Double.POSITIVE_INFINITY);
@@ -58,36 +53,33 @@ public class Server extends LinkedService {
 	}
 
 	@Override
-	public void startAction() {
+	protected boolean startProcessing(double simTime) {
 
 		// Determine the match value
 		Integer m = this.getNextMatchValue(getSimTime());
 
-		// Stop if the queue is empty or a threshold is closed
-		if (waitQueue.getValue().getMatchCount(m) == 0 || !this.isOpen()) {
-			servedEntity = null;
-			this.setBusy(false);
-			this.setPresentState();
-			return;
+		// Stop if the queue is empty
+		if (waitQueue.getValue().getMatchCount(m) == 0) {
+			return false;
 		}
 
 		// Remove the first entity from the queue
 		servedEntity = this.getNextEntityForMatch(m);
 		this.moveToProcessPosition(servedEntity);
-
-		// Schedule the completion of service
-		double dt = serviceTime.getValue().getNextSample(getSimTime());
-		this.scheduleProcess(dt, 5, endActionTarget);
+		return true;
 	}
 
 	@Override
-	public void endAction() {
+	protected void endProcessing(double simTime) {
 
 		// Send the entity to the next component in the chain
 		this.sendToNextComponent(servedEntity);
+		servedEntity = null;
+	}
 
-		// Remove the next entity from the queue and start processing
-		this.startAction();
+	@Override
+	protected double getProcessingTime(double simTime) {
+		return serviceTime.getValue().getNextSample(simTime);
 	}
 
 }

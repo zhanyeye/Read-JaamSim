@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2014 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2016 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +21,7 @@ import java.util.ArrayList;
 
 import com.jaamsim.Graphics.DisplayEntity;
 import com.jaamsim.Samples.SampleConstant;
-import com.jaamsim.Samples.SampleExpInput;
+import com.jaamsim.Samples.SampleInput;
 import com.jaamsim.basicsim.Entity;
 import com.jaamsim.datatypes.IntegerVector;
 import com.jaamsim.input.BooleanInput;
@@ -28,13 +29,14 @@ import com.jaamsim.input.EntityInput;
 import com.jaamsim.input.EntityListInput;
 import com.jaamsim.input.IntegerListInput;
 import com.jaamsim.input.Keyword;
+import com.jaamsim.states.StateEntity;
 import com.jaamsim.units.TimeUnit;
 
 public class Assemble extends LinkedService {
 
 	@Keyword(description = "The service time required to perform the assembly process.",
 	         exampleList = { "3.0 h", "ExponentialDistribution1", "'1[s] + 0.5*[TimeSeries1].PresentValue'" })
-	private final SampleExpInput serviceTime;
+	private final SampleInput serviceTime;
 
 	@Keyword(description = "A list of Queue objects in which to place the arriving sub-component entities.",
 	         exampleList = {"Queue1 Queue2 Queue3"})
@@ -62,7 +64,7 @@ public class Assemble extends LinkedService {
 		waitQueue.setHidden(true);
 		match.setHidden(true);
 
-		serviceTime = new SampleExpInput("ServiceTime", "Key Inputs", new SampleConstant(TimeUnit.class, 0.0));
+		serviceTime = new SampleInput("ServiceTime", "Key Inputs", new SampleConstant(TimeUnit.class, 0.0));
 		serviceTime.setUnitType(TimeUnit.class);
 		serviceTime.setEntity(this);
 		serviceTime.setValidRange(0, Double.POSITIVE_INFINITY);
@@ -109,31 +111,20 @@ public class Assemble extends LinkedService {
 	* Process DisplayEntities from the Queue
 	*/
 	@Override
-	public void startAction() {
-
-		// Do any of the thresholds stop the generator?
-		if (!this.isOpen()) {
-			this.setBusy(false);
-			this.setPresentState();
-			return;
-		}
+	protected boolean startProcessing(double simTime) {
 
 		// Do the queues have enough entities?
 		ArrayList<Queue> queueList = waitQueueList.getValue();
 		if (matchRequired.getValue()) {
 			Integer m = Queue.selectMatchValue(queueList, numberRequired.getValue());
 			if (m == null) {
-				this.setBusy(false);
-				this.setPresentState();
-				return;
+				return false;
 			}
 			this.setMatchValue(m);
 		}
 		else {
 			if (!Queue.sufficientEntities(queueList, numberRequired.getValue(), null)) {
-				this.setBusy(false);
-				this.setPresentState();
-				return;
+				return false;
 			}
 		}
 
@@ -156,27 +147,30 @@ public class Assemble extends LinkedService {
 		numberGenerated++;
 		DisplayEntity proto = prototypeEntity.getValue();
 		StringBuilder sb = new StringBuilder();
-		sb.append(proto.getName()).append("_Copy").append(numberGenerated);
+		sb.append(this.getName()).append("_").append(numberGenerated);
 		assembledEntity = Entity.fastCopy(proto, sb.toString());
 		assembledEntity.earlyInit();
 
+		// Set the state for the assembled part
+		if (!stateAssignment.getValue().isEmpty() && assembledEntity instanceof StateEntity)
+			((StateEntity)assembledEntity).setPresentState(stateAssignment.getValue());
+
 		// Position the assembled part relative to the Assemble object
 		this.moveToProcessPosition(assembledEntity);
-
-		// Schedule the completion of processing
-		double dt = serviceTime.getValue().getNextSample(getSimTime());
-		this.scheduleProcess(dt, 5, endActionTarget);
+		return true;
 	}
 
 	@Override
-	public void endAction() {
+	protected void endProcessing(double simTime) {
 
 		// Send the assembled part to the next element in the chain
 		this.sendToNextComponent(assembledEntity);
 		assembledEntity = null;
+	}
 
-		// Try to assemble another part
-		this.startAction();
+	@Override
+	protected double getProcessingTime(double simTime) {
+		return serviceTime.getValue().getNextSample(simTime);
 	}
 
 }

@@ -22,7 +22,6 @@ import java.util.HashSet;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.jaamsim.MeshFiles.BlockReader;
-import com.jaamsim.MeshFiles.DataBlock;
 import com.jaamsim.MeshFiles.MeshData;
 import com.jaamsim.MeshFiles.MeshReader;
 import com.jaamsim.MeshFiles.ObjReader;
@@ -30,14 +29,11 @@ import com.jaamsim.collada.ColParser;
 import com.jaamsim.ui.LogBox;
 
 public class MeshDataCache {
-	private static HashMap<MeshProtoKey, MeshData> dataMap = new HashMap<>();
-	private static Object mapLock = new Object();
+	private static final HashMap<MeshProtoKey, MeshData> dataMap = new HashMap<>();
 
-	private static HashMap<MeshProtoKey, AtomicBoolean> loadingMap = new HashMap<>();
-	private static Object loadingLock = new Object();
+	private static final HashMap<MeshProtoKey, AtomicBoolean> loadingMap = new HashMap<>();
 
-	private static HashSet<MeshProtoKey> badMeshSet = new HashSet<>();
-	private static Object badMeshLock = new Object();
+	private static final HashSet<MeshProtoKey> badMeshSet = new HashSet<>();
 	private static MeshData badMesh = null;
 
 	public static final MeshProtoKey BAD_MESH_KEY;
@@ -52,20 +48,20 @@ public class MeshDataCache {
 
 	// Fetch, or lazily initialize the mesh data
 	public static MeshData getMeshData(MeshProtoKey key) {
-		synchronized (mapLock) {
+		synchronized (dataMap) {
 			MeshData data = dataMap.get(key);
 			if (data != null) {
 				return data;
 			}
 		}
-		synchronized (badMeshLock) {
+		synchronized (badMeshSet) {
 			if (badMeshSet.contains(key)) {
 				return getBadMesh();
 			}
 		}
 
 		AtomicBoolean loadingFlag = null;
-		synchronized (loadingLock) {
+		synchronized (loadingMap) {
 			loadingFlag = loadingMap.get(key);
 		}
 
@@ -78,7 +74,9 @@ public class MeshDataCache {
 					} catch (InterruptedException ex) {}
 				}
 			}
-			return dataMap.get(key);
+			synchronized (dataMap) {
+				return dataMap.get(key);
+			}
 		}
 
 		// Release the lock long enough to load the model
@@ -92,8 +90,7 @@ public class MeshDataCache {
 			} else if (ext.toUpperCase().equals("JSM")) {
 				data = MeshReader.parse(key.getURI());
 			} else if (ext.toUpperCase().equals("JSB")) {
-				DataBlock block = BlockReader.readBlockFromURI(key.getURI());
-				data = new MeshData(false, block, key.getURI().toURL());
+				data = BlockReader.parse(key.getURI());
 			} else if (ext.toUpperCase().equals("OBJ")) {
 				data = ObjReader.parse(key.getURI());
 			} else {
@@ -101,20 +98,20 @@ public class MeshDataCache {
 			}
 		} catch (Exception ex) {
 			LogBox.formatRenderLog("Could not load mesh: %s \n Error: %s\n", key.getURI().toString(), ex.getMessage());
-			synchronized (badMeshLock) {
+			synchronized (badMeshSet) {
 				badMeshSet.add(key);
 				return getBadMesh();
 			}
 		}
 
-		synchronized (mapLock) {
+		synchronized (dataMap) {
 			dataMap.put(key, data);
 		}
 		return data;
 	}
 
 	public static boolean isMeshLoaded(MeshProtoKey key) {
-		synchronized (mapLock) {
+		synchronized (dataMap) {
 			return dataMap.containsKey(key);
 		}
 	}
@@ -124,10 +121,9 @@ public class MeshDataCache {
 	 * @param key
 	 * @param notifier
 	 */
-	public static void loadMesh(final MeshProtoKey key, final AtomicBoolean notifier) {
-		assert(notifier != null);
-
-		synchronized (loadingLock) {
+	public static void loadMesh(final MeshProtoKey key) {
+		final AtomicBoolean notifier = new AtomicBoolean();
+		synchronized (loadingMap) {
 			loadingMap.put(key, notifier);
 		}
 

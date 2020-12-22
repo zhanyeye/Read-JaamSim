@@ -1,7 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2012 Ausenco Engineering Canada Inc.
- * Copyright (C) 2015 KMA Technologies
+ * Copyright (C) 2015 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.Stack;
 import java.util.TreeSet;
@@ -2118,9 +2119,10 @@ public class ColParser {
 			String[] names = new String[actionNames.size()];
 
 			int actionInd = 0;
-			for (String actionName : actions.keySet()) {
+			for (Entry<String, AnimAction> eachAction : actions.entrySet()) {
+				final String actionName = eachAction.getKey();
 				double[] originalTimes = getKeyTimes(actionName);
-				AnimAction act = actions.get(actionName);
+				AnimAction act = eachAction.getValue();
 
 				// Add new sample points because linearly interpolating a rotation matrix usually does not work correctly
 				final int OVERSAMPLE = 4;

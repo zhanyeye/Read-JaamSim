@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2014 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2016 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +18,7 @@
 package com.jaamsim.BasicObjects;
 
 import com.jaamsim.Samples.SampleConstant;
-import com.jaamsim.Samples.SampleExpInput;
+import com.jaamsim.Samples.SampleInput;
 import com.jaamsim.input.Keyword;
 import com.jaamsim.units.TimeUnit;
 
@@ -25,12 +26,12 @@ public class Unpack extends LinkedService {
 
 	@Keyword(description = "The service time required to unpacking each entity.",
 	         exampleList = { "3.0 h", "NormalDistribution1", "'1[s] + 0.5*[TimeSeries1].PresentValue'" })
-	private final SampleExpInput serviceTime;
+	private final SampleInput serviceTime;
 
 	private int numberToRemove;   // Number of entities to remove from the present EntityContainer
 
 	{
-		serviceTime = new SampleExpInput("ServiceTime", "Key Inputs", new SampleConstant(TimeUnit.class, 0.0));
+		serviceTime = new SampleInput("ServiceTime", "Key Inputs", new SampleConstant(TimeUnit.class, 0.0));
 		serviceTime.setUnitType(TimeUnit.class);
 		serviceTime.setEntity(this);
 		serviceTime.setValidRange(0, Double.POSITIVE_INFINITY);
@@ -50,23 +51,14 @@ public class Unpack extends LinkedService {
 	}
 
 	@Override
-	public void startAction() {
+	protected boolean startProcessing(double simTime) {
 
 		// Determine the match value
 		Integer m = this.getNextMatchValue(getSimTime());
 
 		// Is there a container waiting to be unpacked?
 		if (container == null && waitQueue.getValue().getMatchCount(m) == 0) {
-			this.setBusy(false);
-			this.setPresentState();
-			return;
-		}
-
-		// Do any of the thresholds stop the generator?
-		if (!this.isOpen()) {
-			this.setBusy(false);
-			this.setPresentState();
-			return;
+			return false;
 		}
 
 		if (container == null) {
@@ -80,11 +72,7 @@ public class Unpack extends LinkedService {
 			this.moveToProcessPosition(container);
 		}
 
-		// Schedule the removal of the next entity
-		double dt = 0.0;
-		if (numberRemoved < numberToRemove && container.getCount() > 0)
-			dt = serviceTime.getValue().getNextSample(getSimTime());
-		this.scheduleProcess(dt, 5, endActionTarget);
+		return true;
 	}
 
 	protected void disposeContainer(EntityContainer c) {
@@ -96,7 +84,7 @@ public class Unpack extends LinkedService {
 	}
 
 	@Override
-	public void endAction() {
+	protected void endProcessing(double simTime) {
 
 		// Remove the next entity from the container
 		if (numberRemoved < numberToRemove && container.getCount() > 0) {
@@ -109,9 +97,14 @@ public class Unpack extends LinkedService {
 			this.disposeContainer(container);
 			container = null;
 		}
+	}
 
-		// Continue the process
-		this.startAction();
+	@Override
+	protected double getProcessingTime(double simTime) {
+		double dur = 0.0;
+		if (numberRemoved < numberToRemove && container.getCount() > 0)
+			dur = serviceTime.getValue().getNextSample(simTime);
+		return dur;
 	}
 
 }

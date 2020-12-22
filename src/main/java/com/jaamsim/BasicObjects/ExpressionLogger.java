@@ -1,7 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2015 Ausenco Engineering Canada Inc.
- * Copyright (C) 2015 KMA Technologies
+ * Copyright (C) 2015 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ package com.jaamsim.BasicObjects;
 import java.util.ArrayList;
 
 import com.jaamsim.Graphics.DisplayEntity;
-import com.jaamsim.Samples.SampleExpListInput;
+import com.jaamsim.Samples.SampleListInput;
 import com.jaamsim.Samples.SampleProvider;
 import com.jaamsim.StringProviders.StringProvListInput;
 import com.jaamsim.StringProviders.StringProvider;
@@ -94,7 +94,7 @@ public class ExpressionLogger extends DisplayEntity implements StateEntityListen
 			+ "Each source is specified by an Expression. Also acceptable are: "
 			+ "a constant value, a Probability Distribution, TimeSeries, or a Calculation Object.",
 	         exampleList = {"{ [Entity1].Output1 } { [Entity2].Output2 }"})
-	private final SampleExpListInput valueTraceList;
+	private final SampleListInput valueTraceList;
 
 	private final ArrayList<Double> lastValueList = new ArrayList<>();
 
@@ -139,7 +139,7 @@ public class ExpressionLogger extends DisplayEntity implements StateEntityListen
 		valueUnitTypeList.setDefaultText("None");
 		this.addInput(valueUnitTypeList);
 
-		valueTraceList = new SampleExpListInput("ValueTraceList", "Tracing",
+		valueTraceList = new SampleListInput("ValueTraceList", "Tracing",
 				new ArrayList<SampleProvider>());
 		valueTraceList.setUnitType(UserSpecifiedUnit.class);
 		valueTraceList.setEntity(this);
@@ -269,7 +269,7 @@ public class ExpressionLogger extends DisplayEntity implements StateEntityListen
 		this.scheduleProcess(interval.getValue(), 5, endActionTarget);
 	}
 
-	private void endAction() {
+	final void endAction() {
 
 		// Stop the log if the end time has been reached
 		double simTime = getSimTime();
@@ -357,7 +357,7 @@ public class ExpressionLogger extends DisplayEntity implements StateEntityListen
 	/**
 	 * Returns true if any of the traced expressions have changed their values.
 	 */
-	private boolean valueChanged() {
+	final boolean valueChanged() {
 		boolean ret = false;
 		double simTime = getSimTime();
 		try {
@@ -392,13 +392,18 @@ public class ExpressionLogger extends DisplayEntity implements StateEntityListen
 		EventManager.scheduleUntil(doValueTrace, valueChanged, null);
 	}
 
-	class ValueChangedConditional extends Conditional {
+	static class ValueChangedConditional extends Conditional {
+		private final ExpressionLogger ent;
+
+		ValueChangedConditional(ExpressionLogger ent) {
+			this.ent = ent;
+		}
 		@Override
 		public boolean evaluate() {
-			return ExpressionLogger.this.valueChanged();
+			return ent.valueChanged();
 		}
 	}
-	private final Conditional valueChanged = new ValueChangedConditional();
+	private final Conditional valueChanged = new ValueChangedConditional(this);
 
 	class DoValueTraceTarget extends ProcessTarget {
 		@Override

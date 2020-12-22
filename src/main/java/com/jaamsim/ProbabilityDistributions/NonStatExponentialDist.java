@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2015 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2016 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +17,7 @@
  */
 package com.jaamsim.ProbabilityDistributions;
 
+import com.jaamsim.Samples.SampleConstant;
 import com.jaamsim.events.EventManager;
 import com.jaamsim.input.Keyword;
 import com.jaamsim.input.TimeSeriesInput;
@@ -36,7 +38,7 @@ public class NonStatExponentialDist extends Distribution {
 	private final MRG1999a rng = new MRG1999a();
 
 	{
-		minValueInput.setDefaultValue(0.0);
+		minValueInput.setDefaultValue(new SampleConstant(0.0d));
 
 		unitType.setHidden(true);
 		unitType.setDefaultValue(TimeUnit.class);
@@ -57,9 +59,9 @@ public class NonStatExponentialDist extends Distribution {
 	}
 
 	@Override
-	protected double getNextSample() {
+	protected double getSample(double simTime) {
 
-		long ticksNow = getSimTicks();
+		long ticksNow = getSimTicks();  // ignore the simTime passed as an argument
 		double valueNow = expectedArrivals.getValue().getInterpolatedCumulativeValueForTicks(ticksNow);
 		double valueNext = valueNow - Math.log(rng.nextUniform());
 		long ticksNext = expectedArrivals.getValue().getInterpolatedTicksForValue(valueNext);
@@ -74,14 +76,14 @@ public class NonStatExponentialDist extends Distribution {
 	}
 
 	@Override
-	protected double getMeanValue() {
+	protected double getMean(double simTime) {
 		double arrivals = expectedArrivals.getValue().getMaxValue();
 		double dt = EventManager.ticksToSecs( expectedArrivals.getValue().getMaxTicksValue() );
 		return dt/arrivals;
 	}
 
 	@Override
-	protected double getStandardDeviation() {
+	protected double getStandardDev(double simTime) {
 		return 0.0d;
 	}
 

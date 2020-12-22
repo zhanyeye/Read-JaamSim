@@ -20,6 +20,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 
 import com.jaamsim.Graphics.DisplayEntity;
+import com.jaamsim.Graphics.EntityLabel;
+import com.jaamsim.Graphics.OverlayEntity;
+import com.jaamsim.Graphics.Region;
 import com.jaamsim.basicsim.Entity;
 import com.jaamsim.input.EntityInput;
 
@@ -60,12 +63,15 @@ public class RelativeEntityInput extends EntityInput<DisplayEntity> {
 			if (each.testFlag(Entity.FLAG_GENERATED))
 				continue;
 
+			if (each instanceof OverlayEntity || each instanceof Region || each instanceof EntityLabel)
+				continue;
+
 			if (isCircular(each))
 				continue;
 
 			list.add(each.getName());
 		}
-		Collections.sort(list);
+		Collections.sort(list, Input.uiSortOrder);
 		return list;
 	}
 

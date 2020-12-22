@@ -19,6 +19,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 import java.util.regex.Pattern;
 
@@ -36,15 +37,14 @@ import com.jaamsim.basicsim.ObjectType;
 import com.jaamsim.datatypes.BooleanVector;
 import com.jaamsim.datatypes.DoubleVector;
 import com.jaamsim.datatypes.IntegerVector;
-import com.jaamsim.input.ExpParser.Expression;
 import com.jaamsim.math.Color4d;
+import com.jaamsim.ui.NaturalOrderComparator;
 import com.jaamsim.units.DimensionlessUnit;
 import com.jaamsim.units.TimeUnit;
 import com.jaamsim.units.Unit;
 import com.jaamsim.units.UserSpecifiedUnit;
 
 public abstract class Input<T> {
-	// 各种异常提示
 	protected static final String INP_ERR_COUNT = "Expected an input with %s value(s), received: %s";
 	protected static final String INP_ERR_RANGECOUNT = "Expected an input with %d to %d values, received: %s";
 	protected static final String INP_ERR_RANGECOUNTMIN = "Expected an input with at least %d values, received: %s";
@@ -77,52 +77,25 @@ public abstract class Input<T> {
 
 	public static final String POSITIVE_INFINITY = "Infinity";
 	public static final String NEGATIVE_INFINITY = "-Infinity";
-	protected static final String SEPARATOR = "  ";
+	public static final String SEPARATOR = "  ";
 
-	/**
-	 * the preferred name for the input keyword
-	 */
-	private String keyword;
-
+	private String keyword; // the preferred name for the input keyword
 	private final String category;
 
 	protected T defValue;
-
 	protected T value;
-	/**
-	 * indicates if input has been edited for this entity
-	 */
-	private boolean edited;
-	/**
-	 * indicates whether to prompt the user to save the configuration file
-	 */
-	private boolean promptReqd;
-	/**
-	 * Hide this input from the EditBox
-	 */
-	private boolean hidden;
-	/**
-	 * Is this input still the default value?
-	 */
-	private boolean isDef;
-	/**
-	 * value from .cfg file
-	 */
-	private String[] valueTokens;
-	/**
-	 * special text to show in the default column of the Input Editor
-	 */
-	private String defText;
-	/**
-	 * indicates whether this input must be provided by the user
-	 */
-	private boolean isReqd;
 
-	/**
-	 * @param key 关键字
-	 * @param cat 分类
-	 * @param def 默认值
-	 */
+	private boolean edited; // indicates if input has been edited for this entity
+	private boolean promptReqd; // indicates whether to prompt the user to save the configuration file
+	private boolean hidden; // Hide this input from the EditBox
+	private boolean isDef; // Is this input still the default value?
+	private String[] valueTokens; // value from .cfg file
+	private String defText; // special text to show in the default column of the Input Editor
+	private boolean isReqd;     // indicates whether this input must be provided by the user
+	private boolean isValid;  // if false, the input is no longer valid and must be re-entered
+
+	public static final Comparator<Object> uiSortOrder = new NaturalOrderComparator();
+
 	public Input(String key, String cat, T def) {
 		keyword = key;
 		category = cat;
@@ -135,6 +108,7 @@ public abstract class Input<T> {
 		valueTokens = null;
 		defText = null;
 		isReqd = false;
+		isValid = true;
 	}
 
 	public void reset() {
@@ -142,10 +116,12 @@ public abstract class Input<T> {
 		valueTokens = null;
 		edited = false;
 		isDef = true;
+		isValid = true;
 	}
 
 	/**
-	 * Assigns the internal state for this input to the same values as the specified input.
+	 * Assigns the internal state for this input to the same values as the
+	 * specified input.
 	 * @param in - input object to be copied.
 	 */
 	public void copyFrom(Input<?> in) {
@@ -240,6 +216,14 @@ public abstract class Input<T> {
 		return isReqd;
 	}
 
+	public void setValid(boolean bool) {
+		isValid = bool;
+	}
+
+	public boolean isValid() {
+		return isValid;
+	}
+
 	public void validate() throws InputErrorException {
 		if (isReqd && isDef && !hidden)
 			throw new InputErrorException("An input must be provided for the keyword '%s'.", keyword);
@@ -271,7 +255,14 @@ public abstract class Input<T> {
 		if (isDefault()) return "";
 
 		ArrayList<String> tmp = new ArrayList<>();
-		getValueTokens(tmp);
+		try {
+			getValueTokens(tmp);
+		} catch (Exception e) {
+			InputAgent.logMessage("Error in input, value has been cleared. Keyword: %s",
+					this.getKeyword());
+			InputAgent.logStackTrace(e);
+			this.reset();
+		}
 		if (tmp.size() == 0) return "";
 
 		StringBuilder sb = new StringBuilder();
@@ -279,7 +270,7 @@ public abstract class Input<T> {
 			String dat = tmp.get(i);
 			if (dat == null) continue;
 			if (i > 0)
-				sb.append("  ");
+				sb.append(Input.SEPARATOR);
 
 			if (Parser.needsQuoting(dat) && !dat.equals("{") && !dat.equals("}"))
 				sb.append("'").append(dat).append("'");
@@ -582,7 +573,7 @@ public abstract class Input<T> {
 				boolean element = Input.parseBoolean(kw.getArg(i));
 				temp.add(element);
 			} catch (InputErrorException e) {
-				throw new InputErrorException(INP_ERR_ELEMENT, i, e.getMessage());
+				throw new InputErrorException(INP_ERR_ELEMENT, i+1, e.getMessage());
 			}
 		}
 		return temp;
@@ -597,7 +588,7 @@ public abstract class Input<T> {
 				boolean element = Input.parseBoolean(input.get(i));
 				temp.add(element);
 			} catch (InputErrorException e) {
-				throw new InputErrorException(INP_ERR_ELEMENT, i, e.getMessage());
+				throw new InputErrorException(INP_ERR_ELEMENT, i+1, e.getMessage());
 			}
 		}
 		return temp;
@@ -613,7 +604,7 @@ public abstract class Input<T> {
 				Color4d element = Input.parseColour(subArgs.get(i));
 				temp.add(element);
 			} catch (InputErrorException e) {
-				throw new InputErrorException(INP_ERR_ELEMENT, i, e.getMessage());
+				throw new InputErrorException(INP_ERR_ELEMENT, i+1, e.getMessage());
 			}
 		}
 		return temp;
@@ -677,7 +668,7 @@ public abstract class Input<T> {
 				int element = Input.parseInteger(input.get(i), minValue, maxValue);
 				temp.add(element);
 			} catch (InputErrorException e) {
-				throw new InputErrorException(INP_ERR_ELEMENT, i, e.getMessage());
+				throw new InputErrorException(INP_ERR_ELEMENT, i+1, e.getMessage());
 			}
 		}
 		return temp;
@@ -692,7 +683,7 @@ public abstract class Input<T> {
 				int element = Input.parseInteger(kw.getArg(i), minValue, maxValue);
 				temp.add(element);
 			} catch (InputErrorException e) {
-				throw new InputErrorException(INP_ERR_ELEMENT, i, e.getMessage());
+				throw new InputErrorException(INP_ERR_ELEMENT, i+1, e.getMessage());
 			}
 		}
 		return temp;
@@ -711,7 +702,7 @@ public abstract class Input<T> {
 		double value = 0.0d;
 
 		// check for hh:mm:ss or hh:mm
-		if (data.indexOf(":") > -1) {
+		if (data.indexOf(':') > -1) {
 			String[] splitDouble = data.split( ":" );
 			if (splitDouble.length != 2 && splitDouble.length != 3)
 				throw new InputErrorException(INP_ERR_TIME, data);
@@ -828,7 +819,7 @@ public abstract class Input<T> {
 		}
 
 		if (isextendfull.matcher(input).matches()) {
-			int len = input.indexOf(".");
+			int len = input.indexOf('.');
 			int hh = Integer.parseInt(input.substring(0, len - 6));
 			int mm = Integer.parseInt(input.substring(len - 5, len - 3));
 			int ss = Integer.parseInt(input.substring(len - 2, len));
@@ -985,7 +976,7 @@ public abstract class Input<T> {
 				double element = Input.parseDouble(input.get(i), minValue, maxValue, factor);
 				temp.add(element);
 			} catch (InputErrorException e) {
-				throw new InputErrorException(INP_ERR_ELEMENT, i, e.getMessage());
+				throw new InputErrorException(INP_ERR_ELEMENT, i+1, e.getMessage());
 			}
 		}
 		return temp;
@@ -1049,7 +1040,7 @@ public abstract class Input<T> {
 				}
 			} catch (InputErrorException e) {
 				if (includeIndex && numDoubles > 1)
-					throw new InputErrorException(INP_ERR_ELEMENT, i, e.getMessage());
+					throw new InputErrorException(INP_ERR_ELEMENT, i+1, e.getMessage());
 				else
 					throw e;
 			}
@@ -1112,7 +1103,7 @@ public abstract class Input<T> {
 				if (numDoubles == 1)
 					throw e;
 				else
-					throw new InputErrorException(INP_ERR_ELEMENT, i, e.getMessage());
+					throw new InputErrorException(INP_ERR_ELEMENT, i+1, e.getMessage());
 			}
 		}
 		return temp;
@@ -1185,7 +1176,7 @@ public abstract class Input<T> {
 				String element = Input.parseString(kw.getArg(i), validList);
 				temp.add(element);
 			} catch (InputErrorException e) {
-				throw new InputErrorException(INP_ERR_ELEMENT, i, e.getMessage());
+				throw new InputErrorException(INP_ERR_ELEMENT, i+1, e.getMessage());
 			}
 		}
 		return temp;
@@ -1361,7 +1352,7 @@ public abstract class Input<T> {
 				ArrayList<T> element = Input.parseEntityList(subArgs.get(i), aClass, unique);
 				temp.add(element);
 			} catch (InputErrorException e) {
-				throw new InputErrorException(INP_ERR_ELEMENT, i, e.getMessage());
+				throw new InputErrorException(INP_ERR_ELEMENT, i+1, e.getMessage());
 			}
 		}
 		return temp;
@@ -1444,7 +1435,7 @@ public abstract class Input<T> {
 		}
 	}
 
-	public static OutputChain parseOutputChain(KeywordIndex kw) {
+	public static OutputChain parseOutputChain(KeywordIndex kw, Class<? extends Unit> unitType) {
 		String entName = "";
 		String outputName = "";
 		ArrayList<String> outputNameList = new ArrayList<>();
@@ -1501,6 +1492,11 @@ public abstract class Input<T> {
 		if (!outputNameList.isEmpty() && !(Entity.class).isAssignableFrom(out.getReturnType()))
 			throw new InputErrorException("The first output in an output chain must return an Entity");
 
+		if (outputNameList.isEmpty() && out.isNumericValue() && out.getUnitType() != unitType)
+			throw new InputErrorException("Unit mismatch. Expected a %s, received a %s",
+					ObjectType.getObjectTypeForClass(unitType),
+					ObjectType.getObjectTypeForClass(out.getUnitType()));
+
 		return new OutputChain(ent, outputName, out, outputNameList);
 	}
 
@@ -1508,12 +1504,14 @@ public abstract class Input<T> {
 
 		// Try to parse the input as an OutputChain
 		try {
-			OutputChain chain = Input.parseOutputChain(kw);
+			OutputChain chain = Input.parseOutputChain(kw, unitType);
 			return new StringProvOutput(chain, unitType);
 		}
 		catch (InputErrorException e) {}
 
 		// Parse the input as a SampleProvider
+		if (unitType == null)
+			throw new InputErrorException("A valid unit type must be defined before an expression returning a number can be entered.");
 		SampleProvider samp = Input.parseSampleExp(kw, thisEnt, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, unitType);
 		return new StringProvSample(samp);
 	}
@@ -1524,7 +1522,7 @@ public abstract class Input<T> {
 		// If there are two or more inputs, it could be a chain of outputs
 		if (kw.numArgs() >= 2) {
 			try {
-				return new SampleOutput(Input.parseOutputChain(kw), unitType);
+				return new SampleOutput(Input.parseOutputChain(kw, unitType), unitType);
 			}
 			catch (InputErrorException e) {
 				if (kw.numArgs() > 2 || unitType == null)
@@ -1573,9 +1571,8 @@ public abstract class Input<T> {
 
 		// 3) Try parsing an expression
 		try {
-			Expression exp = ExpParser.parseExpression(ExpEvaluator.getParseContext(), kw.getArg(0));
-			ExpValidator.validateExpression(exp, thisEnt, unitType);
-			return new SampleExpression(exp, thisEnt, unitType);
+			String expString = kw.getArg(0);
+			return new SampleExpression(expString, thisEnt, unitType);
 		}
 		catch (ExpError e) {
 			throw new InputErrorException(e.toString());

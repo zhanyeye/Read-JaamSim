@@ -35,7 +35,9 @@ import java.awt.event.FocusEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.awt.geom.Rectangle2D;
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.InputStreamReader;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Locale;
@@ -59,6 +61,7 @@ import javax.swing.JSpinner;
 import javax.swing.JTextField;
 import javax.swing.JToggleButton;
 import javax.swing.JToolBar;
+import javax.swing.JWindow;
 import javax.swing.SpinnerNumberModel;
 import javax.swing.SwingUtilities;
 import javax.swing.ToolTipManager;
@@ -192,10 +195,11 @@ public class GUIFrame extends JFrame implements EventTimeListener, EventErrorLis
 
 		this.setIconImage(GUIFrame.getWindowIcon());
 
-		//Set window size and make visible
+		//Set window size
+		setResizable( true );  //FIXME should be false, but this causes the window to be sized
+		                       //      and positioned incorrectly in the Windows 7 Aero theme
 		pack();
 		setSize(DEFAULT_GUI_WIDTH, getPreferredSize().height);
-		setResizable( false );
 
 		controlStartResume.setSelected( false );
 		controlStartResume.setEnabled( false );
@@ -292,7 +296,7 @@ public class GUIFrame extends JFrame implements EventTimeListener, EventErrorLis
 	}
 
 	/**
-	 * Clears the simulation and user interface for a new run
+	 * Clears the simulation and user interface prior to loading a new model
 	 */
 	public void clear() {
 		currentEvt.clear();
@@ -432,16 +436,29 @@ public class GUIFrame extends JFrame implements EventTimeListener, EventErrorLis
 		fileMenu.add( saveConfigurationAsMenuItem );
 
 		// 5) "Import..." menu item
-		JMenuItem importGraphicsMenuItem = new JMenuItem( "Import..." );
+		JMenu importGraphicsMenuItem = new JMenu( "Import..." );
 		importGraphicsMenuItem.setMnemonic( 'I' );
-		importGraphicsMenuItem.addActionListener( new ActionListener() {
+
+		JMenuItem importImages = new JMenuItem( "Images..." );
+		importImages.addActionListener(new ActionListener() {
 
 			@Override
 			public void actionPerformed( ActionEvent event ) {
-				DisplayEntityFactory.importGraphics(GUIFrame.this);
-
+				DisplayEntityFactory.importImages(GUIFrame.this);
 			}
 		} );
+		importGraphicsMenuItem.add( importImages );
+
+		JMenuItem import3D = new JMenuItem( "3D Assets..." );
+		import3D.addActionListener(new ActionListener() {
+
+			@Override
+			public void actionPerformed( ActionEvent event ) {
+				DisplayEntityFactory.import3D(GUIFrame.this);
+			}
+		} );
+		importGraphicsMenuItem.add( import3D );
+
 		fileMenu.add( importGraphicsMenuItem );
 
 		// 6) "Print Input Report" menu item
@@ -509,74 +526,53 @@ public class GUIFrame extends JFrame implements EventTimeListener, EventErrorLis
 		// 3) "Model Builder" menu item
 		JMenuItem objectPalletMenuItem = new JMenuItem( "Model Builder" );
 		objectPalletMenuItem.setMnemonic( 'O' );
-		objectPalletMenuItem.addActionListener( new ActionListener() {
-
-			@Override
-			public void actionPerformed( ActionEvent event ) {
-				InputAgent.applyArgs(Simulation.getInstance(), "ShowModelBuilder", "TRUE");
-			}
-		} );
+		objectPalletMenuItem.addActionListener(new SimulationMenuAction("ShowModelBuilder", "TRUE"));
 		viewMenu.add( objectPalletMenuItem );
 
 		// 4) "Object Selector" menu item
 		JMenuItem objectSelectorMenuItem = new JMenuItem( "Object Selector" );
 		objectSelectorMenuItem.setMnemonic( 'S' );
-		objectSelectorMenuItem.addActionListener( new ActionListener() {
-
-			@Override
-			public void actionPerformed( ActionEvent event ) {
-				InputAgent.applyArgs(Simulation.getInstance(), "ShowObjectSelector", "TRUE");
-			}
-		} );
+		objectSelectorMenuItem.addActionListener(new SimulationMenuAction("ShowObjectSelector", "TRUE"));
 		viewMenu.add( objectSelectorMenuItem );
 
 		// 5) "Input Editor" menu item
 		JMenuItem inputEditorMenuItem = new JMenuItem( "Input Editor" );
 		inputEditorMenuItem.setMnemonic( 'I' );
-		inputEditorMenuItem.addActionListener( new ActionListener() {
-
-			@Override
-			public void actionPerformed( ActionEvent event ) {
-				InputAgent.applyArgs(Simulation.getInstance(), "ShowInputEditor", "TRUE");
-			}
-		} );
+		inputEditorMenuItem.addActionListener(new SimulationMenuAction("ShowInputEditor", "TRUE"));
 		viewMenu.add( inputEditorMenuItem );
 
 		// 6) "Output Viewer" menu item
 		JMenuItem outputMenuItem = new JMenuItem( "Output Viewer" );
 		outputMenuItem.setMnemonic( 'U' );
-		outputMenuItem.addActionListener( new ActionListener() {
-
-			@Override
-			public void actionPerformed( ActionEvent event ) {
-				InputAgent.applyArgs(Simulation.getInstance(), "ShowOutputViewer", "TRUE");
-			}
-		} );
+		outputMenuItem.addActionListener(new SimulationMenuAction("ShowOutputViewer", "TRUE"));
 		viewMenu.add( outputMenuItem );
 
 		// 7) "Property Viewer" menu item
 		JMenuItem propertiesMenuItem = new JMenuItem( "Property Viewer" );
 		propertiesMenuItem.setMnemonic( 'P' );
-		propertiesMenuItem.addActionListener( new ActionListener() {
-
-			@Override
-			public void actionPerformed( ActionEvent event ) {
-				InputAgent.applyArgs(Simulation.getInstance(), "ShowPropertyViewer", "TRUE");
-			}
-		} );
+		propertiesMenuItem.addActionListener(new SimulationMenuAction("ShowPropertyViewer", "TRUE"));
 		viewMenu.add( propertiesMenuItem );
 
 		// 8) "Log Viewer" menu item
 		JMenuItem logMenuItem = new JMenuItem( "Log Viewer" );
 		logMenuItem.setMnemonic( 'L' );
-		logMenuItem.addActionListener( new ActionListener() {
-
-			@Override
-			public void actionPerformed( ActionEvent event ) {
-				InputAgent.applyArgs(Simulation.getInstance(), "ShowLogViewer", "TRUE");
-			}
-		} );
+		logMenuItem.addActionListener(new SimulationMenuAction("ShowLogViewer", "TRUE"));
 		viewMenu.add( logMenuItem );
+	}
+
+	private static final class SimulationMenuAction implements ActionListener {
+		final String keyword;
+		final String args;
+
+		SimulationMenuAction(String k, String a) {
+			keyword = k;
+			args = a;
+		}
+
+		@Override
+		public void actionPerformed(ActionEvent e) {
+			InputAgent.applyArgs(Simulation.getInstance(), keyword, args);
+		}
 	}
 
 	/**
@@ -749,7 +745,6 @@ public class GUIFrame extends JFrame implements EventTimeListener, EventErrorLis
 				JToggleButton startResume = (JToggleButton)event.getSource();
 				startResume.setEnabled(false);
 				if(startResume.isSelected()) {
-					// GUI 启动仿真
 					GUIFrame.this.startSimulation();
 					controlStartResume.setPressedIcon(pausePressedIcon);
 				}
@@ -815,6 +810,10 @@ public class GUIFrame extends JFrame implements EventTimeListener, EventErrorLis
 				new SpinnerModel(Simulation.DEFAULT_REAL_TIME_FACTOR,
 				   Simulation.MIN_REAL_TIME_FACTOR, Simulation.MAX_REAL_TIME_FACTOR, 1);
 		spinner = new JSpinner(numberModel);
+
+		// show up to 6 decimal places
+		JSpinner.NumberEditor numberEditor = new JSpinner.NumberEditor(spinner,"0.######");
+		spinner.setEditor(numberEditor);
 
 		// make sure spinner TextField is no wider than 9 digits
 		int diff =
@@ -1182,7 +1181,15 @@ public class GUIFrame extends JFrame implements EventTimeListener, EventErrorLis
 	 * @param val - the speed up factor to write.
 	 */
 	public void setSpeedUp( double val ) {
-		speedUpDisplay.setText(String.format("%,.0f", val));
+		if (val == 0.0) {
+			speedUpDisplay.setText("-");
+		}
+		else if (val >= 0.99) {
+			speedUpDisplay.setText(String.format("%,.0f", val));
+		}
+		else {
+			speedUpDisplay.setText(String.format("%,.6f", val));
+		}
 	}
 
 	/**
@@ -1211,20 +1218,15 @@ public class GUIFrame extends JFrame implements EventTimeListener, EventErrorLis
 
 	/**
 	 * Starts or resumes the simulation run.
-	 * 启动或恢复进程运行
 	 */
 	public void startSimulation() {
 		if( getSimState() <= SIM_STATE_CONFIGURED ) {
-			// 仿真当前没有运行
 			if (InputAgent.isSessionEdited()) {
-				// 判断是否要保存文件
 				this.saveAs();
 			}
-			// 仿真启动并执行初始化， 基于事件管理器
 			Simulation.start(currentEvt);
 		}
 		else if( getSimState() == SIM_STATE_PAUSED ) {
-			// 仿真当前是暂停状态
 			currentEvt.resume(currentEvt.secondsToNearestTick(Simulation.getPauseTime()));
 		}
 		else
@@ -1259,6 +1261,13 @@ public class GUIFrame extends JFrame implements EventTimeListener, EventErrorLis
 	 */
 	public void startNextRun() {
 		Simulation.startRun(currentEvt);
+	}
+
+	/**
+	 * Stops the present simulation run when multiple runs are to be executed.
+	 */
+	public void stopRun() {
+		Simulation.stopRun(currentEvt);
 	}
 
 	/** model was executed, but no configuration performed */
@@ -1391,7 +1400,7 @@ public class GUIFrame extends JFrame implements EventTimeListener, EventErrorLis
 	/**
 	 * updates RealTime button and Spinner
 	 */
-	public void updateForRealTime(boolean executeRT, int factorRT) {
+	public void updateForRealTime(boolean executeRT, double factorRT) {
 		currentEvt.setExecuteRealTime(executeRT, factorRT);
 		controlRealTime.setSelected(executeRT);
 		spinner.setValue(factorRT);
@@ -1479,22 +1488,20 @@ public class GUIFrame extends JFrame implements EventTimeListener, EventErrorLis
 		COL1_WIDTH = 220;
 		COL2_WIDTH = Math.min(520, (winSize.width - COL1_WIDTH) / 2);
 		COL3_WIDTH = Math.min(420, winSize.width - COL1_WIDTH - COL2_WIDTH);
+		VIEW_WIDTH = COL2_WIDTH + COL3_WIDTH;
 
-		COL1_START = 0;
+		COL1_START = GUIFrame.instance().getX();
 		COL2_START = COL1_START + COL1_WIDTH;
 		COL3_START = COL2_START + COL2_WIDTH;
 
 		HALF_TOP = (winSize.height - guiSize.height) / 2;
 		HALF_BOTTOM = (winSize.height - guiSize.height - HALF_TOP);
-
-		TOP_START = guiSize.height;
-		BOTTOM_START = TOP_START + HALF_TOP;
-
 		LOWER_HEIGHT = (winSize.height - guiSize.height) / 3;
-		LOWER_START = winSize.height - LOWER_HEIGHT;
+		VIEW_HEIGHT = winSize.height - guiSize.height - LOWER_HEIGHT;
 
-		VIEW_WIDTH = COL2_WIDTH + COL3_WIDTH;
-		VIEW_HEIGHT = winSize.height - TOP_START - LOWER_HEIGHT;
+		TOP_START = GUIFrame.instance().getY() + guiSize.height;
+		BOTTOM_START = TOP_START + HALF_TOP;
+		LOWER_START = TOP_START + VIEW_HEIGHT;
 	}
 
 	/**
@@ -1541,12 +1548,19 @@ public class GUIFrame extends JFrame implements EventTimeListener, EventErrorLis
 		boolean batch = false;
 		boolean minimize = false;
 		boolean quiet = false;
+		boolean scriptMode = false;
 
 		for (String each : args) {
 			// Batch mode
 			if (each.equalsIgnoreCase("-b") ||
 			    each.equalsIgnoreCase("-batch")) {
 				batch = true;
+				continue;
+			}
+			// Script mode (command line I/O)
+			if (each.equalsIgnoreCase("-s") ||
+			    each.equalsIgnoreCase("-script")) {
+				scriptMode = true;
 				continue;
 			}
 			// z-buffer offset
@@ -1576,7 +1590,28 @@ public class GUIFrame extends JFrame implements EventTimeListener, EventErrorLis
 			configFiles.add(each);
 		}
 
+		InputAgent.setScriptMode(scriptMode);
+
+		// If not running in batch mode, create the splash screen
+		JWindow splashScreen = null;
 		if (!batch) {
+			URL splashImage = GUIFrame.class.getResource("/resources/images/splashscreen.png");
+			ImageIcon imageIcon = new ImageIcon(splashImage);
+			Dimension screen = Toolkit.getDefaultToolkit().getScreenSize();
+			int splashX = (screen.width - imageIcon.getIconWidth()) / 2;
+			int splashY = (screen.height - imageIcon.getIconHeight()) / 2;
+
+			// Set the window's bounds, centering the window
+			splashScreen = new JWindow();
+			splashScreen.setAlwaysOnTop(true);
+			splashScreen.setBounds(splashX, splashY, imageIcon.getIconWidth(), imageIcon.getIconHeight());
+
+			// Build the splash screen
+			splashScreen.getContentPane().add(new JLabel(imageIcon));
+
+			// Display it
+			splashScreen.setVisible(true);
+
 			// Begin initializing the rendering system
 			RenderManager.initialize(SAFE_GRAPHICS);
 		}
@@ -1623,12 +1658,23 @@ public class GUIFrame extends JFrame implements EventTimeListener, EventErrorLis
 
 			Throwable t = gui.configure(loadFile);
 			if (t != null) {
+				// Hide the splash screen
+				if (splashScreen != null) {
+					splashScreen.dispose();
+					splashScreen = null;
+				}
 				handleConfigError(t, loadFile);
 			}
 		}
 
+		// If in script mode, load a configuration file from standard in
+		if (scriptMode) {
+			BufferedReader buf = new BufferedReader(new InputStreamReader(System.in));
+			InputAgent.readBufferedStream(buf, null, "");
+		}
+
 		// If no configuration files were specified on the command line, then load the default configuration file
-		if( configFiles.size() == 0 ) {
+		if (configFiles.size() == 0 && !scriptMode) {
 			InputAgent.setRecordEdits(true);
 			InputAgent.loadDefault();
 			gui.updateForSimulationState(GUIFrame.SIM_STATE_CONFIGURED);
@@ -1654,6 +1700,12 @@ public class GUIFrame extends JFrame implements EventTimeListener, EventErrorLis
 			return;
 		}
 
+		// Hide the splash screen
+		if (splashScreen != null) {
+			splashScreen.dispose();
+			splashScreen = null;
+		}
+
 		// Bring the Control Panel to the front (along with any open Tools)
 		gui.toFront();
 
@@ -1665,7 +1717,15 @@ public class GUIFrame extends JFrame implements EventTimeListener, EventErrorLis
 
 		@Override
 		public void stateChanged( ChangeEvent e ) {
-			String str = String.format("%d", ((JSpinner)e.getSource()).getValue());
+			Double val = (Double)((JSpinner)e.getSource()).getValue();
+
+			String str;
+			if (val.doubleValue() >= 1.0) {
+				str = String.format("%.0f", val);
+			}
+			else {
+				str = String.format("%.6f", val);
+			}
 			InputAgent.applyArgs(Simulation.getInstance(), "RealTimeFactor", str);
 		}
 	}
@@ -1675,18 +1735,20 @@ public class GUIFrame extends JFrame implements EventTimeListener, EventErrorLis
 	 * previous value will be value / 2
 	 */
 	public static class SpinnerModel extends SpinnerNumberModel {
-		private int value;
-		public SpinnerModel( int val, int min, int max, int stepSize) {
+		private double value;
+		public SpinnerModel( double val, double min, double max, double stepSize) {
 			super(val, min, max, stepSize);
 		}
 
 		@Override
 		public Object getPreviousValue() {
-			value = this.getNumber().intValue() / 2;
+			value = this.getNumber().doubleValue() / 2.0;
+			if (value >= 1.0)
+				value = Math.floor(value);
 
 			// Avoid going beyond limit
-			Integer min = (Integer)this.getMinimum();
-			if (min.intValue() > value) {
+			Double min = (Double)this.getMinimum();
+			if (min.doubleValue() > value) {
 				return min;
 			}
 			return value;
@@ -1694,11 +1756,13 @@ public class GUIFrame extends JFrame implements EventTimeListener, EventErrorLis
 
 		@Override
 		public Object getNextValue() {
-			value = this.getNumber().intValue() * 2;
+			value = this.getNumber().doubleValue() * 2.0;
+			if (value >= 1.0)
+				value = Math.floor(value);
 
 			// Avoid going beyond limit
-			Integer max = (Integer)this.getMaximum();
-			if (max.intValue() < value) {
+			Double max = (Double)this.getMaximum();
+			if (max.doubleValue() < value) {
 				return max;
 			}
 			return value;
@@ -1751,8 +1815,7 @@ public class GUIFrame extends JFrame implements EventTimeListener, EventErrorLis
 			InputAgent.logMessage("Out of Memory use the -Xmx flag during execution for more memory");
 			InputAgent.logMessage("Further debug information:");
 			InputAgent.logMessage("Error: %s", e.getMessage());
-			for (StackTraceElement each : e.getStackTrace())
-				InputAgent.logMessage(each.toString());
+			InputAgent.logStackTrace(t);
 			GUIFrame.shutdown(1);
 			return;
 		}
@@ -1760,8 +1823,7 @@ public class GUIFrame extends JFrame implements EventTimeListener, EventErrorLis
 			double curSec = evt.ticksToSeconds(currentTick);
 			InputAgent.logMessage("EXCEPTION AT TIME: %f s", curSec);
 			InputAgent.logMessage("Error: %s", t.getMessage());
-			for (StackTraceElement each : t.getStackTrace())
-				InputAgent.logMessage(each.toString());
+			InputAgent.logStackTrace(t);
 		}
 
 		GUIFrame.showErrorDialog("Runtime Error",
@@ -1844,7 +1906,7 @@ public class GUIFrame extends JFrame implements EventTimeListener, EventErrorLis
 
 	static void handleConfigError(Throwable t, File file) {
 		if (t instanceof InputErrorException) {
-			LogBox.logLine("Input Error: " + t.getMessage());
+			InputAgent.logMessage("Input Error: %s", t.getMessage());
 			GUIFrame.showErrorOptionDialog("Input Error",
 			                         "Input errors were detected while loading file: '%s'\n\n%s\n\n" +
 			                         "Open '%s' with Log Viewer?",
@@ -1852,7 +1914,7 @@ public class GUIFrame extends JFrame implements EventTimeListener, EventErrorLis
 			return;
 		}
 
-		LogBox.format("Fatal Error while loading file '%s': %s\n", file.getName(), t.getMessage());
+		InputAgent.logMessage("Fatal Error while loading file '%s': %s\n", file.getName(), t.getMessage());
 		GUIFrame.showErrorDialog("Fatal Error",
 		                         "A fatal error has occured while loading the file '%s':\n\n%s",
 		                         file.getName(), t.getMessage());
@@ -1915,7 +1977,7 @@ public class GUIFrame extends JFrame implements EventTimeListener, EventErrorLis
 
 		// Add the file extension ".cfg" if needed
 		filePath = filePath.trim();
-		if (file.getName().trim().indexOf(".") == -1) {
+		if (file.getName().trim().indexOf('.') == -1) {
 			filePath = filePath.concat(".cfg");
 		}
 
@@ -2020,14 +2082,14 @@ public class GUIFrame extends JFrame implements EventTimeListener, EventErrorLis
 	 */
 	public static void invokeErrorDialog(String title, String fmt, Object... args) {
 		final String msg = String.format(fmt,  args);
-		SwingUtilities.invokeLater(new runnableError(title, msg));
+		SwingUtilities.invokeLater(new RunnableError(title, msg));
 	}
 
-	private static class runnableError implements Runnable {
+	private static class RunnableError implements Runnable {
 		private final String title;
 		private final String message;
 
-		public runnableError(String t, String m) {
+		public RunnableError(String t, String m) {
 			title = t;
 			message = m;
 		}

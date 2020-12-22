@@ -20,6 +20,7 @@ import java.awt.Point;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.Map.Entry;
 
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
@@ -28,6 +29,7 @@ import javax.swing.table.TableModel;
 
 import com.jaamsim.basicsim.Entity;
 import com.jaamsim.datatypes.DoubleVector;
+import com.jaamsim.input.Input;
 import com.jaamsim.input.OutputHandle;
 import com.jaamsim.units.DimensionlessUnit;
 import com.jaamsim.units.Unit;
@@ -203,7 +205,10 @@ private class OutputTableModel extends AbstractTableModel {
 						str = String.format("%g, ", vec.get(i)/factor);
 						sb.append(str);
 					}
-					sb.replace(sb.length()-2, sb.length()-1, "}");
+					if (sb.length() > 1)
+						sb.replace(sb.length()-2, sb.length()-1, "}");
+					else
+						sb.append("}");
 				}
 
 				// ArrayList output
@@ -221,29 +226,37 @@ private class OutputTableModel extends AbstractTableModel {
 						}
 						sb.append(str);
 					}
-					sb.replace(sb.length()-2, sb.length()-1, "}");
+					if (sb.length() > 1)
+						sb.replace(sb.length()-2, sb.length()-1, "}");
+					else
+						sb.append("}");
 				}
 
 				// Keyed outputs
 				else if (out.getReturnType() == LinkedHashMap.class) {
 					sb.append("{");
 					LinkedHashMap<?, ?> map = out.getValue(simTime, LinkedHashMap.class);
-					for (Object key : map.keySet()) {
-						Object obj = map.get(key);
+					for (Entry<?, ?> mapEntry : map.entrySet()) {
+						Object obj = mapEntry.getValue();
 						if (obj instanceof Double) {
 							double val = (Double)obj;
-							str = String.format("%s=%g, ", key, val/factor);
+							str = String.format("%s=%g, ", mapEntry.getKey(), val/factor);
 						}
 						else {
-							str = String.format("%s=%s, ", key, obj);
+							str = String.format("%s=%s, ", mapEntry.getKey(), obj);
 						}
 						sb.append(str);
 					}
-					sb.replace(sb.length()-2, sb.length()-1, "}");
+					if (sb.length() > 1)
+						sb.replace(sb.length()-2, sb.length()-1, "}");
+					else
+						sb.append("}");
 				}
 
 				// All other outputs
 				else {
+					if (out.getValue(simTime, out.getReturnType()) == null)
+						return "null";
 					str = out.getValue(simTime, out.getReturnType()).toString();
 					sb.append(str);
 					unitString = Unit.getSIUnit(ut);  // other outputs are not converted to preferred units
@@ -251,7 +264,7 @@ private class OutputTableModel extends AbstractTableModel {
 
 				// Append the appropriate unit
 				if (ut != Unit.class && ut != DimensionlessUnit.class)
-					sb.append("  ").append(unitString);
+					sb.append(Input.SEPARATOR).append(unitString);
 
 				return sb.toString();
 			}

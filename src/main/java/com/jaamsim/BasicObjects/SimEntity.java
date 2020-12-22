@@ -24,9 +24,6 @@ import com.jaamsim.states.StateEntity;
 
 public class SimEntity extends StateEntity {
 
-	/**
-	 * 即使没有记录该状态的时间，状态列表也会始终显示在输出报告中。
-	 */
 	@Keyword(description = "A list of states that will always appear in the output report, "
 			+ "even if no time is recorded for this state.",
 	         exampleList = "Idle Working")

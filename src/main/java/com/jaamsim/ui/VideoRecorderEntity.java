@@ -18,6 +18,8 @@ package com.jaamsim.ui;
 
 import java.util.ArrayList;
 
+import javax.swing.JOptionPane;
+
 import com.jaamsim.Graphics.DisplayEntity;
 import com.jaamsim.controllers.RenderManager;
 import com.jaamsim.controllers.VideoRecorder;
@@ -39,47 +41,68 @@ import com.jaamsim.input.ValueInput;
 import com.jaamsim.units.TimeUnit;
 
 public class VideoRecorderEntity extends DisplayEntity {
-	@Keyword(description = "Simulated time between screen captures",
-	         example = "This is placeholder example text")
-	private final ValueInput captureInterval;
 
-	@Keyword(description = "How long the simulation waits until starting video recording",
-	         example = "This is placeholder example text")
+	@Keyword(description = "Simulation time at which to capture the first frame.",
+	         exampleList = {"200 h"})
 	private final ValueInput captureStartTime;
 
-	@Keyword(description = "Number of frames to capture",
-	         example = "This is placeholder example text")
+	@Keyword(description = "Simulation time between captured frames.",
+	         exampleList = {"60 s"})
+	private final ValueInput captureInterval;
+
+	@Keyword(description = "Total number of frames to capture for the video.\n"
+	                     + "The recorded video assumes 30 frames per second. Therefore, if a "
+	                     + "2 minute video is required, the number of frames should be set to "
+	                     + "120 x 30 = 3600.",
+	         exampleList = {"3600"})
 	private final IntegerInput captureFrames;
 
-	@Keyword(description = "If the video recorder should save out PNG files of individual frames",
-	         example = "This is placeholder example text")
-	private final BooleanInput saveImages;
-
-	@Keyword(description = "If the video recorder should save out an AVI file",
-	         example = "This is placeholder example text")
-	private final BooleanInput saveVideo;
-
-	@Keyword(description = "The size of the video/image in pixels",
-	         example = "This is placeholder example text")
+	@Keyword(description = "The size of the video/image, expressed as the number of horizontal "
+	                     + "and vertical pixels.\n"
+	                     + "The top left hand corner of the captured frames will be the same as "
+	                     + "the top left hand corner of the image on the monitor. If the "
+	                     + "specified image size is larger than the monitor resolution, then the "
+	                     + "image will be extented beyond the bottom and/or right sides of the "
+	                     + "monitor.",
+	         exampleList = {"1920 1080"})
 	private final IntegerListInput captureArea;
 
-	@Keyword(description = "The background color to use for video recording",
-	         example = "This is placeholder example text")
-	private final ColourInput videoBGColor;
-
-	@Keyword(description = "The list of views to draw in the video",
-	         example = "This is placeholder example text")
+	@Keyword(description = "The list of View windows to be captured.",
+	         exampleList = {"View1 View2 View3"})
 	private final EntityListInput<View> captureViews;
 
-	@Keyword(description = "The name of the video file to record",
-	         example = "This is placeholder example text")
+	@Keyword(description = "The background color for the captured frames.\n"
+	                     + "Only the 3D view portion of the specified windows will be captured. "
+	                     + "The remainder of the frame, such as the Control Panel or any gaps "
+	                     + "between the view windows, will be replaced by the background color.",
+	         exampleList = {"skyblue", "135 206 235"})
+	private final ColourInput videoBGColor;
+
+	@Keyword(description = "A label to append to the run name when the AVI file is saved.\n"
+	                     + "The saved file will be named <run name>_<VideoName>.avi.",
+	         exampleList = {"video"})
 	private final StringInput videoName;
+
+	@Keyword(description = "If TRUE, an individual PNG file will be saved for each frame.",
+	         exampleList = {"TRUE"})
+	private final BooleanInput saveImages;
+
+	@Keyword(description = "If TRUE, an AVI file containing the video will be saved.\n"
+	                     + "The AVI file will be encoded using the VP8 codec, which is NOT "
+	                     + "supported by Windows Media Player. Furthermore, the present encoding "
+	                     + "algorithm is quite inefficient making the file size much larger than "
+	                     + "necessary. Both problems can be solved by recoding the video using "
+	                     + "free open-source software such as HandBrake (https://handbrake.fr/).",
+	         exampleList = {"TRUE"})
+	private final BooleanInput saveVideo;
 
 	private boolean hasRunStartup;
 	private int numFramesWritten;
 	private final EventHandle captureHandle = new EventHandle();
 
 	{
+		attributeDefinitionList.setHidden(true);
+
 		captureStartTime = new ValueInput("CaptureStartTime", "Key Inputs", 0.0d);
 		captureStartTime.setUnitType(TimeUnit.class);
 		captureStartTime.setValidRange(0, Double.POSITIVE_INFINITY);
@@ -90,33 +113,34 @@ public class VideoRecorderEntity extends DisplayEntity {
 		captureInterval.setValidRange(0.1d, Double.POSITIVE_INFINITY);
 		this.addInput(captureInterval);
 
-		videoBGColor = new ColourInput("VideoBackgroundColor", "Key Inputs", ColourInput.WHITE);
-		this.addInput(videoBGColor);
-		this.addSynonym(videoBGColor, "Colour");
-
 		captureFrames = new IntegerInput("CaptureFrames", "Key Inputs", 0);
 		captureFrames.setValidRange(0, 30000);
 		this.addInput(captureFrames);
 
-		saveImages = new BooleanInput("SaveImages", "Key Inputs", false);
-		this.addInput(saveImages);
-
-		saveVideo = new BooleanInput("SaveVideo", "Key Inputs", false);
-		this.addInput(saveVideo);
-
 		IntegerVector defArea = new IntegerVector(2);
-		defArea.add(1000);
-		defArea.add(1000);
+		defArea.add(1920);
+		defArea.add(1080);
 		captureArea = new IntegerListInput("CaptureArea", "Key Inputs", defArea);
 		captureArea.setValidCount(2);
 		captureArea.setValidRange(0, 3000);
 		this.addInput(captureArea);
 
 		captureViews = new EntityListInput<>(View.class, "CaptureViews", "Key Inputs", new ArrayList<View>(0));
+		captureViews.setRequired(true);
 		this.addInput(captureViews);
+
+		videoBGColor = new ColourInput("VideoBackgroundColor", "Key Inputs", ColourInput.WHITE);
+		this.addInput(videoBGColor);
+		this.addSynonym(videoBGColor, "Colour");
 
 		videoName = new StringInput("VideoName", "Key Inputs", "");
 		this.addInput(videoName);
+
+		saveImages = new BooleanInput("SaveImages", "Key Inputs", false);
+		this.addInput(saveImages);
+
+		saveVideo = new BooleanInput("SaveVideo", "Key Inputs", false);
+		this.addInput(saveVideo);
 	}
 
 	@Override
@@ -187,14 +211,20 @@ public class VideoRecorderEntity extends DisplayEntity {
 			RenderManager.initialize(false);
 		}
 
+		if (!RenderManager.canRenderOffscreen()) {
+			JOptionPane.showMessageDialog(null, "Your hardware does not support Video Recording.");
+			return;
+		}
+
 		int width = captureArea.getValue().get(0);
 		int height = captureArea.getValue().get(1);
 
 		ArrayList<View> views = captureViews.getValue();
 
 		String videoFileName = String.format("%s_%s", InputAgent.getRunName(), videoName.getValue());
+		String fullVideoFile = InputAgent.getReportFileName(videoFileName); // getReportFileName() prepends the report directory onto a filename
 
-		VideoRecorder recorder = new VideoRecorder(views, videoFileName, width, height, captureFrames.getDefaultValue(),
+		VideoRecorder recorder = new VideoRecorder(views, fullVideoFile, width, height, captureFrames.getDefaultValue(),
 		                             saveImages.getValue(), saveVideo.getValue(), videoBGColor.getValue());
 
 		// Otherwise, start capturing

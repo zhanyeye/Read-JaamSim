@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2014 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2016 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,6 +27,7 @@ import com.jaamsim.input.ColourInput;
 import com.jaamsim.input.ExpError;
 import com.jaamsim.input.ExpEvaluator;
 import com.jaamsim.input.ExpressionInput;
+import com.jaamsim.input.Input;
 import com.jaamsim.input.Keyword;
 import com.jaamsim.input.Output;
 import com.jaamsim.math.Color4d;
@@ -33,21 +35,42 @@ import com.jaamsim.units.DimensionlessUnit;
 
 public class ExpressionThreshold extends Threshold {
 
-	@Keyword(description = "The logical condition for which the Threshold is open.",
-	         example = "ExpressionThreshold1  OpenCondition { '[Queue1].QueueLength &gt 3' }")
+	@Keyword(description = "The logical condition for the ExpressionThreshold to open.",
+	         exampleList = { "'[Queue1].QueueLength > 3'" })
 	private final ExpressionInput openCondition;
 
-	@Keyword(description = "The colour of the threshold graphic when the threshold condition is open, but the gate is still closed.",
-	         example = "ExpressionThreshold1  PendingOpenColour { yellow }")
+	@Keyword(description = "The logical condition for the ExpressionThreshold to close.\n"
+	                     + "If not specified, the CloseCondition defaults to the opposite of the "
+	                     + "OpenCondition. If the OpenCondition and CloseCondition are both TRUE, "
+	                     + "then the ExpressionThreshold is set to open.",
+	         exampleList = { "'[Queue1].QueueLength < 2'" })
+	private final ExpressionInput closeCondition;
+
+	@Keyword(description = "The initial state for the ExpressionThreshold: "
+	                     + "TRUE = Open, FALSE = Closed.\n"
+	                     + "This input is only relevant when the CloseCondition input is used "
+	                     + "and both the OpenCondition and CloseCondition are FALSE at the "
+	                     + "start of the simulation run. Otherwise, the the initial state is "
+	                     + "determined explicitly by the OpenCondition and CloseCondition.",
+	         exampleList = { "TRUE" })
+	private final BooleanInput initialOpenValue;
+
+	@Keyword(description = "The colour of the ExpressionThreshold graphic when the threshold "
+	                     + "condition is open, but the gate is still closed.",
+	         exampleList = { "yellow" })
 	private final ColourInput pendingOpenColour;
 
-	@Keyword(description = "The colour of the threshold graphic when the threshold condition is closed, but the gate is still open.",
-	         example = "ExpressionThreshold1  PendingClosedColour { yellow }")
+	@Keyword(description = "The colour of the ExpressionThreshold graphic when the threshold "
+	                     + "condition is closed, but the gate is still open.",
+	         exampleList = { "magenta" })
 	private final ColourInput pendingClosedColour;
 
-	@Keyword(description = "A Boolean value.  If TRUE, the threshold displayed distinguishes the pending open and pending closed states.",
-	         example = "Threshold1 ShowPendingStates { FALSE }")
+	@Keyword(description = "A Boolean value. If TRUE, the ExpressionThreshold displays the "
+	                     + "pending open and pending closed states.",
+	         exampleList = { "FALSE" })
 	private final BooleanInput showPendingStates;
+
+	private boolean lastOpenValue; // state of the threshold that was calculated on-demand
 
 	{
 		attributeDefinitionList.setHidden(false);
@@ -56,6 +79,13 @@ public class ExpressionThreshold extends Threshold {
 		openCondition.setEntity(this);
 		openCondition.setRequired(true);
 		this.addInput(openCondition);
+
+		closeCondition = new ExpressionInput("CloseCondition", "Key Inputs", null);
+		closeCondition.setEntity(this);
+		this.addInput(closeCondition);
+
+		initialOpenValue = new BooleanInput("InitialOpenValue", "Key Inputs", false);
+		this.addInput(initialOpenValue);
 
 		pendingOpenColour = new ColourInput("PendingOpenColour", "Graphics", ColourInput.YELLOW);
 		this.addInput(pendingOpenColour);
@@ -69,13 +99,122 @@ public class ExpressionThreshold extends Threshold {
 		this.addInput(showPendingStates);
 	}
 
+	public ExpressionThreshold() {}
+
 	@Override
-    public void startUp() {
+	public void earlyInit() {
+		super.earlyInit();
+		lastOpenValue = initialOpenValue.getValue();
+		lastOpenValue = this.getOpenConditionValue(0.0);
+	}
+
+	@Override
+	public void updateForInput(Input<?> in) {
+		super.updateForInput(in);
+
+		if (in == openCondition || in == closeCondition || in == initialOpenValue) {
+			lastOpenValue = initialOpenValue.getValue();
+			this.setInitialOpenValue(this.getOpenConditionValue(0.0));
+			return;
+		}
+	}
+
+	@Override
+	public void startUp() {
 		super.startUp();
 
 		doOpenClose();
 	}
 
+	/**
+	 * Loops from one state change to the next.
+	 */
+	void doOpenClose() {
+		// Set the present state
+		setOpen(this.getOpenConditionValue(this.getSimTime()));
+
+		// Wait until the state is ready to change
+		EventManager.scheduleUntil(doOpenClose, openChanged, null);
+	}
+
+	/**
+	 * Returns true if the saved state differs from the state implied by the OpenCondition
+	 * and CloseCondition
+	 * @return true if the state has changed
+	 */
+	boolean openStateChanged() {
+		return getOpenConditionValue(getSimTime()) != super.isOpen();
+	}
+
+	/**
+	 * Returns the state implied by the present values for the OpenCondition
+	 * and CloseCondition expressions.
+	 * @param simTime - present simulation time.
+	 * @return state implied by the OpenCondition and CloseCondition expressions.
+	 */
+	private boolean getOpenConditionValue(double simTime) {
+		try {
+			if (openCondition.getValue() == null)
+				return super.isOpen();
+
+			// Evaluate the open condition (0 = false, non-zero = true)
+			boolean openCond = ExpEvaluator.evaluateExpression(openCondition.getValue(),
+					simTime).value != 0;
+
+			// If the open condition is satisfied or there is no close condition, then we are done
+			boolean ret;
+			if (openCond || closeCondition.getValue() == null) {
+				ret = openCond;
+			}
+
+			// The open condition is false
+			else {
+
+				// If the close condition is satisfied, then the threshold is closed
+				boolean closeCond = ExpEvaluator.evaluateExpression(closeCondition.getValue(),
+						simTime).value != 0;
+				if (closeCond) {
+					ret = false;
+				}
+
+				// If the open and close conditions are both false, then the state is unchanged
+				else {
+					ret = lastOpenValue;
+				}
+			}
+
+			// Save the threshold's last state (unless called by the UI thread)
+			if (EventManager.hasCurrent())
+				lastOpenValue = ret;
+			return ret;
+		}
+		catch(ExpError e) {
+			error("%s", e.getMessage());
+			return false; //never hit, error() will throw
+		}
+	}
+
+	@Override
+	public boolean isOpen() {
+
+		// If called from the user interface, return the saved state
+		if (!EventManager.hasCurrent())
+			return super.isOpen();
+
+		// Determine the state implied by the OpenCondition and CloseCondition expressions
+		boolean ret = this.getOpenConditionValue(getSimTime());
+
+		// If necessary, schedule an event to change the saved state
+		if (ret != super.isOpen())
+			this.scheduleProcessTicks(0, 2, setOpenTarget);
+
+		// Return the value calculated on demand
+		return ret;
+	}
+
+	/**
+	 * Conditional that tests whether the state has changed
+	 */
 	class OpenChangedConditional extends Conditional {
 		@Override
 		public boolean evaluate() {
@@ -84,6 +223,9 @@ public class ExpressionThreshold extends Threshold {
 	}
 	private final Conditional openChanged = new OpenChangedConditional();
 
+	/**
+	 * ProcessTarget the executes the doOpenClose() method
+	 */
 	class DoOpenCloseTarget extends ProcessTarget {
 		@Override
 		public String getDescription() {
@@ -97,20 +239,15 @@ public class ExpressionThreshold extends Threshold {
 	}
 	private final ProcessTarget doOpenClose = new DoOpenCloseTarget();
 
-	void doOpenClose() {
-		// Set the present state
-		setOpen(this.getOpenConditionValue(this.getSimTime()));
-		EventManager.scheduleUntil(doOpenClose, openChanged, null);
-	}
+	private final SetOpenTarget setOpenTarget = new SetOpenTarget(this);
+	private static class SetOpenTarget extends EntityTarget<ExpressionThreshold> {
+		SetOpenTarget(ExpressionThreshold thresh) {
+			super(thresh, "setOpen");
+		}
 
-	private boolean getOpenConditionValue(double simTime) {
-		try {
-			// Evaluate the condition (0 = false, non-zero = true)
-			boolean ret = ExpEvaluator.evaluateExpression(openCondition.getValue(), simTime, this).value != 0;
-			return ret;
-		} catch(ExpError e) {
-			error("%s", e.getMessage());
-			return false; //never hit, error() will throw
+		@Override
+		public void process() {
+			ent.setOpen(ent.getOpenConditionValue(ent.getSimTime()));
 		}
 	}
 
@@ -144,30 +281,6 @@ public class ExpressionThreshold extends Threshold {
 		setTagVisibility(ShapeModel.TAG_OUTLINES, true);
 		setTagColour(ShapeModel.TAG_CONTENTS, col);
 		setTagColour(ShapeModel.TAG_OUTLINES, ColourInput.BLACK);
-	}
-
-	@Override
-	public boolean isOpen() {
-		boolean ret = this.getOpenConditionValue(getSimTime());
-		if (ret != super.isOpen())
-			this.scheduleProcessTicks(0, 2, setOpenTarget);
-		return ret;
-	}
-
-	private final SetOpenTarget setOpenTarget = new SetOpenTarget(this);
-	private static class SetOpenTarget extends EntityTarget<ExpressionThreshold> {
-		SetOpenTarget(ExpressionThreshold thresh) {
-			super(thresh, "setOpen");
-		}
-
-		@Override
-		public void process() {
-			ent.setOpen(ent.getOpenConditionValue(ent.getSimTime()));
-		}
-	}
-
-	boolean openStateChanged() {
-		return getOpenConditionValue(getSimTime()) != super.isOpen();
 	}
 
 	@Output(name = "Open",

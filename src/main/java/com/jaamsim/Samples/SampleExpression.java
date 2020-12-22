@@ -22,17 +22,32 @@ import com.jaamsim.input.ExpError;
 import com.jaamsim.input.ExpEvaluator;
 import com.jaamsim.input.ExpParser;
 import com.jaamsim.input.ExpResult;
+import com.jaamsim.input.ExpValResult;
+import com.jaamsim.input.InputErrorException;
 import com.jaamsim.units.Unit;
 
 public class SampleExpression implements SampleProvider {
 	private final ExpParser.Expression exp;
 	private final Entity thisEnt;
 	private final Class<? extends Unit> unitType;
+	private final ExpEvaluator.EntityParseContext parseContext;
 
-	public SampleExpression(ExpParser.Expression e, Entity ent, Class<? extends Unit> ut) {
-		exp = e;
+	public SampleExpression(String expString, Entity ent, Class<? extends Unit> ut) throws ExpError {
 		thisEnt = ent;
 		unitType = ut;
+		parseContext = ExpEvaluator.getParseContext(thisEnt, expString);
+		exp = ExpParser.parseExpression(parseContext, expString);
+		if (exp.validationResult.state == ExpValResult.State.VALID) {
+			// We know the returned unit type with certainty, so we can check it against what we expect
+			Class<? extends Unit> expUnitType = exp.validationResult.unitType;
+			if (expUnitType != unitType) {
+				throw new InputErrorException(String.format("Invalid unit returned by an expression: '%s'%n"
+						+ "Received: %s, expected: %s",
+						exp, ObjectType.getObjectTypeForClass(expUnitType),
+						ObjectType.getObjectTypeForClass(unitType)));
+
+			}
+		}
 	}
 
 	@Override
@@ -44,7 +59,7 @@ public class SampleExpression implements SampleProvider {
 	public double getNextSample(double simTime) {
 		double ret = 0.0;
 		try {
-			ExpResult res = ExpEvaluator.evaluateExpression(exp, simTime, thisEnt);
+			ExpResult res = ExpEvaluator.evaluateExpression(exp, simTime);
 			if (res.unitType != unitType)
 				thisEnt.error("Invalid unit returned by an expression: '%s'%n"
 						+ "Received: %s, expected: %s",
@@ -74,9 +89,13 @@ public class SampleExpression implements SampleProvider {
 		return Double.POSITIVE_INFINITY;
 	}
 
+	public String getExpressionString() {
+		return parseContext.getUpdatedSource();
+	}
+
 	@Override
 	public String toString() {
-		return exp.toString();
+		return getExpressionString();
 	}
 
 }

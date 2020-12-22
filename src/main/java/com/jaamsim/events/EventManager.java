@@ -22,7 +22,6 @@ import java.util.ArrayList;
  * The EventManager is responsible for scheduling future events, controlling
  * conditional event evaluation, and advancing the simulation time. Events are
  * scheduled in based on:
- * EventManager负责调度未来事件、控制条件事件计算和推进仿真时间。事件调度基于以下规则:
  * <ul>
  * <li>1 - The execution time scheduled for the event
  * <li>2 - The priority of the event (if scheduled to occur at the same time)
@@ -36,102 +35,41 @@ import java.util.ArrayList;
  * Most EventManager functionality is available through static methods that rely
  * on being in a running model context which will access the eventmanager that is
  * currently running, think of it like a thread-local variable for all model threads.
- * 大多数EventManager功能都是通过静态方法提供的，这些静态方法依赖于运行中的模型上下文来访问当前运行的EventManager，
- * 可以把它看作是所有模型线程的一个线程局部变量。
- * 每一个线程都有一个事件管理器
  */
 public final class EventManager {
 	public final String name;
 
-	/**
-	 * Object used as global lock for synchronization
-     * 全局同步锁
-	 */
-	private final Object lockObject;
+	private final Object lockObject; // Object used as global lock for synchronization
 
-	/**
-	 * 事件的优先队列
-	 */
 	private final EventTree eventTree;
 
-	/**
-	 *
-	 */
 	private volatile boolean executeEvents;
-
-	/**
-	 *
-	 */
 	private boolean processRunning;
 
-	/**
-	 *
-	 */
 	private final ArrayList<ConditionalEvent> condEvents;
 
-	/**
-	 * Master simulation time (long)
-	 */
-	private long currentTick;
-	/**
-	 * The next tick to execute events at
-	 */
-	private long nextTick;
-	/**
-	 * the largest time we will execute events for (run to time)
-	 */
-	private long targetTick;
-	/**
-	 * The number of discrete ticks per simulated second
-	 * 每秒的仿真执行刻度数
-	 */
-	private double ticksPerSecond;
-	/**
-	 * The length of time in seconds each tick represents
-	 * 每一个仿真刻度所需要的秒数
-	 */
-	private double secsPerTick;
+	private long currentTick; // Master simulation time (long)
+	private long nextTick; // The next tick to execute events at
+	private long targetTick; // the largest time we will execute events for (run to time)
+
+	private double ticksPerSecond; // The number of discrete ticks per simulated second
+	private double secsPerTick;    // The length of time in seconds each tick represents
 
 	// Real time execution state
+	private long realTimeTick;    // the simulation tick corresponding to the wall-clock millis value
+	private long realTimeMillis;  // the wall-clock time in millis
 
-	/**
-	 * the simulation tick corresponding to the wall-clock millis value
-	 */
-	private long realTimeTick;
-	/**
-	 * the wall-clock time in millis
-	 */
-	private long realTimeMillis;
+	private volatile boolean executeRealTime;  // TRUE if the simulation is to be executed in Real Time mode
+	private volatile boolean rebaseRealTime;   // TRUE if the time keeping for Real Time model needs re-basing
+	private volatile double realTimeFactor;    // target ratio of elapsed simulation time to elapsed wall clock time
 
-	/**
-	 * TRUE if the simulation is to be executed in Real Time mode
-	 */
-	private volatile boolean executeRealTime;
-	/**
-	 * TRUE if the time keeping for Real Time model needs re-basing
-	 */
-	private volatile boolean rebaseRealTime;
-	/**
-	 * target ratio of elapsed simulation time to elapsed wall clock time
-	 */
-	private volatile int realTimeFactor;
-
-	/**
-	 * 时间监听器，用于向gui更新仿真时间和仿真转态
-	 */
 	private EventTimeListener timelistener;
-	/**
-	 * 错误监听器，用于向gui发送错误信息
-	 */
 	private EventErrorListener errListener;
-	/**
-	 *
-	 */
 	private EventTraceListener trcListener;
 
 	/**
 	 * Allocates a new EventManager with the given parent and name
-	 * 实例化一个新的事件管理器
+	 *
 	 * @param parent the connection point for this EventManager in the tree
 	 * @param name the name this EventManager should use
 	 */
@@ -143,7 +81,7 @@ public final class EventManager {
 		// Initialize and event lists and timekeeping variables
 		currentTick = 0;
 		nextTick = 0;
-		// 调用该函数设置secsPerTick为1e-6d, 即 1 秒中 1000000 tick
+
 		setTickLength(1e-6d);
 
 		eventTree = new EventTree();
@@ -158,10 +96,6 @@ public final class EventManager {
 		setErrorListener(null);
 	}
 
-	/**
-	 * 设置时间监听器，通知gui系统仿真时间变化
-	 * @param l
-	 */
 	public final void setTimeListener(EventTimeListener l) {
 		synchronized (lockObject) {
 			if (l != null)
@@ -173,33 +107,21 @@ public final class EventManager {
 		}
 	}
 
-	/**
-	 * 设置错误监听器
-	 * @param l
-	 */
 	public final void setErrorListener(EventErrorListener l) {
 		synchronized (lockObject) {
-			if (l != null) {
+			if (l != null)
 				errListener = l;
-			} else {
+			else
 				errListener = new NoopListener();
-			}
 		}
 	}
 
-	/**
-	 * 设置事件跟踪监听器
-	 * @param l
-	 */
 	public final void setTraceListener(EventTraceListener l) {
 		synchronized (lockObject) {
 			trcListener = l;
 		}
 	}
 
-	/**
-	 * 清空事件管理器的状态
-	 */
 	public void clear() {
 		synchronized (lockObject) {
 			currentTick = 0;
@@ -222,9 +144,6 @@ public final class EventManager {
 		}
 	}
 
-	/**
-	 * 实现了 EventNode.Runner 接口，关闭所有事件
-	 */
 	private static class KillAllEvents implements EventNode.Runner {
 		@Override
 		public void runOnNode(EventNode node) {
@@ -241,56 +160,36 @@ public final class EventManager {
 		}
 	}
 
-
-	/**
-     * 线程cur执行事件目标
-	 * the return from execute target informs whether or not this thread should grab an new Event, or return to the pool
-	 * @param cur
-	 * @param t
-	 * @return boolean 返回true: 让该线程继续获取事件； 返回false:将该线程返回线程池
-	 */
 	private boolean executeTarget(Process cur, ProcessTarget t) {
 		try {
 			// If the event has a captured process, pass control to it
-			// 如果该事件已经捕获了线程，则这是一个waitTarget，还是让原来的线程执行它
-            // 只有 waitTarget 的getProcess 才不为空
 			Process p = t.getProcess();
-			// If the event has a captured process, pass control to it
 			if (p != null) {
-			    // 记录cur线程为调用该线程的父线程
 				p.setNextProcess(cur);
-				// 唤醒已经被event捕获的线程
 				p.wake();
-				// 让当前线程休眠
 				threadWait(cur);
-
-				// 通知 execute() 继续获取事件执行
 				return true;
 			}
 
 			// Execute the method
-			// 执行进程目标的任务
 			t.process();
 
 			// Notify the event manager that the process has been completed
 			if (trcListener != null) trcListener.traceProcessEnd(this, currentTick);
-			// 如果有该线程是其他线程的子线程，则唤醒它的父线程，并释放该线程回线程池
 			if (cur.hasNext()) {
-			    // 唤醒它的父线程
 				cur.wakeNextProcess();
-				// 返回false: 表示当前线程有父线程等待，需唤醒父线程，将该线程返回线程池
 				return false;
-			} else {
-				// 返回true: 表示当前线程没有父线程等待， 通知 execute() 继续获取事件执行
+			}
+			else {
 				return true;
 			}
-		} catch (Throwable e) {
+		}
+		catch (Throwable e) {
 			// This is how kill() is implemented for sleeping processes.
 			if (e instanceof ThreadKilledException)
 				return false;
 
 			// Tear down any threads waiting for this to finish
-            // 说明执行t.process()时出现了异常,删除任何等待此操作完成的线程
 			Process next = cur.forceKillNext();
 			while (next != null) {
 				next = next.forceKillNext();
@@ -323,10 +222,9 @@ public final class EventManager {
 
 			// Loop continuously
 			while (true) {
-				// 从优先队列中取出最近的事件
 				EventNode nextNode = eventTree.getNextNode();
-				if (nextNode == null || currentTick >= targetTick) {
-					// 如果优先队列为空或已经到达目标时间，则结束循环
+				if (nextNode == null ||
+				    currentTick >= targetTick) {
 					executeEvents = false;
 				}
 
@@ -339,25 +237,18 @@ public final class EventManager {
 				// If the next event is at the current tick, execute it
 				if (nextNode.schedTick == currentTick) {
 					// Remove the event from the future events
-                    // 因为EventNode是一个发生时间相同，优先级也相同的事件的链表，所以取出链表头元素
 					Event nextEvent = nextNode.head;
-					// 获取这个链表头元素的执行目标
 					ProcessTarget nextTarget = nextEvent.target;
-					if (trcListener != null) {
-						trcListener.traceEvent(this, currentTick, nextNode.schedTick, nextNode.priority, nextTarget);
-					}
-					// 删除这个头元素
+					if (trcListener != null) trcListener.traceEvent(this, currentTick, nextNode.schedTick, nextNode.priority, nextTarget);
+
 					removeEvent(nextEvent);
 
 					// the return from execute target informs whether or not this
 					// thread should grab an new Event, or return to the pool
-					if (executeTarget(cur, nextTarget)) {
-						// 继续获取事件执行, 从队列中取出事件继续执行
+					if (executeTarget(cur, nextTarget))
 						continue;
-					} else {
-						// 释放线程到线程池
+					else
 						return;
-					}
 				}
 
 				// If the next event would require us to advance the time, check the
@@ -391,21 +282,16 @@ public final class EventManager {
 				}
 
 				// advance time
-				if (targetTick < nextTick) {
+				if (targetTick < nextTick)
 					currentTick = targetTick;
-				} else {
+				else
 					currentTick = nextTick;
-				}
 
 				timelistener.tickUpdate(currentTick);
 			}
 		}
 	}
 
-	/**
-	 *
-	 * @param cur
-	 */
 	private void evaluateConditions(Process cur) {
 		cur.begCondWait();
 		try {
@@ -445,7 +331,6 @@ public final class EventManager {
 	 * @return simulation time in seconds
 	 */
 	private long calcRealTimeTick() {
-		// 系统当前时间毫秒
 		long curMS = System.currentTimeMillis();
 		if (rebaseRealTime) {
 			realTimeTick = currentTick;
@@ -483,7 +368,6 @@ public final class EventManager {
 	}
 
 	/**
-     * 计算系统当前刻度 + 等待刻度， 要考虑数据溢出的情况
 	 * Calculate the time for an event taking into account numeric overflow.
 	 * Must hold the lockObject when calling this method
 	 */
@@ -563,7 +447,6 @@ public final class EventManager {
 	}
 
 	/**
-	 * 查找指定的事件节点，如果没有则按照参数创建一个
 	 * Find an eventNode in the list, if a node is not found, create one and
 	 * insert it.
 	 */
@@ -572,11 +455,6 @@ public final class EventManager {
 	}
 
 	private Event freeEvents = null;
-
-	/**
-	 * 创建一个事件
-	 * @return
-	 */
 	private Event getEvent() {
 		if (freeEvents != null) {
 			Event evt = freeEvents;
@@ -773,7 +651,7 @@ public final class EventManager {
 		}
 	}
 
-	public void setExecuteRealTime(boolean useRealTime, int factor) {
+	public void setExecuteRealTime(boolean useRealTime, double factor) {
 		executeRealTime = useRealTime;
 		realTimeFactor = factor;
 		if (useRealTime)
@@ -829,21 +707,10 @@ public final class EventManager {
 		return ticks;
 	}
 
-	/**
-	 * 将进程目标合成为Event节点, 插入事件队列中
-	 * @param waitLength 等待刻度
-	 * @param eventPriority 事件优先级
-	 * @param fifo 进出队列方式
-	 * @param t 进程目标
-	 * @param handle
-	 */
 	public void scheduleProcessExternal(long waitLength, int eventPriority, boolean fifo, ProcessTarget t, EventHandle handle) {
 		synchronized (lockObject) {
-		    // 调度事件 = 系统当前时刻 + 等待时刻
 			long schedTick = calculateEventTime(waitLength);
-			// 根据时刻和优先级创建一个节点
 			EventNode node = getEventNode(schedTick, eventPriority);
-			// 创建一个Event, 设置Event对应的节点，执行目标t, 等
 			Event evt = getEvent();
 			evt.node = node;
 			evt.target = t;
@@ -854,7 +721,6 @@ public final class EventManager {
 				handle.event = evt;
 			}
 			if (trcListener != null) trcListener.traceSchedProcess(this, currentTick, schedTick, eventPriority, t);
-			// 将事件添加到对应节点，（这个节点已经在队列中）
 			node.addEvent(evt, fifo);
 		}
 	}
@@ -890,15 +756,6 @@ public final class EventManager {
 		cur.evt().scheduleTicks(cur, ticks, eventPriority, fifo, t, handle);
 	}
 
-	/**
-	 *
-	 * @param cur 执行的线程
-	 * @param waitLength 等待多久tick后发生
-	 * @param eventPriority 事件优先级
-	 * @param fifo
-	 * @param t 执行目标
-	 * @param handle
-	 */
 	private void scheduleTicks(Process cur, long waitLength, int eventPriority, boolean fifo, ProcessTarget t, EventHandle handle) {
 		cur.checkCondWait();
 		long schedTick = calculateEventTime(waitLength);
@@ -942,7 +799,6 @@ public final class EventManager {
 				return;
 
 			executeEvents = true;
-			// 从线程池中拉取一个线程，指定事件管理器，唤醒该线程
 			Process.processEvents(this);
 		}
 	}
@@ -989,11 +845,6 @@ public final class EventManager {
 		return currentTick * secsPerTick;
 	}
 
-	/**
-	 * 设置 tick 花费时间，
-     * eventManager 初始化时,调用该函数设置secsPerTick为1e-6d, 即 1 秒中 1000000tick
-	 * @param tickLength
-	 */
 	public final void setTickLength(double tickLength) {
 		secsPerTick = tickLength;
 		ticksPerSecond = Math.round(1e9d / secsPerTick) / 1e9d;

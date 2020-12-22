@@ -1,7 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2012 Ausenco Engineering Canada Inc.
- * Copyright (C) 2015 KMA Technologies
+ * Copyright (C) 2015 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -394,9 +394,6 @@ private void initUniforms(Renderer renderer, Mat4d modelViewMat, Mat4d projMat, 
 	lightsDirFloats[3] = (float)lightsDirScratch[1].x;
 	lightsDirFloats[4] = (float)lightsDirScratch[1].y;
 	lightsDirFloats[5] = (float)lightsDirScratch[1].z;
-
-	Mat4d invModelView = new Mat4d(normalMat);
-	invModelView.transpose4();
 
 	for (int i = 0; i < usedShaders.length; ++i) {
 		int shaderID = usedShaders[i];

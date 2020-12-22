@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2014 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2016 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,43 +17,50 @@
  */
 package com.jaamsim.ProbabilityDistributions;
 
+import com.jaamsim.Samples.SampleConstant;
+import com.jaamsim.Samples.SampleInput;
 import com.jaamsim.input.Keyword;
-import com.jaamsim.input.ValueInput;
 import com.jaamsim.math.Gamma;
 import com.jaamsim.rng.MRG1999a;
+import com.jaamsim.units.DimensionlessUnit;
 import com.jaamsim.units.Unit;
 import com.jaamsim.units.UserSpecifiedUnit;
 
 public class BetaDistribution extends Distribution {
 	@Keyword(description = "The alpha tuning parameter.",
-	         exampleList = {"5.0"})
-	private final ValueInput alphaInput;
+	         exampleList = {"5.0", "InputValue1", "'2 * [InputValue1].Value'"})
+	private final SampleInput alphaInput;
 
 	@Keyword(description = "The beta tuning parameter.",
-	         exampleList = {"5.0"})
-	private final ValueInput betaInput;
+	         exampleList = {"5.0", "InputValue1", "'2 * [InputValue1].Value'"})
+	private final SampleInput betaInput;
 
 	@Keyword(description = "The scale parameter for the distribution.  This scales the " +
 	                       "value of the distribution so it return values between 0 and scale.",
-	         exampleList = {"3.0 h"})
-	private final ValueInput scaleInput;
+	         exampleList = {"5.0", "InputValue1", "'2 * [InputValue1].Value'"})
+	private final SampleInput scaleInput;
 
 	private final MRG1999a rng = new MRG1999a();
 
 	{
-		minValueInput.setDefaultValue(0.0);
+		minValueInput.setDefaultValue(new SampleConstant(0.0d));
 
-		alphaInput = new ValueInput("AlphaParam", "Key Inputs", 1.0d);
+		alphaInput = new SampleInput("AlphaParam", "Key Inputs", new SampleConstant(1.0d));
+		alphaInput.setUnitType(DimensionlessUnit.class);
 		alphaInput.setValidRange(0.0d, Double.POSITIVE_INFINITY);
+		alphaInput.setEntity(this);
 		this.addInput(alphaInput);
 
-		betaInput = new ValueInput("BetaParam", "Key Inputs", 1.0d);
+		betaInput = new SampleInput("BetaParam", "Key Inputs", new SampleConstant(1.0d));
+		betaInput.setUnitType(DimensionlessUnit.class);
 		betaInput.setValidRange(0.0d, Double.POSITIVE_INFINITY);
+		betaInput.setEntity(this);
 		this.addInput(betaInput);
 
-		scaleInput = new ValueInput("Scale", "Key Inputs", 1.0d);
+		scaleInput = new SampleInput("Scale", "Key Inputs", new SampleConstant(1.0d));
 		scaleInput.setValidRange(0.0d, Double.POSITIVE_INFINITY);
 		scaleInput.setUnitType(UserSpecifiedUnit.class);
+		scaleInput.setEntity(this);
 		this.addInput(scaleInput);
 	}
 
@@ -71,12 +79,13 @@ public class BetaDistribution extends Distribution {
 	}
 
 	@Override
-	protected double getNextSample() {
+	protected double getSample(double simTime) {
 		// Effectively calculate the inverse CDF
 		double val = rng.nextUniform();
 
-		double a = alphaInput.getValue();
-		double b = betaInput.getValue();
+		double alpha = alphaInput.getValue().getNextSample(simTime);
+		double beta = betaInput.getValue().getNextSample(simTime);
+		double scale = scaleInput.getValue().getNextSample(simTime);
 
 		double low = 0;
 		double high = 1;
@@ -86,11 +95,11 @@ public class BetaDistribution extends Distribution {
 		double highVal = 1;
 
 		while (true) {
-			double attempt = regularizedBeta(guess, a, b, 1E-14,
+			double attempt = regularizedBeta(guess, alpha, beta, 1E-14,
 					Integer.MAX_VALUE);
 
 			if (near(val, attempt, 1E-9)) {
-				return guess * scaleInput.getValue();
+				return guess * scale;
 			}
 
 			if (val < attempt) {
@@ -107,20 +116,24 @@ public class BetaDistribution extends Distribution {
 	}
 
 	@Override
-	protected double getMeanValue() {
-		double alpha = alphaInput.getValue();
-		double beta = betaInput.getValue();
+	protected double getMean(double simTime) {
 
-		return (alpha / (alpha + beta)) * scaleInput.getValue();
+		double alpha = alphaInput.getValue().getNextSample(simTime);
+		double beta = betaInput.getValue().getNextSample(simTime);
+		double scale = scaleInput.getValue().getNextSample(simTime);
+
+		return (alpha / (alpha + beta)) * scale;
 	}
 
 	@Override
-	protected double getStandardDeviation() {
-		double alpha = alphaInput.getValue();
-		double beta = betaInput.getValue();
+	protected double getStandardDev(double simTime) {
+
+		double alpha = alphaInput.getValue().getNextSample(simTime);
+		double beta = betaInput.getValue().getNextSample(simTime);
+		double scale = scaleInput.getValue().getNextSample(simTime);
 
 		double apbSqrd = (alpha + beta) * (alpha + beta);
-		return (Math.sqrt(alpha * beta / (apbSqrd * (alpha + beta + 1)))) * scaleInput.getValue();
+		return (Math.sqrt(alpha * beta / (apbSqrd * (alpha + beta + 1)))) * scale;
 	}
 
 	/*

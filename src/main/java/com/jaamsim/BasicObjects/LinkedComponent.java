@@ -35,57 +35,36 @@ import com.jaamsim.units.TimeUnit;
  */
 public abstract class LinkedComponent extends StateEntity {
 
-	/**
-	 * 该对象用于接收实体原型
-	 */
-	@Keyword(description = "The prototype for entities that will be received by this object.\n" +
-			"This input must be set if the expression 'this.obj' is used in the input to any keywords.",
-	         exampleList = {"Proto"})
-	protected final EntityInput<DisplayEntity> testEntity;
+	@Keyword(description = "The default value for the output obj.\n"
+	                     + "Normally, obj is set to the last entity received by this object. "
+	                     + "Prior to receiving its first entity, obj is set to the object "
+	                     + "provided by DefaultEntity. If an input for DefaultEntity is not "
+	                     + "provided, then obj is set to null until the first entity is received.",
+	         exampleList = {"SimEntity1"})
+	protected final EntityInput<DisplayEntity> defaultEntity;
 
-	/**
-	 * 已处理的 DisplayEntity 将被传递到的下一个对象
-	 */
 	@Keyword(description = "The next object to which the processed DisplayEntity is passed.",
 			exampleList = {"Queue1"})
 	protected final EntityInput<LinkedComponent> nextComponent;
 
-	/**
-	 * 到达此对象时分配给每个实体的状态
-	 */
 	@Keyword(description = "The state to be assigned to each entity on arrival at this object.\n" +
 			"No state is assigned if the entry is blank.",
 	         exampleList = {"Service"})
 	protected final StringInput stateAssignment;
 
-	/**
-	 * Number of entities added to this component from upstream after initialisation
-	 */
-	private long numberAdded;
-	/**
-	 * Number of entities processed by this component after initialisation
-	 */
-	private long numberProcessed;
-	/**
-	 * Number of entities added to this component from upstream during initialisation
-	 */
-	private long initialNumberAdded;
-	/**
-	 * Number of entities processed by this component during initialisation
-	 */
-	private long initialNumberProcessed;
-	/**
-	 * Entity most recently received by this component
-	 */
-	private DisplayEntity receivedEntity;
-
+	private long numberAdded;     // Number of entities added to this component from upstream after initialisation
+	private long numberProcessed; // Number of entities processed by this component after initialisation
+	private long initialNumberAdded;     // Number of entities added to this component from upstream during initialisation
+	private long initialNumberProcessed; // Number of entities processed by this component during initialisation
+	private DisplayEntity receivedEntity; // Entity most recently received by this component
 	private double releaseTime = Double.NaN;
 
 	{
 		attributeDefinitionList.setHidden(false);
 
-		testEntity = new EntityInput<>(DisplayEntity.class, "TestEntity", "Key Inputs", null);
-		this.addInput(testEntity);
+		defaultEntity = new EntityInput<>(DisplayEntity.class, "DefaultEntity", "Key Inputs", null);
+		this.addInput(defaultEntity);
+		this.addSynonym(defaultEntity, "TestEntity");
 
 		nextComponent = new EntityInput<>(LinkedComponent.class, "NextComponent", "Key Inputs", null);
 		nextComponent.setRequired(true);
@@ -99,8 +78,8 @@ public abstract class LinkedComponent extends StateEntity {
 	public void updateForInput(Input<?> in) {
 		super.updateForInput(in);
 
-		if (in == testEntity) {
-			receivedEntity = testEntity.getValue();
+		if (in == defaultEntity) {
+			receivedEntity = defaultEntity.getValue();
 			return;
 		}
 	}
@@ -110,8 +89,8 @@ public abstract class LinkedComponent extends StateEntity {
 		super.validate();
 
 		// If a state is to be assigned, ensure that the prototype is a StateEntity
-		if (testEntity.getValue() != null && !stateAssignment.getValue().isEmpty()) {
-			if (!(testEntity.getValue() instanceof StateEntity)) {
+		if (defaultEntity.getValue() != null && !stateAssignment.getValue().isEmpty()) {
+			if (!(defaultEntity.getValue() instanceof StateEntity)) {
 				throw new InputErrorException("Only a SimEntity can be specified for the TestEntity keyword if a state is be be assigned.");
 			}
 		}
@@ -124,7 +103,7 @@ public abstract class LinkedComponent extends StateEntity {
 		numberProcessed = 0;
 		initialNumberAdded = 0;
 		initialNumberProcessed = 0;
-		receivedEntity = testEntity.getValue();
+		receivedEntity = defaultEntity.getValue();
 		releaseTime = Double.NaN;
 	}
 

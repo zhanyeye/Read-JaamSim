@@ -38,7 +38,7 @@ public class FluidCentrifugalPump extends FluidComponent {
 	         example = "Pump1 MaxPressure { 1.0 Pa }")
 	private final ValueInput maxPressureInput;
 
-	@Keyword(description = "Maximum static pressure loss speed for the pump (at maximum flow rate).",
+	@Keyword(description = "Maximum static pressure loss for the pump (at maximum flow rate).",
 	         example = "Pump1 MaxPressureLoss { 1.0 Pa }")
 	private final ValueInput maxPressureLossInput;
 
@@ -73,7 +73,7 @@ public class FluidCentrifugalPump extends FluidComponent {
 	 */
 	@Override
 	public double calcOutletPressure( double inletPres, double flowAccel ) {
-		double speedFactor = speedControllerInput.getValue().getValue();
+		double speedFactor = speedControllerInput.getValue().getLastValue();
 		speedFactor = Math.max(speedFactor, 0.0);
 		speedFactor = Math.min(speedFactor, 1.0);
 		double flowFactor = this.getFluidFlow().getFlowRate() / maxFlowRateInput.getValue();

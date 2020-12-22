@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2011 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2016 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,6 +29,7 @@ import java.awt.event.WindowListener;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Locale;
 
 import javax.swing.ImageIcon;
@@ -48,9 +50,11 @@ import javax.swing.filechooser.FileNameExtensionFilter;
 import com.jaamsim.DisplayModels.ColladaModel;
 import com.jaamsim.DisplayModels.DisplayModel;
 import com.jaamsim.DisplayModels.ImageModel;
+import com.jaamsim.DisplayModels.ShapeModel;
 import com.jaamsim.Graphics.DisplayEntity;
 import com.jaamsim.basicsim.Entity;
 import com.jaamsim.controllers.RenderManager;
+import com.jaamsim.input.Input;
 import com.jaamsim.input.InputAgent;
 import com.jaamsim.math.AABB;
 import com.jaamsim.math.Vec2d;
@@ -90,14 +94,17 @@ public class GraphicBox extends JDialog {
 		};
 		this.addWindowListener( windowListener );
 
+		// Preview Area
 		previewLabel = new JLabel("", JLabel.CENTER);
+		previewLabel.setBorder(new EmptyBorder(10, 10, 20, 10));
 		getContentPane().add(previewLabel, "West");
 
+		// DisplayModel List
 		JScrollPane scrollPane = new JScrollPane(displayModelList);
-		scrollPane.setBorder(new EmptyBorder(5, 0, 44, 10));
+		scrollPane.setBorder(new EmptyBorder(10, 10, 20, 10));
 		getContentPane().add(scrollPane, "East");
 
-		// Update the previewLabel according to the selected DisplayModel
+		// Update the preview area according to the selected DisplayModel
 		displayModelList.addListSelectionListener(   new ListSelectionListener() {
 			@Override
 			public void valueChanged(ListSelectionEvent e) {
@@ -132,7 +139,7 @@ public class GraphicBox extends JDialog {
 			}
 		} );
 
-		// Import and Accept buttons
+		// Import button
 		JButton importButton = new JButton("Import");
 		importButton.addActionListener( new ActionListener() {
 			@Override
@@ -147,9 +154,17 @@ public class GraphicBox extends JDialog {
 
 				// Set the file extension filters
 				chooser.setAcceptAllFileFilterUsed(false);
-				for (FileNameExtensionFilter filter : ColladaModel.getFileNameExtensionFilters()) {
-					chooser.addChoosableFileFilter(filter);
+				FileNameExtensionFilter[] colFilters = ColladaModel.getFileNameExtensionFilters();
+				FileNameExtensionFilter[] imgFilters = ImageModel.getFileNameExtensionFilters();
+				chooser.addChoosableFileFilter(colFilters[0]);
+				chooser.addChoosableFileFilter(imgFilters[0]);
+				for (int i = 1; i < colFilters.length; i++) {
+					chooser.addChoosableFileFilter(colFilters[i]);
 				}
+				for (int i = 1; i < imgFilters.length; i++) {
+					chooser.addChoosableFileFilter(imgFilters[i]);
+				}
+				chooser.setFileFilter(colFilters[0]);
 
 				// Show the file chooser and wait for selection
 				int returnVal = chooser.showDialog(null, "Import");
@@ -163,42 +178,46 @@ public class GraphicBox extends JDialog {
 					String fileName = f.getName();
 					int i = fileName.lastIndexOf('.');
 					if (i <= 0 || i >= fileName.length() - 1) {
-						LogBox.format("File name: %s is invalid.", f.getName());
-						LogBox.getInstance().setVisible(true);
+						GUIFrame.invokeErrorDialog("Input Error",
+								"File name: %s is invalid.", f.getName());
 						return;
 					}
 					String extension = fileName.substring(i+1).toLowerCase();
 
 					// Set the entity name
 					String entityName = fileName.substring(0, i);
-					entityName = entityName.replaceAll(" ", ""); // Space is not allowed for Entity Name
-
-					// Check for a valid extension
-					if (!ColladaModel.isValidExtension(extension)) {
-						LogBox.format("File name: %s is invalid.", f.getName());
-						LogBox.getInstance().setVisible(true);
-						return;
-					}
-
-					// Create the ColladaModel
+					entityName = entityName.replaceAll(" ", "_"); // Space is not allowed for Entity Name
 					String modelName = entityName + "-model";
-					ColladaModel dm = InputAgent.defineEntityWithUniqueName(ColladaModel.class, modelName, "", true);
 
-					// Load the 3D content to the ColladaModel
-					InputAgent.applyArgs(dm, "ColladaFile", f.getPath());
+					// Create the DisplayModel
+					DisplayModel dm = null;
+					if (ColladaModel.isValidExtension(extension)) {
+						dm = InputAgent.defineEntityWithUniqueName(ColladaModel.class, modelName, "", true);
+						InputAgent.applyArgs(dm, "ColladaFile", f.getPath());
+					}
+					else if (ImageModel.isValidExtension(extension)) {
+						dm = InputAgent.defineEntityWithUniqueName(ImageModel.class, modelName, "", true);
+						InputAgent.applyArgs(dm, "ImageFile", f.getPath());
+					}
+					else {
+						GUIFrame.invokeErrorDialog("Input Error",
+								"The extension for file: %s is invalid for both an image and "
+								+ "a 3D asset.", fileName);
+					}
 
 					 // Add the new DisplayModel to the List
 					myInstance.refresh();
 					FrameBox.valueUpdate();
 
-					// Scroll to selection and ensure it is visible
-					int index = displayModelList.getModel().getSize() - 1;
+					// Scroll to the new DisplayModel and ensure it is visible
+					int index = GraphicBox.this.getListIndex(dm);
 					displayModelList.setSelectedIndex(index);
 					displayModelList.ensureIndexIsVisible(index);
 				}
 			}
 		} );
 
+		// Accept button
 		JButton acceptButton = new JButton("Accept");
 		acceptButton.addActionListener( new ActionListener() {
 			@Override
@@ -274,16 +293,32 @@ public class GraphicBox extends JDialog {
 				myInstance.close();
 			}
 		} );
+
+		// Cancel button
+		JButton cancelButton = new JButton("Cancel");
+		cancelButton.addActionListener( new ActionListener() {
+			@Override
+			public void actionPerformed( ActionEvent e ) {
+				myInstance.close();
+			}
+		} );
+
+		// CheckBoxes
+		JPanel checkBoxPanel = new JPanel(new BorderLayout());
 		useModelSize = new JCheckBox("Use Display Model Size");
 		useModelSize.setSelected(true);
 		useModelPosition = new JCheckBox("Keep Model Position");
 		useModelPosition.setSelected(false);
+		checkBoxPanel.add(useModelSize, BorderLayout.PAGE_START);
+		checkBoxPanel.add(useModelPosition, BorderLayout.PAGE_END);
+
+		// Button Panel
 		JPanel buttonPanel = new JPanel();
-		buttonPanel.setLayout( new FlowLayout(FlowLayout.RIGHT) );
-		buttonPanel.add(useModelSize);
-		buttonPanel.add(useModelPosition);
+		buttonPanel.setLayout( new FlowLayout(FlowLayout.CENTER) );
 		buttonPanel.add(importButton);
+		buttonPanel.add(checkBoxPanel);
 		buttonPanel.add(acceptButton);
+		buttonPanel.add(cancelButton);
 		getContentPane().add(buttonPanel, BorderLayout.SOUTH);
 		this.pack();
 	}
@@ -319,22 +354,35 @@ public class GraphicBox extends JDialog {
 	}
 
 	private void refresh() {
-		DisplayModel entDisplayModel = currentEntity.getDisplayModelList().get(0);
+		// Prepare a sorted array of all the DisplayModels
+		ArrayList<DisplayModel> models = new ArrayList<>();
+		for (DisplayModel each : Entity.getClonesOfIterator(DisplayModel.class)) {
+			if (each instanceof ImageModel ||
+			    each instanceof ColladaModel ||
+			    each instanceof ShapeModel)
+				models.add(each);
+		}
+		Collections.sort(models, Input.uiSortOrder);
 
-		ArrayList<DisplayModel> models = Entity.getClonesOf(DisplayModel.class);
-		// Populate JList with all the DisplayModels
 		DisplayModel[] displayModels = new DisplayModel[models.size()];
-		int index = 0;
-		int i = 0;
-		for (DisplayModel each : models) {
-			if(entDisplayModel == each) {
-				index = i;
-			}
-			displayModels[i++] = each;
+		for (int i = 0; i < models.size(); i++) {
+			displayModels[i] = models.get(i);
 		}
 		displayModelList.setListData(displayModels);
 		displayModelList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+
+		// Select the present DisplayModel
+		int index = this.getListIndex(currentEntity.getDisplayModelList().get(0));
 		displayModelList.setSelectedIndex(index);
 		displayModelList.ensureIndexIsVisible(index);
+	}
+
+	private int getListIndex(DisplayModel dm) {
+		for (int i=0; i<displayModelList.getModel().getSize(); i++) {
+			if (displayModelList.getModel().getElementAt(i) == dm) {
+				return i;
+			}
+		}
+		return -1;
 	}
 }

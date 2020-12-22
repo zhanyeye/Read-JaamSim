@@ -49,6 +49,7 @@ import com.jaamsim.basicsim.ObjectType;
 import com.jaamsim.basicsim.Simulation;
 import com.jaamsim.datatypes.IntegerVector;
 import com.jaamsim.events.EventManager;
+import com.jaamsim.input.Input;
 import com.jaamsim.input.InputAgent;
 import com.jaamsim.input.InputErrorException;
 import com.jaamsim.input.KeywordIndex;
@@ -77,10 +78,10 @@ import com.jaamsim.render.TessFontKey;
 import com.jaamsim.render.TexCache;
 import com.jaamsim.render.WindowInteractionListener;
 import com.jaamsim.render.util.ExceptionLogger;
+import com.jaamsim.ui.ContextMenu;
 import com.jaamsim.ui.FrameBox;
 import com.jaamsim.ui.GUIFrame;
 import com.jaamsim.ui.LogBox;
-import com.jaamsim.ui.ObjectSelector;
 import com.jaamsim.ui.View;
 
 /**
@@ -541,10 +542,11 @@ public class RenderManager implements DragSourceListener {
 			if (ents.size() == 0) { return; } // Nothing to show
 
 			if (ents.size() == 1) {
-				ObjectSelector.populateMenu(menu, ents.get(0), menuX, menuY);
+				ContextMenu.populateMenu(menu, ents.get(0), menuX, menuY);
 			}
 			else {
 				// Several entities, let the user pick the interesting entity first
+				Collections.sort(ents, Input.uiSortOrder);
 				for (final DisplayEntity de : ents) {
 					JMenuItem thisItem = new JMenuItem(de.getName());
 					thisItem.addActionListener( new ActionListener() {
@@ -552,7 +554,7 @@ public class RenderManager implements DragSourceListener {
 						@Override
 						public void actionPerformed( ActionEvent event ) {
 							menu.removeAll();
-							ObjectSelector.populateMenu(menu, de, menuX, menuY);
+							ContextMenu.populateMenu(menu, de, menuX, menuY);
 							menu.show(awtFrame, menuX, menuY);
 						}
 					} );
@@ -1468,7 +1470,7 @@ public class RenderManager implements DragSourceListener {
 		}
 
 		// The mesh is not loaded and we are non-blocking, so trigger a mesh load and return
-		MeshDataCache.loadMesh(key, new AtomicBoolean());
+		MeshDataCache.loadMesh(key);
 		return null;
 	}
 
@@ -1478,7 +1480,7 @@ public class RenderManager implements DragSourceListener {
 		}
 
 		// The mesh is not loaded and we are non-blocking, so trigger a mesh load and return
-		MeshDataCache.loadMesh(key, new AtomicBoolean());
+		MeshDataCache.loadMesh(key);
 		return null;
 	}
 
@@ -1539,6 +1541,18 @@ public class RenderManager implements DragSourceListener {
 				return rman.renderer.getAWTFrame(entry.getKey());
 		}
 		return null;
+	}
+
+	/**
+	 * Can this hardware perform off screen rendering. Note: this method returning true is necessary, but not sufficient to
+	 * support off screen rendering.
+	 * @return
+	 */
+	public static boolean canRenderOffscreen() {
+		if (!isGood()) return false;
+
+		RenderManager rman = RenderManager.inst();
+		return rman.renderer.isGL3Supported();
 	}
 
 	/**

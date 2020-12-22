@@ -19,6 +19,7 @@ package com.jaamsim.StringProviders;
 import java.util.ArrayList;
 import java.util.Collections;
 
+import com.jaamsim.Samples.SampleConstant;
 import com.jaamsim.Samples.SampleProvider;
 import com.jaamsim.basicsim.Entity;
 import com.jaamsim.input.Input;
@@ -38,8 +39,11 @@ public class StringProvInput extends Input<StringProvider> {
 	}
 
 	public void setUnitType(Class<? extends Unit> ut) {
-		if (ut != unitType)
-			this.reset();
+
+		if (ut == unitType)
+			return;
+
+		this.setValid(false);
 		unitType = ut;
 	}
 
@@ -50,6 +54,7 @@ public class StringProvInput extends Input<StringProvider> {
 	@Override
 	public void parse(KeywordIndex kw) throws InputErrorException {
 		value = Input.parseStringProvider(kw, thisEnt, unitType);
+		this.setValid(true);
 	}
 
 	@Override
@@ -60,7 +65,7 @@ public class StringProvInput extends Input<StringProvider> {
 			if (sp.getUnitType() == unitType)
 				list.add(each.getName());
 		}
-		Collections.sort(list);
+		Collections.sort(list, Input.uiSortOrder);
 		return list;
 	}
 
@@ -68,12 +73,14 @@ public class StringProvInput extends Input<StringProvider> {
 	public void getValueTokens(ArrayList<String> toks) {
 		if (value == null) return;
 
-		if (value instanceof StringProvOutput) {
-			toks.add(value.toString());
+		// Preserve the exact text for a constant value input
+		if (value instanceof StringProvSample && ((StringProvSample) value).getSampleProvider() instanceof SampleConstant) {
+			super.getValueTokens(toks);
 			return;
 		}
 
-		super.getValueTokens(toks);
+		// All other inputs can be built from scratch
+		toks.add(value.toString());
 	}
 
 }

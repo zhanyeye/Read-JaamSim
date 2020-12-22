@@ -1,6 +1,7 @@
 /*
  * JaamSim Discrete Event Simulation
  * Copyright (C) 2013 Ausenco Engineering Canada Inc.
+ * Copyright (C) 2016 JaamSim Software Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +17,7 @@
  */
 package com.jaamsim.ProbabilityDistributions;
 
+import com.jaamsim.Samples.SampleConstant;
 import com.jaamsim.rng.MRG1999a;
 
 /**
@@ -26,8 +28,8 @@ public class UniformDistribution extends Distribution {
 	private final MRG1999a rng = new MRG1999a();
 
 	{
-		minValueInput.setDefaultValue(0.0d);
-		maxValueInput.setDefaultValue(1.0d);
+		minValueInput.setDefaultValue(new SampleConstant(0.0d));
+		maxValueInput.setDefaultValue(new SampleConstant(1.0d));
 	}
 
 	public UniformDistribution() {}
@@ -39,21 +41,26 @@ public class UniformDistribution extends Distribution {
 	}
 
 	@Override
-	protected double getNextSample() {
+	protected double getSample(double simTime) {
 
 		// Select the sample from a uniform distribution between the min and max values
-		double min = this.getMinValue();
-		double max = this.getMaxValue();
-		return min + rng.nextUniform() * (max - min);
+		double minVal = minValueInput.getValue().getNextSample(simTime);
+		double maxVal = maxValueInput.getValue().getNextSample(simTime);
+		return minVal + rng.nextUniform()*(maxVal - minVal);
 	}
 
 	@Override
-	protected double getMeanValue() {
-		return ( 0.5 * ( this.getMinValue() + this.getMaxValue() ) );
+	protected double getMean(double simTime) {
+		double minVal = minValueInput.getValue().getNextSample(simTime);
+		double maxVal = maxValueInput.getValue().getNextSample(simTime);
+		return 0.5 *(minVal + maxVal);
 	}
 
 	@Override
-	protected double getStandardDeviation() {
-		return (  0.5 * ( this.getMaxValue() - this.getMinValue() ) / Math.sqrt(3.0) );
+	protected double getStandardDev(double simTime) {
+		double minVal = minValueInput.getValue().getNextSample(simTime);
+		double maxVal = maxValueInput.getValue().getNextSample(simTime);
+		return 0.5*(maxVal - minVal) / Math.sqrt(3.0);
 	}
+
 }

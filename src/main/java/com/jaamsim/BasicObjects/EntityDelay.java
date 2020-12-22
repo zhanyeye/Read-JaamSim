@@ -16,12 +16,11 @@
  */
 package com.jaamsim.BasicObjects;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 
 import com.jaamsim.Graphics.DisplayEntity;
 import com.jaamsim.Graphics.PolylineInfo;
-import com.jaamsim.Samples.SampleExpInput;
+import com.jaamsim.Samples.SampleInput;
 import com.jaamsim.basicsim.EntityTarget;
 import com.jaamsim.input.BooleanInput;
 import com.jaamsim.input.ColourInput;
@@ -41,7 +40,7 @@ public class EntityDelay extends LinkedComponent {
 	@Keyword(description = "The delay time for the path.\n" +
 			"The input can be a constant value, a time series of values, or a probability distribution to be sampled.",
 	         exampleList = { "3.0 h", "NormalDistribution1", "'1[s] + 0.5*[TimeSeries1].PresentValue'" })
-	private final SampleExpInput duration;
+	private final SampleInput duration;
 
 	@Keyword(description = "If TRUE, a delayed entity is moved along the " +
 			"specified path to indicate its progression through the delay.",
@@ -59,12 +58,10 @@ public class EntityDelay extends LinkedComponent {
 
 	private final HashMap<Long, EntityDelayEntry> entityMap = new HashMap<>();  // List of the entities being handled
 
-	private double totalLength;  // Graphical length of the path
-	private final ArrayList<Double> lengthList;  // Length of each segment of the path
-	private final ArrayList<Double> cumLengthList;  // Total length to the end of each segment
-
 	{
-		duration = new SampleExpInput("Duration", "Key Inputs", null);
+		stateGraphics.setHidden(false);
+
+		duration = new SampleInput("Duration", "Key Inputs", null);
 		duration.setUnitType(TimeUnit.class);
 		duration.setEntity(this);
 		duration.setValidRange(0, Double.POSITIVE_INFINITY);
@@ -84,10 +81,7 @@ public class EntityDelay extends LinkedComponent {
 		this.addSynonym(colorInput, "Colour");
 	}
 
-	public EntityDelay() {
-		lengthList = new ArrayList<>();
-		cumLengthList = new ArrayList<>();
-	}
+	public EntityDelay() {}
 
 	@Override
 	public void updateForInput(Input<?> in) {
@@ -110,23 +104,7 @@ public class EntityDelay extends LinkedComponent {
 	@Override
 	public void earlyInit() {
 		super.earlyInit();
-
 		entityMap.clear();
-
-		// Initialize the segment length data
-		lengthList.clear();
-		cumLengthList.clear();
-		totalLength = 0.0;
-		for (int i = 1; i < pointsInput.getValue().size(); i++) {
-			// Get length between points
-			Vec3d vec = new Vec3d();
-			vec.sub3(pointsInput.getValue().get(i), pointsInput.getValue().get(i-1));
-			double length = vec.mag3();
-
-			lengthList.add(length);
-			totalLength += length;
-			cumLengthList.add(totalLength);
-		}
 	}
 
 	@Override
@@ -198,48 +176,16 @@ public class EntityDelay extends LinkedComponent {
 		}
 	}
 
-	/**
-	 * Return the position coordinates for a given distance along the path.
-	 * @param dist = distance along the path.
-	 * @return position coordinates
-	 */
-	private Vec3d getPositionForDistance(double dist) {
-
-		// Find the present segment
-		int seg = 0;
-		for (int i = 0; i < cumLengthList.size(); i++) {
-			if (dist <= cumLengthList.get(i)) {
-				seg = i;
-				break;
-			}
-		}
-
-		// Interpolate between the start and end of the segment
-		double frac = 0.0;
-		if (seg == 0) {
-			frac = dist / lengthList.get(0);
-		}
-		else {
-			frac = ( dist - cumLengthList.get(seg-1) ) / lengthList.get(seg);
-		}
-		if (frac < 0.0)  frac = 0.0;
-		else if (frac > 1.0)  frac = 1.0;
-
-		Vec3d vec = new Vec3d();
-		vec.interpolate3(pointsInput.getValue().get(seg), pointsInput.getValue().get(seg+1), frac);
-		return vec;
-	}
-
 	@Override
 	public void updateGraphics(double simTime) {
 
 		// Loop through the entities on the path
 		for (EntityDelayEntry entry : entityMap.values()) {
 			// Calculate the distance travelled by this entity
-			double dist = ( simTime - entry.startTime ) / entry.duration * totalLength;
+			double frac = ( simTime - entry.startTime ) / entry.duration;
 
 			// Set the position for the entity
-			Vec3d localPos = this.getPositionForDistance(dist);
+			Vec3d localPos = this.getPositionOnPolyline(frac);
 			entry.ent.setGlobalPosition(this.getGlobalPosition(localPos));
 		}
 	}
