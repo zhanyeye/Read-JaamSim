@@ -23,489 +23,9 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="458000ff-867a-409a-bdcc-9abc93260f06" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/.idea/libraries/jar.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/modules.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Read-JaamSim.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/LICENSE" beforeDir="false" afterPath="$PROJECT_DIR$/LICENSE" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/make/JS32.exe4j" beforeDir="false" afterPath="$PROJECT_DIR$/make/JS32.exe4j" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/make/JS64.exe4j" beforeDir="false" afterPath="$PROJECT_DIR$/make/JS64.exe4j" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/AddTo.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/AddTo.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/Assemble.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/Assemble.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/Assign.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/Assign.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/BooleanIndicator.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/BooleanIndicator.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/Branch.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/Branch.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/Combine.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/Combine.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/DowntimeEntity.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/DowntimeEntity.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/Duplicate.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/Duplicate.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/EntitlementSelector.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/EntitlementSelector.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/EntityContainer.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/EntityContainer.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/EntityConveyor.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/EntityConveyor.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/EntityDelay.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/EntityDelay.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/EntityGate.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/EntityGate.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/EntityGenerator.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/EntityGenerator.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/EntityLogger.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/EntityLogger.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/EntitySignal.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/EntitySignal.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/EntitySink.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/EntitySink.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/EventSchedule.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/EventSchedule.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/ExpressionEntity.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/ExpressionEntity.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/ExpressionLogger.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/ExpressionLogger.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/InputValue.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/InputValue.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/LinkedComponent.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/LinkedComponent.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/LinkedService.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/LinkedService.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/Pack.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/Pack.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/Queue.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/Queue.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/QueueUser.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/QueueUser.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/Release.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/Release.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/RemoveFrom.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/RemoveFrom.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/Resource.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/Resource.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/Seize.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/Seize.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/Server.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/Server.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/SetGraphics.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/SetGraphics.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/SimEntity.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/SimEntity.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/Statistics.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/Statistics.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/Unpack.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/Unpack.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/ValueSequence.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/ValueSequence.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/CalculationObjects/CalculationEntity.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/CalculationObjects/CalculationEntity.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/CalculationObjects/Controller.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/CalculationObjects/Controller.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/CalculationObjects/Differentiator.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/CalculationObjects/Differentiator.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/CalculationObjects/DoubleCalculation.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/CalculationObjects/DoubleCalculation.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/CalculationObjects/Integrator.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/CalculationObjects/Integrator.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/CalculationObjects/Lag.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/CalculationObjects/Lag.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/CalculationObjects/MovingAverage.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/CalculationObjects/MovingAverage.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/CalculationObjects/PIDController.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/CalculationObjects/PIDController.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/CalculationObjects/Polynomial.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/CalculationObjects/Polynomial.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/CalculationObjects/SineWave.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/CalculationObjects/SineWave.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/CalculationObjects/SquareWave.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/CalculationObjects/SquareWave.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/CalculationObjects/WaveGenerator.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/CalculationObjects/WaveGenerator.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/CalculationObjects/WeightedSum.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/CalculationObjects/WeightedSum.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/DisplayModels/ArrowModel.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/DisplayModels/ArrowModel.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/DisplayModels/ColladaModel.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/DisplayModels/ColladaModel.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/DisplayModels/DisplayModel.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/DisplayModels/DisplayModel.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/DisplayModels/GraphModel.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/DisplayModels/GraphModel.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/DisplayModels/ImageModel.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/DisplayModels/ImageModel.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/DisplayModels/PolylineModel.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/DisplayModels/PolylineModel.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/DisplayModels/ShapeModel.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/DisplayModels/ShapeModel.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/DisplayModels/TextModel.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/DisplayModels/TextModel.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/FluidObjects/Fluid.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/FluidObjects/Fluid.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/FluidObjects/FluidCentrifugalPump.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/FluidObjects/FluidCentrifugalPump.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/FluidObjects/FluidComponent.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/FluidObjects/FluidComponent.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/FluidObjects/FluidFixedFlow.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/FluidObjects/FluidFixedFlow.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/FluidObjects/FluidFlow.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/FluidObjects/FluidFlow.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/FluidObjects/FluidFlowCalculation.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/FluidObjects/FluidFlowCalculation.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/FluidObjects/FluidPipe.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/FluidObjects/FluidPipe.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/FluidObjects/FluidTank.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/FluidObjects/FluidTank.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/Graphics/Arrow.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/Graphics/Arrow.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/Graphics/BillboardText.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/Graphics/BillboardText.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/Graphics/DisplayEntity.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/Graphics/DisplayEntity.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/Graphics/EntityLabel.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/Graphics/EntityLabel.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/Graphics/Graph.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/Graphics/Graph.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/Graphics/GraphBasics.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/Graphics/GraphBasics.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/Graphics/InputBox.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/Graphics/InputBox.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/Graphics/OverlayClock.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/Graphics/OverlayClock.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/Graphics/OverlayEntity.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/Graphics/OverlayEntity.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/Graphics/OverlayImage.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/Graphics/OverlayImage.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/Graphics/OverlayText.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/Graphics/OverlayText.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/Graphics/PolylineInfo.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/Graphics/PolylineInfo.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/Graphics/Region.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/Graphics/Region.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/Graphics/Tag.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/Graphics/Tag.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/Graphics/Text.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/Graphics/Text.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/Graphics/TextBasics.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/Graphics/TextBasics.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/Graphics/XYGraph.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/Graphics/XYGraph.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/MeshFiles/BinaryExporter.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/MeshFiles/BinaryExporter.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/MeshFiles/BlockReader.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/MeshFiles/BlockReader.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/MeshFiles/BlockUtils.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/MeshFiles/BlockUtils.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/MeshFiles/BlockWriter.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/MeshFiles/BlockWriter.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/MeshFiles/DataBlock.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/MeshFiles/DataBlock.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/MeshFiles/MeshData.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/MeshFiles/MeshData.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/MeshFiles/MeshReader.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/MeshFiles/MeshReader.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/MeshFiles/MeshWriter.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/MeshFiles/MeshWriter.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/MeshFiles/ObjReader.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/MeshFiles/ObjReader.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/MeshFiles/Vertex.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/MeshFiles/Vertex.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/MeshFiles/VertexMap.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/MeshFiles/VertexMap.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/ProbabilityDistributions/BetaDistribution.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/ProbabilityDistributions/BetaDistribution.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/ProbabilityDistributions/BooleanSelector.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/ProbabilityDistributions/BooleanSelector.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/ProbabilityDistributions/ContinuousDistribution.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/ProbabilityDistributions/ContinuousDistribution.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/ProbabilityDistributions/CumulativeProbInput.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/ProbabilityDistributions/CumulativeProbInput.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/ProbabilityDistributions/DiscreteDistribution.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/ProbabilityDistributions/DiscreteDistribution.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/ProbabilityDistributions/Distribution.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/ProbabilityDistributions/Distribution.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/ProbabilityDistributions/ErlangDistribution.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/ProbabilityDistributions/ErlangDistribution.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/ProbabilityDistributions/ExponentialDistribution.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/ProbabilityDistributions/ExponentialDistribution.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/ProbabilityDistributions/GammaDistribution.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/ProbabilityDistributions/GammaDistribution.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/ProbabilityDistributions/LogLogisticDistribution.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/ProbabilityDistributions/LogLogisticDistribution.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/ProbabilityDistributions/LogNormalDistribution.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/ProbabilityDistributions/LogNormalDistribution.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/ProbabilityDistributions/NonStatExponentialDist.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/ProbabilityDistributions/NonStatExponentialDist.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/ProbabilityDistributions/NormalDistribution.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/ProbabilityDistributions/NormalDistribution.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/ProbabilityDistributions/TriangularDistribution.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/ProbabilityDistributions/TriangularDistribution.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/ProbabilityDistributions/UniformDistribution.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/ProbabilityDistributions/UniformDistribution.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/ProbabilityDistributions/WeibullDistribution.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/ProbabilityDistributions/WeibullDistribution.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/Samples/SampleConstant.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/Samples/SampleConstant.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/Samples/SampleExpInput.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/Samples/SampleExpListInput.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/Samples/SampleExpression.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/Samples/SampleExpression.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/Samples/SampleInput.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/Samples/SampleInput.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/Samples/SampleListInput.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/Samples/SampleListInput.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/Samples/SampleOutput.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/Samples/SampleOutput.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/Samples/SampleProvider.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/Samples/SampleProvider.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/Samples/TSPoint.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/Samples/TSPoint.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/Samples/TimeSeries.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/Samples/TimeSeries.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/Samples/TimeSeriesConstantDouble.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/Samples/TimeSeriesConstantDouble.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/Samples/TimeSeriesData.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/Samples/TimeSeriesData.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/Samples/TimeSeriesProvider.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/Samples/TimeSeriesProvider.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/StringProviders/StringProvInput.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/StringProviders/StringProvInput.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/StringProviders/StringProvListInput.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/StringProviders/StringProvListInput.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/StringProviders/StringProvOutput.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/StringProviders/StringProvOutput.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/StringProviders/StringProvSample.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/StringProviders/StringProvSample.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/StringProviders/StringProvider.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/StringProviders/StringProvider.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/Thresholds/ExpressionThreshold.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/Thresholds/ExpressionThreshold.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/Thresholds/SignalThreshold.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/Thresholds/SignalThreshold.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/Thresholds/Threshold.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/Thresholds/Threshold.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/Thresholds/ThresholdUser.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/Thresholds/ThresholdUser.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/Thresholds/TimeSeriesThreshold.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/Thresholds/TimeSeriesThreshold.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/basicsim/ClearStatisticsTarget.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/basicsim/ClearStatisticsTarget.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/basicsim/ClonesOfIterable.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/basicsim/ClonesOfIterable.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/basicsim/ClonesOfIterableInterface.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/basicsim/ClonesOfIterableInterface.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/basicsim/EndModelTarget.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/basicsim/EndModelTarget.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/model/mode-1.cfg" beforeDir="false" afterPath="$PROJECT_DIR$/model/mode-1.cfg" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/basicsim/Entity.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/basicsim/Entity.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/basicsim/EntityIterator.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/basicsim/EntityIterator.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/basicsim/EntityTarget.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/basicsim/EntityTarget.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/basicsim/EntityTracer.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/basicsim/EntityTracer.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/basicsim/ErrorException.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/basicsim/ErrorException.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/basicsim/EventRecorder.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/basicsim/EventRecorder.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/basicsim/EventTraceRecord.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/basicsim/EventTraceRecord.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/basicsim/EventTracer.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/basicsim/EventTracer.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/basicsim/FileEntity.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/basicsim/FileEntity.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/basicsim/Group.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/basicsim/Group.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/basicsim/InitModelTarget.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/basicsim/InitModelTarget.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/basicsim/InstanceIterable.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/basicsim/InstanceIterable.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/basicsim/ObjectType.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/basicsim/ObjectType.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/basicsim/OutputMethod.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/basicsim/OutputMethod.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/basicsim/PauseModelTarget.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/basicsim/PauseModelTarget.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/basicsim/ReflectionTarget.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/basicsim/ReflectionTarget.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/basicsim/ScriptEntity.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/basicsim/ScriptEntity.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/basicsim/Simulation.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/basicsim/Simulation.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/basicsim/StartUpTarget.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/basicsim/StartUpTarget.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/collada/ColException.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/collada/ColException.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/collada/ColParser.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/collada/ColParser.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/controllers/CameraControl.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/controllers/CameraControl.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/controllers/RateLimiter.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/controllers/RateLimiter.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/controllers/RenderManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/controllers/RenderManager.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/controllers/VideoRecorder.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/controllers/VideoRecorder.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/datatypes/BooleanVector.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/datatypes/BooleanVector.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/datatypes/DoubleTable.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/datatypes/DoubleTable.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/datatypes/DoubleVector.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/datatypes/DoubleVector.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/datatypes/IntegerVector.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/datatypes/IntegerVector.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/datatypes/TVV.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/datatypes/TVV.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/events/BaseEvent.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/events/BaseEvent.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/events/Conditional.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/events/Conditional.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/events/ConditionalEvent.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/events/ConditionalEvent.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/events/Event.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/events/Event.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/events/EventErrorListener.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/events/EventErrorListener.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/events/EventHandle.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/events/EventHandle.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/events/EventManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/events/EventManager.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/events/EventNode.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/events/EventNode.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/events/EventTimeListener.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/events/EventTimeListener.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/events/EventTraceListener.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/events/EventTraceListener.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/events/EventTree.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/events/EventTree.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/events/NoopListener.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/events/NoopListener.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/events/Process.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/events/Process.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/events/ProcessError.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/events/ProcessError.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/events/ProcessTarget.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/events/ProcessTarget.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/events/ThreadKilledException.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/events/ThreadKilledException.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/events/WaitTarget.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/events/WaitTarget.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/font/BillboardString.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/font/BillboardString.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/font/OverlayString.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/font/OverlayString.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/font/TessChar.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/font/TessChar.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/font/TessFont.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/font/TessFont.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/font/TessString.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/font/TessString.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/ActionListInput.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/ActionListInput.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/AssignmentListInput.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/AssignmentListInput.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/AttributeDefinitionListInput.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/AttributeDefinitionListInput.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/AttributeHandle.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/AttributeHandle.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/BooleanInput.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/BooleanInput.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/BooleanListInput.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/BooleanListInput.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/ClassInput.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/ClassInput.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/ColorListInput.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/ColorListInput.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/ColourInput.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/ColourInput.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/DeprecatedInput.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/DeprecatedInput.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/DirInput.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/DirInput.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/EntityInput.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/EntityInput.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/EntityListInput.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/EntityListInput.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/EntityListListInput.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/EntityListListInput.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/EnumInput.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/EnumInput.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/ExpError.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/ExpError.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/ExpEvaluator.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/ExpEvaluator.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/ExpParser.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/ExpParser.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/ExpResult.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/ExpResult.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/ExpTokenizer.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/ExpTokenizer.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/ExpValidator.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/ExpressionInput.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/ExpressionInput.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/FileInput.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/FileInput.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/FormatInput.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/FormatInput.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/ImageInput.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/ImageInput.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/Input.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/Input.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/InputAgent.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/InputAgent.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/InputErrorException.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/InputErrorException.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/IntegerInput.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/IntegerInput.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/IntegerListInput.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/IntegerListInput.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/InterfaceEntityListInput.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/InterfaceEntityListInput.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/KeyInput.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/KeyInput.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/KeyListInput.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/KeyListInput.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/KeyedCurve.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/KeyedCurve.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/KeyedVec3dCurve.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/KeyedVec3dCurve.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/KeyedVec3dInput.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/KeyedVec3dInput.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/Keyword.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/Keyword.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/KeywordIndex.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/KeywordIndex.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/KeywordInput.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/KeywordInput.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/ListInput.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/ListInput.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/OneOrTwoKeyInput.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/OneOrTwoKeyInput.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/OneOrTwoKeyListInput.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/OneOrTwoKeyListInput.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/Output.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/Output.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/OutputChain.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/OutputChain.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/OutputHandle.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/OutputHandle.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/ParseContext.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/ParseContext.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/Parser.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/Parser.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/RelativeEntityInput.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/RelativeEntityInput.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/RunNumberInput.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/RunNumberInput.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/StringChoiceInput.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/StringChoiceInput.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/StringInput.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/StringInput.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/StringKeyInput.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/StringKeyInput.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/StringListInput.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/StringListInput.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/SynonymInput.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/SynonymInput.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/TimeSeriesDataInput.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/TimeSeriesDataInput.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/TimeSeriesInput.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/TimeSeriesInput.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/TwoKeyInput.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/TwoKeyInput.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/TwoKeyListInput.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/TwoKeyListInput.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/TwoOrThreeKeyInput.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/TwoOrThreeKeyInput.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/UnitTypeInput.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/UnitTypeInput.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/UnitTypeListInput.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/UnitTypeListInput.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/ValueInput.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/ValueInput.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/ValueListInput.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/ValueListInput.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/Vec3dInput.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/Vec3dInput.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/Vec3dListInput.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/input/Vec3dListInput.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/math/AABB.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/math/AABB.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/math/Color4d.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/math/Color4d.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/math/Constants.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/math/ConvexHull.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/math/ConvexHull.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/math/Gamma.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/math/Gamma.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/math/Mat4d.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/math/Mat4d.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/math/MathUtils.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/math/MathUtils.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/math/Plane.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/math/Plane.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/math/Quaternion.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/math/Quaternion.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/math/Ray.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/math/Ray.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/math/Sphere.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/math/Sphere.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/math/Transform.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/math/Transform.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/math/Vec2d.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/math/Vec2d.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/math/Vec2dInterner.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/math/Vec2dInterner.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/math/Vec3d.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/math/Vec3d.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/math/Vec3dInterner.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/math/Vec3dInterner.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/math/Vec4d.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/math/Vec4d.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/math/Vec4dInterner.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/math/Vec4dInterner.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/Action.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/Action.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/AnimCurve.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/AnimCurve.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/Armature.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/Armature.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/BillboardStringProxy.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/BillboardStringProxy.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/Camera.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/Camera.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/CameraInfo.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/CameraInfo.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/DebugLine.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/DebugLine.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/DebugPoints.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/DebugPoints.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/DebugUtils.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/DebugUtils.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/DisplayModelBinding.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/DisplayModelBinding.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/Future.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/Future.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/HullProto.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/HullProto.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/ImageProxy.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/ImageProxy.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/LineProxy.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/LineProxy.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/Mesh.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/Mesh.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/MeshDataCache.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/MeshDataCache.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/MeshProto.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/MeshProto.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/MeshProtoKey.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/MeshProtoKey.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/MeshProxy.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/MeshProxy.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/MouseHandler.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/MouseHandler.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/OffscreenTarget.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/OffscreenTarget.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/OverlayRenderable.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/OverlayRenderable.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/OverlayStringProxy.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/OverlayStringProxy.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/OverlayTexture.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/OverlayTexture.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/OverlayTextureProxy.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/OverlayTextureProxy.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/PointProxy.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/PointProxy.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/Polygon.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/Polygon.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/PolygonProxy.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/PolygonProxy.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/PreviewCache.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/PreviewCache.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/RenderException.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/RenderException.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/RenderFrame.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/RenderFrame.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/RenderProxy.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/RenderProxy.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/RenderUtils.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/RenderUtils.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/RenderWindow.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/RenderWindow.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/Renderable.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/Renderable.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/Renderer.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/Renderer.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/S3TexCompressor.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/S3TexCompressor.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/Shader.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/Shader.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/Skybox.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/Skybox.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/StringProxy.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/StringProxy.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/TessFontKey.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/TessFontKey.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/TexCache.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/TexCache.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/TextureView.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/TextureView.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/VisibilityInfo.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/VisibilityInfo.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/WindowInteractionListener.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/WindowInteractionListener.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/util/ExceptionLogger.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/render/util/ExceptionLogger.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/rng/MRG1999a.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/rng/MRG1999a.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/states/DowntimeUser.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/states/DowntimeUser.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/states/StateEntity.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/states/StateEntity.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/states/StateEntityListener.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/states/StateEntityListener.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/states/StateRecord.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/states/StateRecord.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/ui/AboutBox.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/ui/AboutBox.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/ui/DefaultCellRenderer.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/ui/DefaultCellRenderer.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/ui/DisplayEntityFactory.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/ui/DisplayEntityFactory.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/ui/EditBox.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/ui/EditBox.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/ui/EditBoxColumnRenderer.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/ui/EditBoxColumnRenderer.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/ui/EntityPallet.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/ui/EntityPallet.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/ui/FrameBox.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/ui/FrameBox.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/ui/GUIFrame.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/ui/GUIFrame.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/ui/GraphicBox.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/ui/GraphicBox.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/ui/LogBox.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/ui/LogBox.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/ui/MenuItem.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/ui/MenuItemEntity.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/ui/ObjectSelector.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/ui/ObjectSelector.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/ui/OutputBox.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/ui/OutputBox.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/ui/PropertyBox.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/ui/PropertyBox.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/ui/RoundToggleButton.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/ui/RoundToggleButton.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/ui/VideoRecorderEntity.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/ui/VideoRecorderEntity.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/ui/View.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/ui/View.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/units/AccelerationUnit.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/units/AccelerationUnit.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/units/AngleUnit.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/units/AngleUnit.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/units/AngularSpeedUnit.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/units/AngularSpeedUnit.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/units/AreaUnit.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/units/AreaUnit.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/units/CostRateUnit.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/units/CostRateUnit.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/units/CostUnit.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/units/CostUnit.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/units/DensityUnit.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/units/DensityUnit.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/units/DimensionlessUnit.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/units/DimensionlessUnit.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/units/DistanceUnit.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/units/DistanceUnit.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/units/EnergyDensityUnit.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/units/EnergyDensityUnit.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/units/EnergyUnit.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/units/EnergyUnit.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/units/LinearDensityUnit.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/units/LinearDensityUnit.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/units/LinearDensityVolumeUnit.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/units/LinearDensityVolumeUnit.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/units/MassFlowUnit.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/units/MassFlowUnit.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/units/MassUnit.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/units/MassUnit.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/units/PowerUnit.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/units/PowerUnit.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/units/PressureUnit.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/units/PressureUnit.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/units/RateUnit.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/units/RateUnit.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/units/SIUnitFactorInput.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/units/SIUnitFactorInput.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/units/SpecificEnergyUnit.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/units/SpecificEnergyUnit.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/units/SpeedUnit.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/units/SpeedUnit.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/units/TimeUnit.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/units/TimeUnit.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/units/Unit.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/units/Unit.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/units/UserSpecifiedUnit.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/units/UserSpecifiedUnit.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/units/ViscosityUnit.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/units/ViscosityUnit.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/units/VolumeFlowUnit.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/units/VolumeFlowUnit.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/units/VolumeUnit.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/units/VolumeUnit.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/video/AviTester.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/video/AviTester.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/video/AviWriter.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/video/AviWriter.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/video/vp8/BoolDecoder.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/video/vp8/BoolDecoder.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/video/vp8/BoolEncoder.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/video/vp8/BoolEncoder.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/video/vp8/Decoder.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/video/vp8/Decoder.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/video/vp8/DecoderTester.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/video/vp8/DecoderTester.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/video/vp8/Defs.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/video/vp8/Defs.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/video/vp8/Encoder.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/video/vp8/Encoder.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/video/vp8/EncoderTester.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/video/vp8/EncoderTester.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/video/vp8/Pred.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/video/vp8/Pred.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/video/vp8/TokenProbs.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/video/vp8/TokenProbs.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/video/vp8/Transform.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/video/vp8/Transform.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/video/vp8/Util.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/video/vp8/Util.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/video/vp8/VP8Exception.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/video/vp8/VP8Exception.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/video/vp8/YUVImage.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/video/vp8/YUVImage.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/xml/XmlNode.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/xml/XmlNode.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/xml/XmlParser.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/xml/XmlParser.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/resources/images/icon.png" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/resources/images/icon.png" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/resources/inputs/autoload.cfg" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/resources/inputs/autoload.cfg" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/resources/inputs/basicObjects.inc" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/resources/inputs/basicObjects.inc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/resources/inputs/calculationObjects.inc" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/resources/inputs/calculationObjects.inc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/resources/inputs/default.cfg" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/resources/inputs/default.cfg" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/resources/inputs/displayModels.inc" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/resources/inputs/displayModels.inc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/resources/inputs/fluidObjects.inc" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/resources/inputs/fluidObjects.inc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/resources/inputs/graphics.inc" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/resources/inputs/graphics.inc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/resources/inputs/probabilityDistributions.inc" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/resources/inputs/probabilityDistributions.inc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/resources/inputs/processFlow.inc" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/resources/inputs/processFlow.inc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/resources/inputs/sim.inc" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/resources/inputs/sim.inc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/resources/inputs/units-imperial.inc" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/resources/inputs/units-imperial.inc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/resources/inputs/units-knots.inc" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/resources/inputs/units-knots.inc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/resources/inputs/units.inc" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/resources/inputs/units.inc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/resources/shaders/debug.frag" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/resources/shaders/debug.frag" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/resources/shaders/debug.vert" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/resources/shaders/debug.vert" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/resources/shaders/flat.frag" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/resources/shaders/flat.frag" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/resources/shaders/flat.vert" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/resources/shaders/flat.vert" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/resources/shaders/font.frag" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/resources/shaders/font.frag" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/resources/shaders/font.vert" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/resources/shaders/font.vert" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/resources/shaders/hull.frag" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/resources/shaders/hull.frag" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/resources/shaders/hull.vert" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/resources/shaders/hull.vert" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/resources/shaders/overlay-flat.frag" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/resources/shaders/overlay-flat.frag" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/resources/shaders/overlay-flat.vert" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/resources/shaders/overlay-flat.vert" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/resources/shaders/overlay-font.frag" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/resources/shaders/overlay-font.frag" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/resources/shaders/overlay-font.vert" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/resources/shaders/overlay-font.vert" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/resources/shaders/skybox.frag" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/resources/shaders/skybox.frag" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/resources/shaders/skybox.vert" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/resources/shaders/skybox.vert" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/resources/shaders_core/debug.frag" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/resources/shaders_core/debug.frag" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/resources/shaders_core/debug.vert" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/resources/shaders_core/debug.vert" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/resources/shaders_core/flat.frag" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/resources/shaders_core/flat.frag" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/resources/shaders_core/flat.vert" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/resources/shaders_core/flat.vert" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/resources/shaders_core/font.frag" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/resources/shaders_core/font.frag" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/resources/shaders_core/font.vert" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/resources/shaders_core/font.vert" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/resources/shaders_core/hull.frag" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/resources/shaders_core/hull.frag" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/resources/shaders_core/hull.vert" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/resources/shaders_core/hull.vert" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/resources/shaders_core/overlay-flat.frag" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/resources/shaders_core/overlay-flat.frag" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/resources/shaders_core/overlay-flat.vert" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/resources/shaders_core/overlay-flat.vert" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/resources/shaders_core/overlay-font.frag" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/resources/shaders_core/overlay-font.frag" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/resources/shaders_core/overlay-font.vert" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/resources/shaders_core/overlay-font.vert" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/resources/shaders_core/skybox.frag" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/resources/shaders_core/skybox.frag" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/resources/shaders_core/skybox.vert" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/resources/shaders_core/skybox.vert" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/resources/shapes/CrossHairs.dae" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/resources/shapes/CrossHairs.dae" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/resources/shapes/Sphere.dae" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/resources/shapes/Sphere.dae" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/resources/shapes/axis_text.dae" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/resources/shapes/axis_text.dae" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/resources/shapes/bad-mesh.jsm" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/resources/shapes/bad-mesh.jsm" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/resources/shapes/cube.dae" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/resources/shapes/cube.dae" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/resources/shapes/grid100x100.dae" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/resources/shapes/grid100x100.dae" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/resources/shapes/grid10x10.dae" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/resources/shapes/grid10x10.dae" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/java/com/jaamsim/AllTests.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/com/jaamsim/AllTests.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/java/com/jaamsim/MeshFiles/TestDataBlocks.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/com/jaamsim/MeshFiles/TestDataBlocks.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/java/com/jaamsim/MeshFiles/TestVertexMap.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/com/jaamsim/MeshFiles/TestVertexMap.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/java/com/jaamsim/events/TestEventManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/com/jaamsim/events/TestEventManager.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/java/com/jaamsim/events/TestEventTree.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/com/jaamsim/events/TestEventTree.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/java/com/jaamsim/events/TestFrameworkHelpers.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/com/jaamsim/events/TestFrameworkHelpers.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/java/com/jaamsim/events/TestSchedEvent.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/com/jaamsim/events/TestSchedEvent.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/java/com/jaamsim/input/TestExpParser.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/com/jaamsim/input/TestExpParser.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/java/com/jaamsim/input/TestKeyedVec3dCurve.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/com/jaamsim/input/TestKeyedVec3dCurve.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/java/com/jaamsim/input/TestOutput.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/com/jaamsim/input/TestOutput.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/java/com/jaamsim/input/TestParser.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/com/jaamsim/input/TestParser.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/java/com/jaamsim/math/TestAABB.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/com/jaamsim/math/TestAABB.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/java/com/jaamsim/math/TestConvex.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/com/jaamsim/math/TestConvex.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/java/com/jaamsim/math/TestInterners.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/com/jaamsim/math/TestInterners.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/java/com/jaamsim/math/TestMat4d.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/com/jaamsim/math/TestMat4d.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/java/com/jaamsim/math/TestPlane.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/com/jaamsim/math/TestPlane.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/java/com/jaamsim/math/TestQuaternion.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/com/jaamsim/math/TestQuaternion.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/java/com/jaamsim/math/TestRay.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/com/jaamsim/math/TestRay.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/java/com/jaamsim/math/TestSphere.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/com/jaamsim/math/TestSphere.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/java/com/jaamsim/math/TestTransform.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/com/jaamsim/math/TestTransform.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/java/com/jaamsim/math/TestVec.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/com/jaamsim/math/TestVec.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/java/com/jaamsim/math/TestVec2d.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/com/jaamsim/math/TestVec2d.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/java/com/jaamsim/math/TestVec3d.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/com/jaamsim/math/TestVec3d.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/java/com/jaamsim/math/TestVec4d.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/com/jaamsim/math/TestVec4d.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/java/com/jaamsim/probability/TestBetaDistribution.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/com/jaamsim/probability/TestBetaDistribution.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/java/com/jaamsim/probability/TestBooleanSelector.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/com/jaamsim/probability/TestBooleanSelector.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/java/com/jaamsim/probability/TestContinuousDistribution.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/com/jaamsim/probability/TestContinuousDistribution.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/java/com/jaamsim/probability/TestDiscreteDistribution.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/com/jaamsim/probability/TestDiscreteDistribution.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/java/com/jaamsim/probability/TestEntitlementSelector.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/com/jaamsim/probability/TestEntitlementSelector.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/java/com/jaamsim/probability/TestErlangDistribution.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/com/jaamsim/probability/TestErlangDistribution.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/java/com/jaamsim/probability/TestExponentialDistribution.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/com/jaamsim/probability/TestExponentialDistribution.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/java/com/jaamsim/probability/TestGammaDistribution.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/com/jaamsim/probability/TestGammaDistribution.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/java/com/jaamsim/probability/TestLogLogisticDistribution.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/com/jaamsim/probability/TestLogLogisticDistribution.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/java/com/jaamsim/probability/TestLogNormalDistribution.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/com/jaamsim/probability/TestLogNormalDistribution.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/java/com/jaamsim/probability/TestNormalDistribution.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/com/jaamsim/probability/TestNormalDistribution.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/java/com/jaamsim/probability/TestTriangularDistribution.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/com/jaamsim/probability/TestTriangularDistribution.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/java/com/jaamsim/probability/TestUniformDistribution.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/com/jaamsim/probability/TestUniformDistribution.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/java/com/jaamsim/probability/TestWeibullDistribution.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/com/jaamsim/probability/TestWeibullDistribution.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/java/com/jaamsim/rng/TestMRG1999a.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/com/jaamsim/rng/TestMRG1999a.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/java/com/jaamsim/video/vp8/TestBoolEncoder.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/com/jaamsim/video/vp8/TestBoolEncoder.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/java/com/jaamsim/video/vp8/TestTransforms.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/com/jaamsim/video/vp8/TestTransforms.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/java/com/jaamsim/video/vp8/TestYUV.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/com/jaamsim/video/vp8/TestYUV.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -524,6 +44,7 @@
     </option>
   </component>
   <component name="ProjectId" id="1lY2riuy2Jg895oPagCyojVXAO6" />
+  <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
@@ -537,7 +58,7 @@
     <property name="project.structure.last.edited" value="Libraries" />
     <property name="project.structure.proportion" value="0.15" />
     <property name="project.structure.side.proportion" value="0.2" />
-    <property name="settings.editor.selected.configurable" value="MavenSettings" />
+    <property name="settings.editor.selected.configurable" value="preferences.pluginManager" />
   </component>
   <component name="RunManager" selected="Application.GUIFrame">
     <configuration name="GUIFrame" type="Application" factoryName="Application" temporary="true" nameIsGenerated="true">
@@ -549,17 +70,6 @@
           <option name="ENABLED" value="true" />
         </pattern>
       </extension>
-      <method v="2">
-        <option name="Make" enabled="true" />
-      </method>
-    </configuration>
-    <configuration default="true" type="ArquillianJUnit" factoryName="" nameIsGenerated="true">
-      <option name="arquillianRunConfiguration">
-        <value>
-          <option name="containerStateName" value="" />
-        </value>
-      </option>
-      <option name="TEST_OBJECT" value="class" />
       <method v="2">
         <option name="Make" enabled="true" />
       </method>
@@ -606,7 +116,11 @@
       <workItem from="1607945933297" duration="258000" />
       <workItem from="1608562043233" duration="391000" />
       <workItem from="1608564160528" duration="96000" />
-      <workItem from="1608600488650" duration="2495000" />
+      <workItem from="1608600488650" duration="18744000" />
+      <workItem from="1608686476839" duration="709000" />
+      <workItem from="1608702883365" duration="2147000" />
+      <workItem from="1608705488184" duration="17194000" />
+      <workItem from="1608774870897" duration="9463000" />
     </task>
     <servers />
   </component>
@@ -628,27 +142,54 @@
   <component name="XDebuggerManager">
     <breakpoint-manager>
       <breakpoints>
-        <line-breakpoint enabled="true" type="java-line">
+        <line-breakpoint type="java-line">
           <url>file://$PROJECT_DIR$/src/main/java/com/jaamsim/ProcessFlow/EntityGenerator.java</url>
           <line>133</line>
           <option name="timeStamp" value="25" />
         </line-breakpoint>
-        <line-breakpoint enabled="true" type="java-line">
-          <url>file://$PROJECT_DIR$/src/main/java/com/jaamsim/basicsim/Entity.java</url>
-          <line>230</line>
-          <option name="timeStamp" value="28" />
+        <line-breakpoint type="java-line">
+          <url>file://$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/EntityGenerator.java</url>
+          <line>163</line>
+          <option name="timeStamp" value="31" />
         </line-breakpoint>
-        <line-breakpoint enabled="true" type="java-line">
-          <url>file://$PROJECT_DIR$/src/main/java/com/jaamsim/basicsim/Entity.java</url>
-          <line>231</line>
-          <option name="timeStamp" value="29" />
+        <line-breakpoint enabled="true" suspend="THREAD" type="java-line">
+          <condition expression="resolved.toString().equals(&quot;file:/C:/Users/zhanyeye/IdeaProjects/Read-JaamSim/model/mode-1.cfg&quot;)" language="JAVA" />
+          <url>file://$PROJECT_DIR$/src/main/java/com/jaamsim/input/InputAgent.java</url>
+          <line>372</line>
+          <option name="timeStamp" value="43" />
         </line-breakpoint>
-        <line-breakpoint enabled="true" type="java-line">
-          <url>file://$PROJECT_DIR$/src/main/java/com/jaamsim/basicsim/Entity.java</url>
-          <line>232</line>
-          <option name="timeStamp" value="30" />
+        <line-breakpoint enabled="true" suspend="THREAD" type="java-line">
+          <condition expression="resolved.toString().equals(&quot;file:/C:/Users/zhanyeye/IdeaProjects/Read-JaamSim/model/mode-1.cfg&quot;)" language="JAVA" />
+          <url>file://$PROJECT_DIR$/src/main/java/com/jaamsim/input/InputAgent.java</url>
+          <line>397</line>
+          <option name="timeStamp" value="49" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="java-line">
+          <url>file://$PROJECT_DIR$/src/main/java/com/jaamsim/BasicObjects/LinkedService.java</url>
+          <line>261</line>
+          <option name="timeStamp" value="52" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="java-line">
+          <url>file://$PROJECT_DIR$/src/main/java/com/jaamsim/events/EventManager.java</url>
+          <line>174</line>
+          <option name="timeStamp" value="53" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="java-line">
+          <url>file://$PROJECT_DIR$/src/main/java/com/jaamsim/events/EventManager.java</url>
+          <line>247</line>
+          <option name="timeStamp" value="54" />
         </line-breakpoint>
       </breakpoints>
+      <breakpoints-defaults>
+        <breakpoint suspend="THREAD" type="java-line" />
+      </breakpoints-defaults>
     </breakpoint-manager>
+    <watches-manager>
+      <configuration name="Application">
+        <watch expression="Entity.allInstances" language="JAVA" />
+        <watch expression="ent" language="JAVA" />
+        <watch expression="words.get(0).input" />
+      </configuration>
+    </watches-manager>
   </component>
 </project>

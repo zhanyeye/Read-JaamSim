@@ -66,10 +66,10 @@ public class Entity {
 	//public static final int FLAG_TRACESTATE = 0x04;
 	public static final int FLAG_LOCKED = 0x08;
 	//public static final int FLAG_TRACKEVENTS = 0x10;
-	public static final int FLAG_ADDED = 0x20;
-	public static final int FLAG_EDITED = 0x40;
-	public static final int FLAG_GENERATED = 0x80;
-	public static final int FLAG_DEAD = 0x0100;
+	public static final int FLAG_ADDED = 0x20;      // 0010 0000
+	public static final int FLAG_EDITED = 0x40;     // 0100 0000
+	public static final int FLAG_GENERATED = 0x80;  // 1000 0000
+	public static final int FLAG_DEAD = 0x0100;     // 0001 0000 0000
 	private int flags;
 	protected boolean traceFlag = false;
 
