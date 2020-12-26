@@ -65,6 +65,9 @@ import com.jaamsim.units.UserSpecifiedUnit;
 public class Simulation extends Entity {
 
 	// Key Inputs tab
+	/**
+	 * 将记录所有统计信息的模拟运行的持续时间
+	 */
 	@Keyword(description = "The duration of the simulation run in which all statistics will be recorded.",
 	             example = "Simulation Duration { 8760 h }")
 	private static final ValueInput runDuration;

@@ -24,8 +24,9 @@
   <component name="ChangeListManager">
     <list default="true" id="458000ff-867a-409a-bdcc-9abc93260f06" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/model/mode-1.cfg" beforeDir="false" afterPath="$PROJECT_DIR$/model/mode-1.cfg" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/basicsim/Entity.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/basicsim/Entity.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/model/mode-3.cfg" beforeDir="false" afterPath="$PROJECT_DIR$/model/mode-3.cfg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/model/mode-3.log" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/com/jaamsim/basicsim/Simulation.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/jaamsim/basicsim/Simulation.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -121,6 +122,10 @@
       <workItem from="1608702883365" duration="2147000" />
       <workItem from="1608705488184" duration="17194000" />
       <workItem from="1608774870897" duration="9463000" />
+      <workItem from="1608791177306" duration="4838000" />
+      <workItem from="1608806714223" duration="3391000" />
+      <workItem from="1608860993975" duration="48000" />
+      <workItem from="1608862495521" duration="4644000" />
     </task>
     <servers />
   </component>
@@ -172,12 +177,12 @@
         <line-breakpoint enabled="true" suspend="THREAD" type="java-line">
           <url>file://$PROJECT_DIR$/src/main/java/com/jaamsim/events/EventManager.java</url>
           <line>174</line>
-          <option name="timeStamp" value="53" />
+          <option name="timeStamp" value="55" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="java-line">
           <url>file://$PROJECT_DIR$/src/main/java/com/jaamsim/events/EventManager.java</url>
           <line>247</line>
-          <option name="timeStamp" value="54" />
+          <option name="timeStamp" value="56" />
         </line-breakpoint>
       </breakpoints>
       <breakpoints-defaults>
@@ -187,8 +192,7 @@
     <watches-manager>
       <configuration name="Application">
         <watch expression="Entity.allInstances" language="JAVA" />
-        <watch expression="ent" language="JAVA" />
-        <watch expression="words.get(0).input" />
+        <watch expression="this.currentTick" language="JAVA" />
       </configuration>
     </watches-manager>
   </component>
